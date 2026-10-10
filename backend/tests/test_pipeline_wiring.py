@@ -74,7 +74,9 @@ def test_document_ingestion_budget_preserves_existing_workflow_replay(
 
     monkeypatch.setattr(module.workflow, "execute_activity", checked)
     monkeypatch.setattr(
-        module.workflow, "patched", lambda name: name != "pdf-checkpoints-v2" or extended
+        module.workflow,
+        "patched",
+        lambda name: name != "pdf-checkpoints-v2" or extended,
     )
     asyncio.run(module.AnalysisWorkflow().run(analysis_manifest()))
     assert timeouts == [timedelta(hours=4 if extended else 1)] * 2

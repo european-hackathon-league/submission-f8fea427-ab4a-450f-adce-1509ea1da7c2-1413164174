@@ -1,0 +1,12 @@
+{
+  "builder": {"provider_instance_id": "codex", "model_id": "gpt-6.1-sol"},
+  "stories": [
+    {"story": "S1", "work_packages": ["BE-01", "BE-02", "BE-03", "BE-04"], "status": "in_progress", "branch": "be/S1-foundation", "pr_url": null, "tested_commit": null, "tests": [], "merge_sha": null, "blocker": null},
+    {"story": "S2", "work_packages": ["BE-05", "BE-06", "BE-07"], "status": "not_started", "branch": "be/S2-ingestion", "pr_url": null, "tested_commit": null, "tests": [], "merge_sha": null, "blocker": null},
+    {"story": "S3", "work_packages": ["BE-08", "BE-09"], "status": "not_started", "branch": "be/S3-findings", "pr_url": null, "tested_commit": null, "tests": [], "merge_sha": null, "blocker": null},
+    {"story": "S4", "work_packages": ["BE-10", "BE-11", "BE-12"], "status": "not_started", "branch": "be/S4-proposals", "pr_url": null, "tested_commit": null, "tests": [], "merge_sha": null, "blocker": null},
+    {"story": "S5", "work_packages": ["BE-13", "BE-14", "BE-15"], "status": "not_started", "branch": "be/S5-control", "pr_url": null, "tested_commit": null, "tests": [], "merge_sha": null, "blocker": null},
+    {"story": "S6", "work_packages": ["BE-16"], "status": "not_started", "branch": "be/S6-handoff", "pr_url": null, "tested_commit": null, "tests": [], "merge_sha": null, "blocker": null}
+  ],
+  "live_integrations": {"ai_connectivity": {"status": "verified", "model": "gpt-6.1-sol", "input_tokens": 21, "output_tokens": 5}, "ai_structured_extraction": "not_verified", "search": "not_verified", "oidc": "unconfigured", "s3": "unconfigured", "hosted_temporal": "unconfigured", "renderer": "unconfigured", "otlp": "unconfigured"}
+}

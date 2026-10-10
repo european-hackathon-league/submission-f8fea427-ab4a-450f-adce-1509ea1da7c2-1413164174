@@ -4,6 +4,7 @@ from uuid import uuid4
 
 from fastapi import (
     APIRouter,
+    Depends,
     FastAPI,
     File,
     Header,
@@ -15,9 +16,11 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
 from app import wire as w
+from app.auth import Actor, actor
 from app.config import Settings
 
 app = FastAPI(title="Vehicle requirements backend", version="1")
@@ -25,7 +28,12 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=Settings().cors_origins,
     allow_methods=["GET", "POST"],
-    allow_headers=["Authorization", "Idempotency-Key", "Last-Event-ID"],
+    allow_headers=[
+        "Authorization",
+        "X-Workspace-ID",
+        "Idempotency-Key",
+        "Last-Event-ID",
+    ],
     expose_headers=["X-Request-ID"],
 )
 
@@ -40,8 +48,8 @@ async def request_id(
     return response
 
 
-@app.exception_handler(HTTPException)
-async def http_error(request: Request, error: HTTPException) -> JSONResponse:
+@app.exception_handler(StarletteHTTPException)
+async def http_error(request: Request, error: StarletteHTTPException) -> JSONResponse:
     body = (
         error.detail
         if isinstance(error.detail, dict)
@@ -75,9 +83,11 @@ def health() -> dict[str, str]:
 
 router = APIRouter(
     prefix="/api/v1",
+    dependencies=[Depends(actor)],
     responses={code: {"model": w.Error} for code in (401, 403, 404, 409, 422, 501)},
 )
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
+Auth = Annotated[Actor, Depends(actor)]
 Limit = Annotated[int, Query(ge=1, le=100)]
 
 

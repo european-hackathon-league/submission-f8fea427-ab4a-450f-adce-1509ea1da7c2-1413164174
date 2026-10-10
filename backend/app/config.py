@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     temporal_address: str = "localhost:7233"
     temporal_namespace: str = "default"
     storage_path: Path = Path(".local/objects")
+    storage_backend: Literal["local", "s3"] = "local"
+    s3_bucket: str = ""
+    otlp_endpoint: str = ""
     openai_api_key: SecretStr = SecretStr("")
     openai_base_url: str = "https://api.openai.com/v1"
     app_model: str = "gpt-6.1-sol"
@@ -34,6 +37,9 @@ class Settings(BaseSettings):
     max_archive_bytes: int = 256 * 1024 * 1024
     max_pdf_pages: int = 500
     event_retention: int = 10000
+    catalog_path: Path = (
+        Path(__file__).resolve().parents[2] / "contracts/catalog.example.json"
+    )
 
     @model_validator(mode="after")
     def validate_runtime(self) -> Self:
@@ -43,4 +49,6 @@ class Settings(BaseSettings):
             (self.oidc_issuer, self.oidc_audience, self.oidc_jwks_url)
         ):
             raise ValueError("OIDC issuer, audience and JWKS URL are required")
+        if self.storage_backend == "s3" and not self.s3_bucket:
+            raise ValueError("S3 bucket is required")
         return self

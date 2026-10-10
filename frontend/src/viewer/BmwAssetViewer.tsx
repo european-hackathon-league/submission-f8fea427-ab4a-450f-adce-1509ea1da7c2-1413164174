@@ -20,6 +20,7 @@ type SketchfabApi={
   addEventListener:(event:string,callback:(value:any)=>void,options?:Record<string,unknown>)=>void;
   getCameraLookAt:(callback:(error:unknown,camera:CameraState)=>void)=>void;
   setCameraLookAt:(position:number[],target:number[],duration?:number,callback?:(error:unknown)=>void)=>void;
+  setBackground:(options:{color:number[]},callback?:()=>void)=>void;
   recenterCamera:(callback?:(error:unknown)=>void)=>void;
   getNodeMap:(callback:(error:unknown,nodes:SketchfabNodePayload)=>void)=>void;
 };
@@ -61,6 +62,27 @@ export function normalizeSketchfabNodeMap(payload:SketchfabNodePayload):Sketchfa
   });
 }
 
+const wideCameraAspect=16/9;
+function cameraAspectScale(aspect:number):number{
+  if(!Number.isFinite(aspect)||aspect<=0)return 1;
+  return Math.min(1.8,Math.max(1,wideCameraAspect/aspect));
+}
+
+export function frameCameraForAspect(camera:CameraState,aspect:number):CameraState{
+  const scale=cameraAspectScale(aspect);
+  return {
+    target:[...camera.target],
+    position:camera.position.map((coordinate,index)=>camera.target[index]+(coordinate-camera.target[index])*scale),
+  };
+}
+
+function elementAspect(element:HTMLIFrameElement):number{
+  const rect=element.getBoundingClientRect();
+  const width=rect.width||element.clientWidth;
+  const height=rect.height||element.clientHeight;
+  return width>0&&height>0?width/height:0;
+}
+
 function reducedMotion():boolean{
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false;
 }
@@ -96,6 +118,28 @@ function useSketchfabViewer(
     setSceneReady(false);
     let disposed=false;
     let viewerIsReady=false;
+    let lastAspect=elementAspect(iframe);
+    const adjustToAspect=(nextAspect:number)=>{
+      if(disposed||!Number.isFinite(nextAspect)||nextAspect<=0)return;
+      if(!viewerIsReady){lastAspect=nextAspect;return;}
+      const previousAspect=lastAspect||nextAspect;
+      lastAspect=nextAspect;
+      if(!initialCameraRef.current)return;
+      const distanceScale=cameraAspectScale(nextAspect)/cameraAspectScale(previousAspect);
+      if(Math.abs(distanceScale-1)<0.035)return;
+      apiRef.current?.getCameraLookAt((error,camera)=>{
+        if(error||disposed)return;
+        const position=camera.position.map((coordinate,index)=>camera.target[index]+(coordinate-camera.target[index])*distanceScale);
+        apiRef.current?.setCameraLookAt(position,camera.target,reducedMotion()?0:.2);
+      });
+    };
+    const resizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(entries=>{
+      const rect=entries[0]?.contentRect;
+      if(rect)adjustToAspect(rect.width/rect.height);
+    }):null;
+    const resizeHandler=()=>adjustToAspect(elementAspect(iframe));
+    if(resizeObserver)resizeObserver.observe(iframe);
+    else window.addEventListener('resize',resizeHandler);
     const loadTimeout=window.setTimeout(()=>{if(!disposed&&!viewerIsReady)callbacksRef.current.onFailure();},20000);
     void loadSketchfabApi().then(()=>{
       if(disposed||!iframe||!window.Sketchfab)return;
@@ -113,9 +157,19 @@ function useSketchfabViewer(
             if(disposed)return;
             window.clearTimeout(loadTimeout);
             viewerIsReady=true;
+            api.setBackground({color:[0.15,0.16,0.18]});
             setSceneReady(true);
             callbacksRef.current.onReady();
-            api.getCameraLookAt((error,camera)=>{if(!error&&!disposed)initialCameraRef.current=camera;});
+            api.getCameraLookAt((error,camera)=>{
+              if(error||disposed)return;
+              initialCameraRef.current=camera;
+              const aspect=elementAspect(iframe)||lastAspect;
+              if(aspect>0){
+                lastAspect=aspect;
+                const framed=frameCameraForAspect(camera,aspect);
+                if(cameraAspectScale(aspect)!==1)api.setCameraLookAt(framed.position,framed.target,reducedMotion()?0:.2);
+              }
+            });
             api.getNodeMap((error,payload)=>{
               if(error||disposed)return;
               const nodes=normalizeSketchfabNodeMap(payload);
@@ -138,6 +192,8 @@ function useSketchfabViewer(
     return ()=>{
       disposed=true;
       window.clearTimeout(loadTimeout);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize',resizeHandler);
       apiRef.current?.stop();
       apiRef.current=null;
     };
@@ -147,10 +203,13 @@ function useSketchfabViewer(
     const api=apiRef.current;
     if(!api)return false;
     const camera=initialCameraRef.current;
-    if(camera)api.setCameraLookAt(camera.position,camera.target,reducedMotion()?0:.45);
+    if(camera){
+      const framed=frameCameraForAspect(camera,iframe?elementAspect(iframe):0);
+      api.setCameraLookAt(framed.position,framed.target,reducedMotion()?0:.45);
+    }
     else api.recenterCamera();
     return true;
-  },[]);
+  },[iframe]);
 
   const zoom=useCallback((direction:-1|1)=>{
     const api=apiRef.current;
@@ -190,7 +249,9 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
   const [retryVersion,setRetryVersion]=useState(0);
   const reportReady=useCallback(()=>{setApiFailed(false);setLiveMessage('3D model ready. Drag to orbit; use Sketchfab viewer keyboard controls.');onStatusChange?.('ready');},[onStatusChange]);
   const reportFailure=useCallback(()=>{setApiFailed(true);setLiveMessage('3D model unavailable. Showing verified preview image.');onStatusChange?.('fallback');},[onStatusChange]);
-  const {resetCamera,zoom,orbit,pause,resume,sceneReady}=useSketchfabViewer(iframe,reportReady,reportFailure,onSelectComponent);
+  const {resetCamera,zoom,orbit,pause,resume,sceneReady}=useSketchfabViewer(iframe,reportReady,reportFailure,component=>{
+    if(view==='exterior'&&exteriorComponents.includes(component))onSelectComponent(component);
+  });
 
   useEffect(()=>{if(view==='interior')pause();else resume();},[view,pause,resume]);
 
@@ -201,6 +262,12 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
   const handleReset=()=>{
     if(resetCamera())setResetMessage('Exterior camera reset.');
     else setResetMessage('Camera controls available after the 3D model loads.');
+  };
+
+  const changeView=(nextView:VehicleView)=>{
+    onViewChange(nextView);
+    const available=nextView==='exterior'?exteriorComponents:interiorComponents;
+    if(!available.includes(selectedComponent))onSelectComponent(available[0]);
   };
 
   const retryModel=()=>{
@@ -224,8 +291,8 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
         <p>G60 · 2023 · fully electric</p>
       </div>
       <div className="bmw-asset-viewer__controls" role="group" aria-label="Vehicle view">
-        <button type="button" aria-pressed={view==='exterior'} onClick={()=>onViewChange('exterior')}>Exterior 3D</button>
-        <button type="button" aria-pressed={view==='interior'} onClick={()=>onViewChange('interior')}>Interior photo</button>
+        <button type="button" aria-pressed={view==='exterior'} onClick={()=>changeView('exterior')}>Exterior 3D</button>
+        <button type="button" aria-pressed={view==='interior'} onClick={()=>changeView('interior')}>Interior photo</button>
         <button type="button" className="bmw-asset-viewer__reset" onClick={handleReset} disabled={view!=='exterior'}>Reset view</button>
       </div>
     </header>
@@ -270,7 +337,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
 
       <aside className="bmw-asset-viewer__inspector" aria-label="Vehicle component feedback">
         <div className="bmw-asset-viewer__inspector-top"><span>{view==='exterior'?'Exterior components':'Cabin components'}</span><span className="bmw-asset-viewer__heat-label"><i/> {heatLabel}</span></div>
-        <p className="bmw-asset-viewer__instruction">Feedback colors indicate negative share. Colors appear in this list and cabin photo only.</p>
+        <p className="bmw-asset-viewer__instruction">Feedback colors show negative share. {view==='exterior'?'Indicators appear in the component list.':'Markers are synthetic photo overlays.'}</p>
         {heatmap&&<div className="bmw-asset-viewer__legend" role="img" aria-label="Negative feedback share: teal below 25 percent, amber 25 to 49 percent, red 50 percent or more; gray means no sample.">
           <span><i style={{'--heat':'#57b6a0'} as React.CSSProperties}/>0–24%</span>
           <span><i style={{'--heat':'#e8b75a'} as React.CSSProperties}/>25–49%</span>
@@ -303,6 +370,6 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
       <a href="https://creativecommons.org/licenses/by/4.0/" target="_blank" rel="noreferrer">CC BY 4.0</a>
       <span>Creator-uploaded model · not an official BMW asset</span>
     </footer>
-    <div className="bmw-asset-viewer__sr-only" aria-live="polite">{liveMessage} {resetMessage}</div>
+    <div className="bmw-asset-viewer__sr-only" aria-live="polite">{labels[selectedComponent]} selected. {currentSample}. {liveMessage} {resetMessage}</div>
   </section>;
 }

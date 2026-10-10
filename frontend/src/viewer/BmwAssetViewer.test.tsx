@@ -1,6 +1,6 @@
 import {act,cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import BmwAssetViewer, {BMW_I5_MODEL_UID,normalizeSketchfabNodeMap} from './BmwAssetViewer';
+import BmwAssetViewer, {BMW_I5_MODEL_UID,frameCameraForAspect,normalizeSketchfabNodeMap} from './BmwAssetViewer';
 import {findings} from '../domain/fixtures';
 
 type InitOptions={success:(api:any)=>void;error:()=>void};
@@ -15,7 +15,33 @@ describe('normalizeSketchfabNodeMap',()=>{
   });
 });
 
+describe('aspect-aware camera framing',()=>{
+  it('pulls back for narrow stages while preserving target and Z-up viewing direction',()=>{
+    const camera={position:[5,3,8],target:[1,-2,2]};
+    const framed=frameCameraForAspect(camera,573/450);
+    const originalDirection=camera.position.map((value,index)=>value-camera.target[index]);
+    const framedDirection=framed.position.map((value,index)=>value-framed.target[index]);
+
+    expect(framed.target).toEqual(camera.target);
+    expect(framed.position[2]-framed.target[2]).toBeGreaterThan(originalDirection[2]);
+    expect(framedDirection[0]/originalDirection[0]).toBeCloseTo(framedDirection[1]/originalDirection[1]);
+    expect(framedDirection[2]/originalDirection[2]).toBeCloseTo(framedDirection[0]/originalDirection[0]);
+    expect(frameCameraForAspect(camera,16/9)).toEqual(camera);
+  });
+});
+
 describe('BmwAssetViewer', () => {
+  it('keeps selected component inside the active view when switching presets',()=>{
+    const onSelectComponent=vi.fn();
+    const onViewChange=vi.fn();
+    render(<BmwAssetViewer selectedComponent="body" onSelectComponent={onSelectComponent} view="exterior" onViewChange={onViewChange} heatmap={false} period="2026" findings={findings}/>);
+
+    fireEvent.click(screen.getByRole('button',{name:'Interior photo'}));
+
+    expect(onViewChange).toHaveBeenCalledWith('interior');
+    expect(onSelectComponent).toHaveBeenCalledWith('steering');
+  });
+
   it('shows real-asset attribution and keeps parent-controlled component selection usable', () => {
     const onSelectComponent=vi.fn();
     const props={onSelectComponent,view:'exterior' as const,onViewChange:vi.fn(),heatmap:true,period:'2026' as const,findings,className:'bmw-asset-viewer--compact'};
@@ -50,8 +76,8 @@ describe('BmwAssetViewer', () => {
       start:vi.fn(),stop:vi.fn(),
       addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
-      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,{nodes:{front:{instanceID:77,name:'headlamps'}}}),
-      setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,{nodes:{front:{instanceID:77,name:'headlamps'},wheel:{instanceID:78,name:'steering_wheel'}}}),
+      setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
     };
     const init=vi.fn();
     class SketchfabMock { init(uid:string,options:InitOptions){init(uid,options);options.success(api);} }
@@ -62,8 +88,11 @@ describe('BmwAssetViewer', () => {
     expect(events.viewerready).toBeTypeOf('function');
     act(()=>events.viewerready());
     await waitFor(()=>expect(onStatusChange).toHaveBeenCalledWith('ready'));
+    expect(api.setBackground).toHaveBeenCalledWith({color:[0.15,0.16,0.18]});
     events.click({instanceID:77});
     expect(onSelectComponent).toHaveBeenCalledWith('lighting');
+    events.click({instanceID:78});
+    expect(onSelectComponent).toHaveBeenCalledTimes(1);
   });
 
   it('reinitializes the hosted model after switching away from and back to exterior', async () => {
@@ -72,7 +101,7 @@ describe('BmwAssetViewer', () => {
       start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
       getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),
-      setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+      setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
     };
     const init=vi.fn((_uid:string,options:InitOptions)=>options.success(api));
     class SketchfabMock { init=init; }
@@ -104,7 +133,7 @@ describe('BmwAssetViewer', () => {
     const api={
       start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
-      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
     };
     const init=vi.fn((_uid:string,options:InitOptions)=>init.mock.calls.length===1?options.error():options.success(api));
     class SketchfabMock { init=init; }
@@ -123,7 +152,7 @@ describe('BmwAssetViewer', () => {
     const api={
       start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
-      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
     };
     class SketchfabMock { init(_uid:string,options:InitOptions){options.success(api);} }
     Object.assign(window,{Sketchfab:SketchfabMock});

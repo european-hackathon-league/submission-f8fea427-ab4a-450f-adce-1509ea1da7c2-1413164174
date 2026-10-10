@@ -4,12 +4,12 @@ Current state: local pitch prototype; all feedback and research fixtures are syn
 
 | Epic | Current scope | Next gate | Depends on |
 |---|---|---|---|
-| FE-01 Context and navigation | Five destinations, responsive workspace, market/period/baseline controls. | Bind context to validated vehicle and source records. | Shared context contract |
+| FE-01 Context and navigation | Five destinations, responsive workspace, market/period/baseline controls and latest analysis date. | Bind context to validated vehicle and source records. | Shared context contract |
 | FE-02 Vehicle view | Hosted creator-uploaded i5 M60 exterior; bundled preview fallback; separate static G60 520i cabin photo. Component severity appears in HTML list and photo markers; no verified mesh coloring. | Approve matched assets and verify semantic part mapping for each derivative. | Asset/license review, viewer tests |
-| FE-03 Insights and comparison | Synthetic component metrics; Europe has 2025/26 comparison, China/US have 2026 snapshots only. Market populations are unmatched. | Connect source denominators, coverage, and comparability metadata. | FE-01, source data |
-| FE-04 Evidence and research | Prepared synthetic quotes, explicit stance labels, hypotheses, gaps, and three draft concepts. No live research job. | Add source locators and asynchronous research status/results. | FE-03, evidence contract |
-| FE-05 Decisions and data | Rationale-required decisions; prior versions and decisions in browser storage; filtered CSV and print; upload retains file names only for this session. | Add authenticated server audit, import/parsing, and cross-user persistence. | FE-04, backend/auth |
-| FE-06 Release checks | 32 tests and production build pass; desktop/mobile, hosted exterior controls, dialog keyboard and decision persistence reviewed. | Verify licensed cabin/mesh mapping, browser offline/reduced motion, print and target-device performance. See verification record. | FE-01–05 |
+| FE-03 Insights and comparison | Four context-scoped summary indicators, separate period/market comparison modes; synthetic component metrics; Europe has 2025/26 comparison, China/US have 2026 snapshots only. Market populations are unmatched. | Connect source denominators, coverage, and comparability metadata. | FE-01, source data |
+| FE-04 Evidence and research | Prepared synthetic quotes, explicit stance labels, hypotheses, gaps, editable question/market scope, unresolved/cancel/retry states and three editable evidence-linked concepts. No live research job. | Add source locators and asynchronous research status/results. | FE-03, evidence contract |
+| FE-05 Decisions and data | Rationale-required approve/edit/reject/defer/challenge; negative-share priority sorting; built-in sample review → analysis → changes; prior versions and decisions in browser storage; filtered CSV and print; upload retains file names only for this session. | Add authenticated server audit, import/parsing, and cross-user persistence. | FE-04, backend/auth |
+| FE-06 Release checks | Automated workflow/metric/viewer tests and production build; desktop/mobile, hosted exterior controls, dialog keyboard and decision persistence reviewed. | Verify licensed cabin/mesh mapping, browser offline/reduced motion, print and target-device performance. See verification record. | FE-01–05 |
 
 ## Later orchestrator priorities
 

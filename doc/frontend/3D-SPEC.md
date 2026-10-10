@@ -8,7 +8,7 @@ Interior mode is a static **BMW 520i G60 cabin photograph**, licensed CC BY-SA 4
 
 The viewer accepts selected component, view, period, findings, and heatmap state. Severity is negative-feedback share, not a defect score. Color is shown in the HTML component list and cabin-photo markers; **component-mesh heat recoloring is not verified**. Treat scene selection/hotspots as illustrative unless mapping to named geometry is tested. Attribution stays visible. Asset is creator-uploaded, not official BMW material; BMW does not endorse this prototype.
 
-`frontend/src/viewer/VehicleViewer.tsx` contains a procedural study scene but is not the current pitch route. Do not describe it as a BMW model or current exterior/interior asset.
+The earlier procedural study scene has been removed from this pitch branch. Its source remains in the preserved `pitch-before-plan-polish` worktree at checkpoint `aae4732`.
 
 ## Integration gates
 

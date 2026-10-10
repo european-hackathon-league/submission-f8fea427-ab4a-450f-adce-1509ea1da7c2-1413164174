@@ -1,8 +1,11 @@
-# Final plan: AI vehicle requirements pipeline
+# Final plan: parallel frontend and backend delivery
 
-**Status:** Consolidated implementation plan, incorporating the latest product decisions and Deep Dive.
+This is the shared entry point and integration agreement. The implementation work is split into two team plans:
 
-This document supersedes `first_plan.md` for implementation direction. It describes the backend and its contracts with the separate UI and 3D team. Deferred capabilities are recorded in [backlog.md](backlog.md).
+1. **[Frontend and 3D team](frontend_plan.md):** workspace, car/graph visualization, Deep Dive panels, edits, concept views, scene catalog and renderer implementation.
+2. **[Backend team](backend_plan.md):** ingestion, findings, Deep Dive research, variants, requirements, API, jobs, persistence, traceability and renderer orchestration.
+
+Both teams must use the shared contract below. It is the implementation target, not a claim that an API already exists. Deferred capabilities remain in [backlog.md](backlog.md). These documents supersede `first_plan.md`.
 
 ## 1. Product objective and scope
 
@@ -38,23 +41,7 @@ These are implementation defaults, not BMW-prescribed rules:
 - Generate a small set of coherent alternatives, provisionally up to four initially. Preserve unresolved conflicts and support additional branches on request rather than silently discarding them.
 - AI can propose measurable targets. Each target records its basis and maturity; unsupported numbers do not become validated requirements merely because a run completes.
 
-## 3. Initial run setup
-
-The starting area contains:
-
-1. Vehicle/model selection and available market context.
-2. Uploads for customer feedback, findings, equipment, studies and supporting context.
-3. Deep Dive selection.
-4. Participation mode: autonomous or guided.
-5. Create run.
-
-Create run persists the chosen configuration and a versioned source snapshot. The PM can upload all supplied files, only a subset, or multiple regional files. Derive scope from file contents where supported; filenames alone are not authoritative.
-
-Accept partial evidence and expose its limitations. Unsupported files, unreadable inputs or ambiguity that prevents identifying a usable case need a clear repair path. Ordinary missing evidence and conflicting opinions should not turn into repeated PM questions in autonomous mode.
-
-For Deep Dive, persist the research scope, selected competitor set and research limits. The system can infer a proposed comparable set from the vehicle and market context, record its reasons and proceed without another mandatory PM checkpoint.
-
-## 4. Whole-application flow
+## Whole-application flow
 
 ```mermaid
 flowchart TD
@@ -88,285 +75,216 @@ flowchart TD
 
 The graph and tags update alongside analysis; rendering the feedback graph is not a backend processing dependency. Research failures produce explicit partial results or gaps. Renderer failures preserve completed proposals and can be retried independently.
 
-## 5. Backend pipeline
+## Ownership and parallel working agreement
 
-### Stage 1: create and scope the run
+| Area | Owner | Other team's dependency |
+|---|---|---|
+| UI and API client adapter | Frontend | Published API payloads, errors and events |
+| Baseline assets, scene/part catalog | Frontend/3D | Backend consumes stable semantic part IDs |
+| Renderer implementation and stub | Frontend/3D | Backend submits manifests and consumes results |
+| API, auth, uploads, storage and run state | Backend | Frontend consumes API and events |
+| Counts, findings, research, scores and proposals | Backend | Frontend displays authoritative results |
+| Job orchestration, render retries and audit | Backend | Renderer supplies version-bound results |
+| Shared contract and fixtures | Backend maintains; both review | Changes land before either side depends on them |
+| End-to-end acceptance | Joint | Both execute the same scenarios |
 
-Save the vehicle context, participation mode, Deep Dive flag, uploads and configuration versions. Assign stable run and source-version IDs. Preserve original files and any known derivative, market, generation, period, equipment and software context.
+Suggested implementation ownership is `frontend/`, `backend/`, `renderer/` and `contracts/`. These are planned boundaries, not existing application directories. Keep team-specific work in its owned area; coordinate shared package files, root configuration and contract changes explicitly.
 
-**Output:** run configuration and input manifest.
+The frontend starts with a mock API; backend starts with a stub renderer. Mocks and stubs must consume the same schemas and IDs as the real services. Integrate the first upload-to-finding path early while both teams continue their remaining work.
 
-### Stage 2: normalize evidence
+## Shared integration contract
 
-Parse supported workbook and document structures into typed evidence records. Keep original content and exact locators: workbook/sheet/row/cell, PDF page and relevant region, or web passage and URL.
+### Contract rules
 
-Resolve reusable mappings, detect overlapping uploads and prevent duplicate counting. A repeated ID across unrelated source namespaces must not automatically be treated as the same record. Separate exact duplicates, repeated annotations and genuinely independent feedback.
+- Use `/api/v1` for application endpoints and `contract_version: "1"` in snapshots and events.
+- IDs are opaque strings. Do not derive meaning from a display label, array position or filename.
+- Timestamps are UTC ISO 8601 strings. Null means unknown; it is different from zero, false or an empty collection.
+- Lists with potentially large results are paginated; source and asset bodies are retrieved separately through authorized URLs.
+- Wire field names use snake_case. Scores, counts and intensity values are calculated by backend.
+- Mutating commands use an `Idempotency-Key`. Repeating the same key and body returns the same resource/result; reusing a key with a different body is rejected.
+- Commands that change a proposal name `base_proposal_set_version`. A mismatch returns `409 stale_version` and the current version; no partial mutation is committed.
+- The server identifies the actor from authentication and checks run/source access. The frontend never supplies authoritative audit identity.
+- Each response includes a request ID for diagnosis. Errors use `{code, message, retryable, field_errors, current_version}` with inapplicable fields null or empty.
+- Backend publishes OpenAPI/JSON schemas and examples in `contracts/` before feature work relies on them. Both teams run schema validation against the same fixtures. Additive compatible changes stay in v1; breaking changes require a coordinated version change.
 
-Preserve missing or uncertain metadata. Germany and Europe may overlap; cohort membership must be explicit so uploading both does not double-count records.
+### Upload and run creation
 
-**Output:** normalized, source-linked evidence and a coverage report.
+The initial upload flow is separate from analysis. `POST /api/v1/uploads` accepts multipart files and returns source IDs, detected type and `ready` or `rejected` status with a reason. Infrastructure can later use signed direct uploads behind the same logical contract; do not independently implement a different flow on each side.
 
-### Stage 3: extract observations, findings and part mappings
+A rejected file can be removed and the remaining ready sources used as a partial package. Run creation takes source IDs owned by the authenticated workspace; it does not take browser-local paths.
 
-Split multi-topic feedback into observations. Identify the customer task, sentiment, requested outcome, reported issue and relevant car area. Group equivalent observations into findings while retaining disagreements, positive feedback and traceable membership.
+Example create-run body, using synthetic IDs:
 
-Use a shared part catalog with stable IDs agreed with the 3D team. Support parent areas, multiple relevant parts and an unmapped/vehicle-wide category. Do not force a physical location for an app or vehicle-wide software issue.
+```json
+{
+  "vehicle_id": "vehicle_demo",
+  "baseline_asset_id": "asset_demo_v1",
+  "part_catalog_version": "catalog_demo_v1",
+  "source_ids": ["source_demo_1"],
+  "market_context": ["US"],
+  "participation_mode": "autonomous",
+  "deep_dive": {"enabled": true}
+}
+```
 
-**Output:** finding graph, tags, counts and provisional progress events.
+Backend validates catalog/asset compatibility and scope, freezes the configuration, and returns `202` with `run_id`, snapshot URL and events URL. Market labels are hints checked against source contents; they do not manufacture evidence. The backend can choose and record research scope and limits without another PM checkpoint.
 
-### Stage 4: Deep Dive, when enabled
+### Application operations
 
-Research better approaches to the underlying customer need, including cases where customers express dissatisfaction but cannot specify a solution.
+All paths below are under `/api/v1`.
 
-1. Convert the finding into a focused research question.
-2. Select relevant competitors using vehicle class, market, model year, equipment and customer task.
-3. Research actual competitor capabilities and public experience separately.
-4. Verify applicability, source support, independence and counterevidence.
-5. Assess candidate approaches against the original need and the selected vehicle baseline.
-6. Return supported recommendations, alternatives or an explicit validation gap.
-
-**Output:** a versioned research bundle attached to the finding and relevant parts. Section 6 defines the research behavior in more detail.
-
-When Deep Dive is off, skip systematic competitor research. Ordinary bounded checks needed to verify a specific baseline or evidence claim may remain part of standard analysis.
-
-### Stage 5: resolve conflicts and form alternatives
-
-Check whether opposing opinions concern the same capability under comparable conditions. Different equipment, software, usage or regional context may explain the difference without a genuine contradiction.
-
-In autonomous mode, generate coherent alternatives and explain the tradeoffs. In guided mode, surface the conflict so the PM can choose a direction or assign cohorts to variants.
-
-Variants share common findings but retain their own scope, assumptions and changes. For example, a combined China/US variant and a Europe variant are valid only when the supplied evidence supports those assignments. A selected label does not create absent regional evidence.
-
-Avoid the combinatorial explosion of every possible combination. Preserve the conflict ledger even when only a small initial alternative set is generated.
-
-**Output:** variant definitions and recorded conflict resolutions or unresolved tradeoffs.
-
-### Stage 6: define and prioritize changes
-
-Check the applicable product baseline before proposing a new feature. Classify each proposal as a capability change, usability improvement, offering/availability change or preservation of an existing strength. Distinguish a customer requirement from a possible individual fault or service issue.
-
-Use Deep Dive evidence when available to assess possible solutions. Produce measurable customer outcomes with target maturity, validation method, rationale and uncertainties.
-
-Calculate priorities reproducibly from a versioned policy. Keep evidence strength separate from priority. An incomplete factor remains unknown or scenario-based rather than becoming zero.
-
-**Output:** complete proposed requirements and change sets for each variant. Autonomous completion means the proposal set is finished, not that every target is validated or PM-approved.
-
-### Stage 7: Reimagine handoff
-
-Bind the request to exact proposal and baseline versions. Send explicit supported changes, affected part IDs and preservation constraints to the visualization service. Receive status, asset references and per-change outcomes.
-
-Digital experience improvements may require annotations or an interface preview rather than altered geometry. Unsupported visual changes remain understandable in the proposal and are reported explicitly.
-
-**Output:** concept assets linked to exact changes and proposal versions.
-
-### Stage 8: explain and refine
-
-Numbered markers use stable change IDs. Each opens the before/after proposal, why it changed, underlying findings, feedback counts, competitor evidence where used, target maturity and assumptions.
-
-Record PM edits as instructions or proposal changes without modifying source evidence. A PM-added idea without customer support is identified as a PM proposal.
-
-Rerun affected stages using the saved evidence. Preserve prior proposal and render versions. Reuse existing research; a new unanswered question becomes a visible gap rather than triggering deferred background monitoring.
-
-## 6. Deep Dive research and evidence
-
-### Research the need, not only the requested feature
-
-A complaint such as difficulty reaching a frequent control should lead to research into easier ways to perform that task. A customer-suggested solution can be evaluated alongside other approaches.
-
-The result should explain:
-
-- What the uploaded customers struggle with.
-- How relevant competitors address the same need.
-- What sampled owners, reviewers or study participants appreciate or dislike about those approaches.
-- Which improvement best fits the available evidence for this vehicle and market.
-- Why alternatives were weaker, and what remains uncertain.
-
-### Separate capability facts from preference evidence
-
-Official manuals and specifications can establish feature availability. Owner feedback, independent reviews and usability studies can inform experience and preferences. Neither source type automatically proves the other claim.
-
-Store the URL, publisher, publication date when known, retrieval time, exact supporting passage, vehicle/market scope and claim type. Distinguish source statements from the system's inferences.
-
-Deduplicate syndicated material, retain counterevidence and inspect whether a claim is firsthand experience or marketing. Treat retrieved content as evidence, never as instructions to the application.
-
-Public feedback is a sample. Describe what the reviewed sources support; do not infer what the entire general public prefers from a few posts. External opinions must not increase uploaded BMW feedback counts or car-tag redness.
-
-### Recommendation rules
-
-Assess candidate approaches using relevance to the original need, applicability, source quality, baseline fit, tradeoffs and plausible attainability. Preserve strengths existing customers value. A competitor feature being popular does not automatically make it appropriate for this vehicle.
-
-Recommend the best-supported approach under the stated criteria. If coverage is weak or contradictory, produce alternatives or a validation proposal rather than inventing certainty.
-
-### Bounded execution
-
-Research status is `queued → searching → checking → ready / partial / unavailable`.
-
-Version the limits for searches, sources, duration and retries. On failure or timeout, preserve useful evidence, report the gap and allow autonomous completion. Every proposal records the research snapshot used. Late results cannot silently change completed proposals or rendered concepts.
-
-This initial research is current scope. Continuous source refresh is deferred in [backlog.md](backlog.md).
-
-## 7. Evidence graph, counts and visual meaning
-
-The logical graph connects:
-
-`source version → evidence → observation → finding → requirement → change → variant`
-
-Findings and changes also reference vehicle parts. Research bundles connect competitor claims and public-experience evidence to the relevant findings. Relations distinguish support, contradiction, applicability and simple mention.
-
-Counts use distinct feedback records after deduplication. Do not call them unique people unless reliable respondent identifiers support that claim. One record mentioning two parts may count once for each part, but only once in the overall distinct total.
-
-Provide the UI with:
-
-- Negative-record count for red intensity.
-- Total relevant records, negative share and coverage limits.
-- A consistent intensity scale across comparable filters and variants.
-- Provisional/final status and low-evidence indicators.
-- The source membership behind every count.
-
-Missing mentions are not evidence of satisfied customers. Review frequency is not population prevalence. External evidence has its own provenance and counts.
-
-## 8. Requirement quality and prioritization
-
-Each requirement includes:
-
-- Stable ID and version; applicable vehicle, market/cohort and horizon.
-- Clear customer outcome and affected parts or experiences.
-- Linked findings, supporting sources and counterevidence.
-- Metric, unit, proposed target, conditions, baseline when known and validation method.
-- Target origin and maturity: proposed, needs validation, validated or PM-accepted as applicable.
-- Priority factors, rationales, score or incomplete-assessment state, and policy version.
-- Evidence level, future assumptions, uncertainties and decision/proposal status.
-
-Follow the supplied emphasis on specific, measurable, attainable, relevant and timely outcomes. A numerical target still needs a defensible basis. Concept rendering does not validate engineering feasibility.
-
-The earlier impact/breadth/gap/future-relevance policy at 35/25/20/20 can remain a provisional starting point for evaluation. These weights are not prescribed by BMW. Compare alternatives using the same documented policy and expose sensitivity to uncertain factors.
-
-A source's role matters: equipment establishes availability, feedback describes observed experience, a study provides scoped customer context, and sales/strategy data provides broader context. Do not average incompatible sources into false corroboration.
-
-## 9. Backend architecture and ownership
-
-Use one persisted workflow with reusable stages:
-
-`authenticated API → durable job queue → pipeline workers → relational database + original-file storage`
-
-Workers publish progress, graph updates, tag updates and research status to the UI. A separate visualization service consumes change manifests and returns asset references.
-
-AI interprets evidence, proposes mappings where needed, groups observations, researches needs and drafts alternatives. Application code owns deterministic parsing where supported, IDs, deduplication, counts, score calculation, workflow state, permissions and versioning.
-
-A relational database can store typed graph relationships initially. A graph visualization does not itself require a graph database. Select providers and infrastructure against BMW's deployment constraints and measured quality.
-
-### Main persisted objects
-
-- Run, run configuration and source snapshot.
-- Original source, source version and evidence locator.
-- Observation, finding and finding membership.
-- Part reference and part mapping.
-- Research job, research bundle and typed external claim.
-- Conflict, variant and cohort membership.
-- Requirement version, factor assessment and change version.
-- PM instruction, selection/decision and audit event.
-- Render request, per-change outcome, asset reference and export manifest.
-
-### Execution and version rules
-
-- Run progression: uploaded → processing, including research when selected → proposals ready → rendering → completed.
-- Guided pauses and failures have explicit states; autonomous runs do not pause on ordinary preference conflicts.
-- Retries do not duplicate evidence, decisions, variants or render requests.
-- Edits and render requests identify exact versions.
-- A late render belongs to its original version and cannot replace a newer result silently.
-- PM edits invalidate affected downstream work, not the entire source extraction pipeline.
-- Access, interpretation, automated choices, changes, scoring and PM actions are auditable with actor, time and rationale.
-- AI proposals, PM selections and PM approvals remain distinguishable. Autonomous processing cannot fabricate a human approval.
-
-## 10. UI and 3D integration contract
-
-The other team owns UI layout, 3D assets, navigation and generation. Backend work supplies the following contracts:
-
-| Backend output | UI/3D use |
+| Operation | Request/result boundary |
 |---|---|
-| Run settings and upload status | Model selection, uploads, Deep Dive and participation controls |
-| Graph nodes and typed edges | Growing feedback graph |
-| Part IDs, tags, counts and coverage | Car annotations and red intensity |
-| Research progress and evidence bundles | Deep Dive progress and competitor evidence cards |
-| Conflicts and variant definitions | Optional side-panel choices and separate concept views |
-| Versioned change manifests | Reimagine requests and preservation of other parts |
-| Stable change IDs and explanations | Numbered before/after/evidence markers |
-| Version and audit records | History and exports |
+| `GET /vehicles` | Available vehicle IDs, baseline assets, part-catalog versions and supported capabilities. |
+| `POST /uploads` | Multipart uploads; source IDs and per-file status. |
+| `POST /runs` | Frozen configuration; run ID and resource URLs. |
+| `GET /runs/{run_id}` | Coherent current snapshot, revisions, summaries, resource links, actions and event watermark. |
+| `GET /runs/{run_id}/events` | Server-sent events; resume by last event ID. |
+| `GET /runs/{run_id}/findings` | Paginated findings; cohort/part filters and server-computed counts for the same scope. |
+| `GET /runs/{run_id}/graph` | Paginated/filterable graph nodes and typed edges with resource revisions. |
+| `GET /runs/{run_id}/research` | Research status and source-linked bundles by finding. |
+| `GET /runs/{run_id}/conflicts` | Conflicts, proposed alternatives and guided checkpoints. |
+| `GET /runs/{run_id}/proposals` | Current or requested immutable proposal-set version, variants, requirements and changes. |
+| `GET /runs/{run_id}/evidence/{evidence_id}` | Evidence metadata, original locator and authorized access to the source; access is audited. |
+| `POST /runs/{run_id}/instructions` | Version-bound edit/add/remove/regroup or request-more-variants command; instruction/job ID. |
+| `POST /runs/{run_id}/checkpoints/{checkpoint_id}/continue` | Checkpoint version and selected resolution; resume the matching guided pause. |
+| `POST /runs/{run_id}/decisions` | Optional approve/reject/defer/select action, exact variant/version and rationale; recorded decision ID. |
+| `POST /runs/{run_id}/renders` | Exact proposal-set version, variant IDs and baseline asset; durable render request ID. |
+| `GET /runs/{run_id}/renders/{render_request_id}` | Render status, exact input versions, assets and per-change outcomes. |
+| `POST /runs/{run_id}/renders/{render_request_id}/retry` | Retry failed work for the same immutable input with recorded attempt history. |
+| `GET /runs/{run_id}/history` | Paginated audit events and version references. |
+| `POST /runs/{run_id}/exports` | Exact proposal/variant versions and format; export job ID. |
+| `GET /runs/{run_id}/exports/{export_id}` | Export status, version manifest and authorized download URL when ready. |
 
-A render request includes `run_id`, `variant_id`, `proposal_version`, `baseline_asset_id`, and changes containing `change_id`, `part_ids`, `proposed_outcome`, `visual_instruction`, `preserve_constraints` and `evidence_ids`.
+Long commands return `202` with a stable command/resource ID. Expose result state through snapshots/events and resource queries. A proposal instruction contains a typed operation (`edit_change`, `remove_change`, `add_change`, `edit_target`, `regroup_variants` or `request_more_variants`), target IDs, base version, the changed fields and optional free-text intent. Backend validates and records it before processing.
 
-The renderer returns matching IDs, request status, asset references and per-change success or unsupported-change reasons. Agree stable part IDs and supported visual changes early so both teams can work independently against examples.
+### Shared objects and required fields
 
-## 11. Plug-and-play acceptance
-
-Supported files and a different vehicle case use the same workflow without vehicle-specific code changes. Mapping profiles and part catalogs are reusable configuration. New case labels do not inherit another case's evidence, scores or approvals.
-
-Prove reuse with:
-
-1. An end-to-end primary case from a fresh upload.
-2. A second derivative through the same pipeline.
-3. A cross-market case with explicit coverage limits.
-4. A changed input schema to exercise mapping rather than a hardcoded template.
-5. Overlapping regional uploads and duplicate retries.
-6. A partial or unsupported-market package that produces honest gaps.
-
-Use supported supplied formats first, then expand adapter coverage. Do not promise arbitrary-file or arbitrary-vehicle support without testing it.
-
-## 12. Build sequence and quality gates
-
-### Gate A: contracts and evaluation fixtures
-
-Agree run semantics, part IDs, renderer contracts, source locators and proposal schemas. Create reviewed fixtures for duplicates, multi-topic feedback, positive feedback, existing-feature complaints, conflicting preferences, missing evidence and market mismatches. Reserve examples for evaluation rather than tuning everything on the demonstration.
-
-### Gate B: ingestion and findings
-
-Implement upload snapshots, normalization, mappings, deduplication, source links, findings, part mappings and progress events. Pass when a fresh upload yields reproducible counts and inspectable findings.
-
-### Gate C: Deep Dive and autonomous proposals
-
-Implement bounded research, claim verification, conflict analysis, alternatives, measurable requirements and reproducible ranking. Pass when unattended runs produce grounded proposals and useful gaps, including when research partially fails.
-
-### Gate D: PM refinement and traceability
-
-Implement optional guided checkpoints, edits, variant regrouping, targeted reruns, exact-version decisions, audit and export. Pass when the complete reasoning and change history can be reconstructed and edits preserve previous results.
-
-### Gate E: Reimagine integration
-
-Connect the renderer using the agreed manifest. Pass when results match requested versions, unsupported changes are reported, unrelated parts have explicit preservation instructions, and retries or late responses cannot corrupt the current result.
-
-### Gate F: reusable product and measured value
-
-Run second-derivative, cross-market and changed-schema cases. Check performance, recovery, access isolation and deployment/integration needs. Compare assisted and manual work on equivalent tasks before claiming time savings or decision-quality improvements.
-
-## 13. Final evaluation mapping
-
-The supplied evaluation defines five criteria without numerical judging weights.
-
-| Criterion | Required proof |
+| Object | Required integration fields |
 |---|---|
-| Decision and scoring logic | Explain factors, source roles, tradeoffs, uncertainty, candidate comparisons and rank changes. |
-| Workflow and human decision-making | Demonstrate autonomous completion, optional guided checkpoints, PM interventions and explicit responsibility boundaries. |
-| Traceability and auditability | Trace every requirement, change, score and decision to exact evidence and reconstruct versions, rejections and postponements. |
-| Solution quality, usability and feasibility | Produce useful, measurable and realistic customer outcomes; integrate clearly with the UI and render service. |
-| Innovation, scalability and business impact | Prove reuse, bounded research, robust execution and measured improvement in PM effort or decision quality. |
+| Run snapshot | `run_id`, `contract_version`, `config`, `analysis_status`, `stage`, `revision`, `last_event_sequence`, `current_proposal_set_version`, `available_actions`, `warnings`, resource links. |
+| Evidence reference | `evidence_id`, `source_version_id`, `source_kind`, typed `locator`, `scope`, `excerpt`, applicability/limitations. Source kind distinguishes uploaded material from external research. |
+| Finding | `finding_id`, `revision`, `title`, `customer_need`, `part_ids`, `cohort_ids`, `supporting_evidence_ids`, `opposing_evidence_ids`, `counts`, `coverage`, `provisional`. |
+| Part aggregate | `part_id`, scope/cohort IDs, distinct total and negative records, negative share or null, `intensity_value`, `intensity_scale_id`, low-evidence flag, provisional flag. |
+| Research bundle | `research_id`, `finding_id`, `status`, competitor scope, claims with `fact`/`opinion`/`inference` type, citations, counterevidence, candidate approaches, recommendation and gaps. |
+| Conflict/checkpoint | Stable ID, version, finding IDs, scoped alternatives, rationale, resolution status; checkpoint adds allowed actions and current wait state. |
+| Proposal set | Immutable `proposal_set_version`, run/source/research snapshot references, scoring-policy version, variant list and unresolved conflicts. |
+| Variant | `variant_id`, title, cohort scope, assumptions, requirement/change references and relation to other variants. |
+| Requirement/change | Stable IDs and versions, origin (`ai`/`pm`), outcome, part IDs, before/after, evidence/finding references, metric/target/validation, target maturity, score/factor rationale, uncertainty and decision state. |
+| Graph edge | `edge_id`, `from_id`, `to_id`, typed relationship and provenance; nodes carry entity type and stable ID. |
+| Render result | `render_request_id`, exact input version/variant IDs, status, asset references, per-change outcomes and failure/unsupported reasons. |
 
-Honest uncertainty is explicitly rewarded. The demonstration should include an unresolved gap, not only successful recommendations.
+Backend specifies field types and enums in the schema artifact before either team creates divergent representations. Exact quote lengths and source bodies are not embedded in every progress event.
 
-Core evaluation scenarios include duplicate uploads, cohort overlap, conflicting regional preferences, uncertain targets, a PM-added unsupported idea, failed research, unsupported competitor claims, duplicate public sources, counterevidence, a nonvisual change and a failed or late render.
+### States and UI behavior
 
-## 14. Current scope versus backlog
+Analysis and rendering are separate resources. A successful proposal set can have several completed, partial or failed render requests.
 
-Current scope includes initial uploads, initial Deep Dive research, autonomous proposals, optional guided participation, PM edits, variants, Reimagine integration, evidence tracing and export.
+| Resource | Wire states | Required UI behavior |
+|---|---|---|
+| Analysis | `queued`, `processing`, `waiting_for_pm`, `proposals_ready`, `failed` | Ordinary conflicts never enter `waiting_for_pm` in autonomous mode. Display repairable input failures separately from uncertainty. |
+| Research | `queued`, `searching`, `checking`, `ready`, `partial`, `unavailable` | Off is expressed by disabled run configuration and no research jobs. Partial/unavailable research need not fail analysis. |
+| Render | `queued`, `rendering`, `succeeded`, `partial`, `failed` | Preserve proposals and any useful assets on partial/failure; show exact proposal versions. |
+| Export | `queued`, `processing`, `ready`, `failed` | Download only the completed exact-version artifact. |
 
-Deferred capabilities are maintained in [backlog.md](backlog.md): scheduled imports, continuous new-evidence ingestion, source refresh, monitoring, and thresholds for automatically reconsidering requirements. Software-versus-physical-issue trigger thresholds belong to that later work.
+An accepted edit can move analysis back into `processing` while previous proposals remain inspectable. Backend provides `available_actions` such as `edit`, `continue_checkpoint`, `reimagine`, `retry_render` and `export` rather than forcing UI to infer all permissions from stage names.
 
-## 15. Planning sources
+### Progress and reconnection
 
-- Latest product decisions in this conversation, including autonomous-first behavior, the UI/3D ownership boundary and Deep Dive at run creation.
-- [Mission, scope and deliverables](doc/more.md).
-- [Final evaluation criteria](doc/image6.png).
-- [Requirements specification emphasis](doc/image4.png) and [SMART goals](doc/image5.png).
-- [Process overview](doc/image2.png) and [lifecycle context](doc/image7.png), with the supplied clarification that scope is steps 1 and 2.
-- Supplied keynote, annual report, briefing and local data package as evidence context. Applicability must be checked at claim level; a planning document or broad sales figure does not prove demand for a particular feature.
+Use a single server-sent event stream per run. Events are persisted with strictly increasing per-run sequence numbers. A snapshot includes the sequence through which its state is coherent; the client then consumes events after that watermark.
 
-This file defines the intended product and backend behavior. It does not claim that the pipeline, research or renderer integration has already been implemented.
+Example event envelope:
+
+```json
+{
+  "contract_version": "1",
+  "event_id": "event_demo_17",
+  "sequence": 17,
+  "run_id": "run_demo",
+  "type": "research.updated",
+  "occurred_at": "2026-10-10T12:00:00Z",
+  "resource": {"type": "research", "id": "research_demo", "revision": 3},
+  "proposal_set_version": null
+}
+```
+
+Event types include `analysis.updated`, `findings.updated`, `graph.updated`, `part_counts.updated`, `research.updated`, `conflicts.updated`, `checkpoint.created`, `proposals.ready`, `render.updated`, `export.updated` and `audit.appended`.
+
+Events invalidate the referenced resource; frontend fetches its current revision and ignores older/duplicate sequences. Do not apply a graph event as an unversioned patch. On reconnect use the event ID as the replay cursor. If the replay window is unavailable or a gap is detected, fetch a fresh snapshot and resume from its watermark. Snapshot polling is an acceptable fallback when the event transport is unavailable.
+
+### Renderer contract
+
+Frontend/3D implements this server-side adapter; backend owns its calls, retries and result persistence. Use a versioned adapter contract regardless of generation provider.
+
+- `POST /renderer/v1/jobs`: backend-provided `render_request_id`, run/variant IDs, proposal-set version, baseline asset/catalog version and change manifest. Returns accepted job ID and status.
+- `GET /renderer/v1/jobs/{job_id}`: returns current status and exact matching IDs/versions, assets and per-change outcomes. Backend polls this endpoint initially; callbacks can be added later without changing the application UI contract.
+- Repeated submission for the same request ID/input must return the same job. A mismatched body for that ID is rejected.
+- Manifest changes include `change_id`, `part_ids`, `proposed_outcome`, `visual_instruction`, `preserve_constraints` and `evidence_ids`.
+- The versioned scene catalog maps semantic part IDs to parent parts, mesh/anchor references and supported modification/annotation capabilities.
+- Each requested change returns `rendered`, `annotated`, `unsupported` or `failed`, plus reason and asset references where relevant. Partial success is explicit.
+- Service authentication and asset access must be configured between backend and renderer; the browser does not receive provider/service credentials.
+
+Agree these IDs and capabilities before either team hardcodes a scene or manifest. Backend can use the stub while frontend/3D develops real rendering.
+
+## Fixtures both teams use
+
+Create `contracts/` as the first shared implementation deliverable: API schema, renderer schema, sample scene catalog and synthetic request/response/event fixtures. Backend maintains the API fixtures; frontend/3D maintains the scene and renderer fixtures. Both review changes.
+
+Include these named scenarios:
+
+1. `standard_autonomous`: a partial upload package reaches proposals with no PM wait.
+2. `deep_dive_success`: research augments the evidence without changing uploaded-feedback counts.
+3. `deep_dive_partial`: a timeout exposes a gap and proposals still complete.
+4. `guided_conflict`: a checkpoint supports regional regrouping and resumes once.
+5. `duplicate_uploads`: repeated records do not increase counts.
+6. `pm_edit_stale`: the server rejects an old base version; the UI retains the draft.
+7. `render_partial`: one change renders and another is unsupported.
+8. `render_late`: an old result arrives after a newer proposal and cannot replace it.
+9. `reconnect`: duplicate/replayed events or an expired cursor recover a coherent view.
+10. `versioned_export`: the download identifies the selected proposal and evidence versions.
+
+Keep IDs and version references consistent across each fixture's upload, graph, finding, proposal, render and export. The frontend mock replays these fixtures; backend tests validate its actual responses against the same schemas. Synthetic examples must be labeled and must not imply BMW approval.
+
+## Parallel milestones and merge checklist
+
+### Shared start
+
+- Land schemas, fixture IDs, catalog/part IDs, error model and local configuration conventions first.
+- Provide separate frontend mock mode and backend renderer-stub mode.
+- Agree an API base URL and same-origin proxy or explicit development CORS policy.
+- Each team owns its dependencies/configuration under its area; shared root changes are coordinated.
+
+### First integration, while implementation continues
+
+- Run the frontend against the real API for upload, create run, snapshot, one finding and an evidence link.
+- Verify that a real part ID maps to the agreed scene anchor.
+- Backend calls the renderer stub through the final adapter shape.
+- Resolve contract mismatches in the shared schema/fixtures before adding local compatibility hacks.
+
+### Complete vertical flow
+
+- Demonstrate standard and Deep Dive runs, autonomous and guided paths, one edit, Reimagine, a numbered explanation and export.
+- Swap the renderer stub for the real service without changing the frontend's application API.
+- Exercise partial research, partial rendering, stale edits and reconnect behavior.
+
+### Final merge gate
+
+- Both team branches build and their relevant checks pass.
+- Shared schemas validate mock fixtures and real API/renderer results.
+- A clean checkout can start each service using documented commands and example environment files without secrets.
+- The ten joint scenarios pass against the integrated system, not only isolated mocks.
+- No UI-only calculations disagree with server counts or scores.
+- Versions, source references, part IDs and assets remain aligned from upload to export.
+- Unsupported capabilities and deferred items are documented; unfinished placeholders are not presented as live behavior.
+
+Merge shared contracts first, then team-owned changes in small compatible slices. Neither team needs to wait for the other's full feature set. Avoid independently editing the same schema or root configuration and reconciling only at final merge.
+
+## Evaluation and sources
+
+Both teams share the five criteria from [the final evaluation](doc/image6.png): decision/scoring logic, workflow and human roles, traceability, solution quality/usability/feasibility, and innovation/scalability/business impact. There are no supplied numerical judging weights.
+
+Backend provides defensible evidence, proposals and records; frontend makes those explanations and limitations usable. Evaluate both together, including honest gaps and measured reduction in PM work.
+
+The source brief is [more.md](doc/more.md), with [measurable requirements](doc/image4.png), [SMART goals](doc/image5.png), [the process](doc/image2.png) and [lifecycle context](doc/image7.png). Later user decisions govern the autonomous-first product and initial Deep Dive selection. Scope remains lifecycle steps 1 and 2.
+
+This is an implementation plan and integration target. It does not claim that the application or contract artifacts have already been built.

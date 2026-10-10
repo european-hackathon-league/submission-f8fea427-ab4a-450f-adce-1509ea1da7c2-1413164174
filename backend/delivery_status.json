@@ -12,19 +12,20 @@
         "BE-03",
         "BE-04"
       ],
-      "status": "draft",
+      "status": "merged",
       "branch": "be/S1-foundation",
       "pr_url": "https://github.com/indkhan/vehicle-requirements-ai/pull/2",
-      "tested_commit": "c65b3735fd04968c0a4e4954de0da804159a4272",
+      "tested_commit": "c9d6a06e8f382c55d7f51e2bf9fc688868048a99",
       "tests": [
-        "Final fresh-image local verification: cumulative suite 50 passed in 71.43s; Ruff lint/format (36 files), strict mypy (19 source files), Alembic upgrade/repeat/no-drift, generated contracts and git diff checks passed; final CI pending",
+        "Final GitHub Actions run 38078058760 at c9d6a06: cumulative suite 50 passed in 35.33s; lint, formatting, type checks, migrations, contracts, API/worker startup and parser imports passed",
+        "Final fresh-image local verification: cumulative suite 50 passed in 71.43s; Ruff lint/format (36 files), strict mypy (19 source files), Alembic upgrade/repeat/no-drift, generated contracts and git diff checks passed",
         "GitHub Actions run 38077115078 at c65b373: Linux cumulative suite 49 passed in 31.25s",
         "GitHub Actions at c65b373: Ruff lint/format, strict mypy (19 files), migration repeat/no-drift, generated contracts, API/worker startup and parser binary imports passed",
         "Local cumulative suite at c65b373: 47 passed, 2 timing failures in 333.50s under host contention; unchanged focused reproductions passed 2 in 7.21s, deadline rejection/dispatch recovery behavior confirmed",
         "Runtime pip-audit: no known vulnerabilities found",
         "Focused privacy + connected Temporal trace: 6 passed in 10.64s"
       ],
-      "merge_sha": null,
+      "merge_sha": "2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46",
       "blocker": null
     },
     {
@@ -34,12 +35,17 @@
         "BE-06",
         "BE-07"
       ],
-      "status": "not_started",
+      "status": "merged",
       "branch": "be/S2-ingestion",
-      "pr_url": null,
+      "merged_commit": "e128bf8364c93bd73c2f60388583993202950bb2",
+      "local_followups": {"status": "implementation_complete_checks_pending", "branch": "be/backend-completion", "tested_commit": null, "merge_sha": null, "validation_state": "Additional local ingestion/evidence/recovery fixes are unpublished and require final cumulative verification"},
+      "implementation_paths": ["backend/app/ingestion.py", "backend/app/excel.py", "backend/app/excel_process.py", "backend/app/pdf.py", "backend/app/pdf_worker.py", "backend/app/evidence.py", "backend/migrations/versions/0005_ingestion_cache.py"],
+      "tests_written": ["backend/tests/test_ingestion_execution.py", "backend/tests/test_ingestion_cache.py", "backend/tests/test_ingestion_join.py", "backend/tests/test_evidence.py", "backend/tests/test_evidence_security.py", "backend/tests/test_pdf_evaluation.py"],
+      "validation_state": "Final cumulative checks pending; private PDF/corpus quality evaluation and recovery acceptance remain open",
+      "pr_url": "https://github.com/indkhan/vehicle-requirements-ai/pull/3",
       "tested_commit": null,
       "tests": [],
-      "merge_sha": null,
+      "merge_sha": "12c1ade5dd3829cd6f48d7336091f954207f161f",
       "blocker": null
     },
     {
@@ -48,8 +54,11 @@
         "BE-08",
         "BE-09"
       ],
-      "status": "not_started",
-      "branch": "be/S3-findings",
+      "status": "implementation_complete_checks_pending",
+      "branch": "be/backend-completion",
+      "implementation_paths": ["backend/app/findings.py", "backend/app/artifacts.py", "backend/app/main.py"],
+      "tests_written": ["backend/tests/test_findings.py"],
+      "validation_state": "Final cumulative and structured live inference quality checks pending; no tested commit recorded",
       "pr_url": null,
       "tested_commit": null,
       "tests": [],
@@ -63,8 +72,11 @@
         "BE-11",
         "BE-12"
       ],
-      "status": "not_started",
-      "branch": "be/S4-proposals",
+      "status": "implementation_complete_checks_pending",
+      "branch": "be/backend-completion",
+      "implementation_paths": ["backend/app/research.py", "backend/app/proposals.py", "backend/app/control.py", "backend/app/workflows.py"],
+      "tests_written": ["backend/tests/test_proposal_scoring.py", "backend/tests/test_research_security.py", "backend/tests/test_research_budget.py"],
+      "validation_state": "Final cumulative checks pending; guided recovery, research/search capability and all-scenario endpoint acceptance not yet verified",
       "pr_url": null,
       "tested_commit": null,
       "tests": [],
@@ -78,8 +90,11 @@
         "BE-14",
         "BE-15"
       ],
-      "status": "not_started",
-      "branch": "be/S5-control",
+      "status": "implementation_complete_checks_pending",
+      "branch": "be/backend-completion",
+      "implementation_paths": ["backend/app/control.py", "backend/app/rendering.py", "backend/app/exports.py", "backend/app/evidence.py"],
+      "tests_written": ["backend/tests/test_control_delivery.py", "backend/tests/test_evidence_external.py"],
+      "validation_state": "Final cumulative checks pending; simultaneous edits, late results, renderer integration and exact-version export reconciliation not yet verified",
       "pr_url": null,
       "tested_commit": null,
       "tests": [],
@@ -91,8 +106,11 @@
       "work_packages": [
         "BE-16"
       ],
-      "status": "not_started",
-      "branch": "be/S6-handoff",
+      "status": "in_progress",
+      "branch": "be/backend-completion",
+      "implementation_paths": ["backend/TESTING_HANDOFF.md", "backend/app/pdf_evaluation.py", "backend/app/excel_evaluation.py", "backend/README.md"],
+      "validation_state": "Validation was deferred during implementation at the user's request; final checks are in progress, full acceptance is not claimed",
+      "outstanding_gates": ["Final cumulative lint, formatting, types, migrations, contracts and backend tests", "All ten named scenarios through actual endpoints with labeled external fakes", "Crash recovery, guided-wait recovery, lost acknowledgements and workflow replay after code update", "Private real-corpus extraction/grouping/retrieval/baseline quality and resource measurements", "Configured live OIDC, production storage, hosted Temporal, structured inference/search, OTLP and real renderer", "Joint frontend/assets/renderer acceptance and production readiness/backup/restore configuration"],
       "pr_url": null,
       "tested_commit": null,
       "tests": [],
@@ -100,6 +118,14 @@
       "blocker": null
     }
   ],
+  "working_tree_validation": {
+    "date": "2026-10-10",
+    "branch": "be/backend-completion",
+    "focused_tests": "60 passed in 6.92s: pipeline_wiring, demo_readiness, proposal_scoring, research_security, findings, dispatch_wiring, control_delivery, evidence_external",
+    "test_dependencies": "PostgreSQL integration and deterministic AI/Temporal/renderer fakes; no live structured inference/search or renderer verification",
+    "static_checks": "Ruff lint/format passed; generated contracts refreshed; strict mypy passed all 38 source files",
+    "remaining": "Full cumulative suite, all scenario endpoints, crash/replay, private corpus and configured live integrations deferred to testing phase"
+  },
   "live_integrations": {
     "ai_connectivity": {
       "status": "verified",

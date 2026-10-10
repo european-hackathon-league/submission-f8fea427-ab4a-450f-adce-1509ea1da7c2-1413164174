@@ -34,14 +34,18 @@ services:
   worker:
     build:
       context: .
-      target: runtime
+      target: parser
     command: ["python", "-m", "app.worker"]
     restart: on-failure
     environment:
       DATABASE_URL: postgresql+psycopg://vehicle:vehicle@postgres:5432/vehicle
       TEMPORAL_ADDRESS: temporal:7233
       STORAGE_PATH: /data/objects
-    volumes: ["objects:/data/objects", "../contracts:/srv/contracts:ro"]
+      PDF_ARTIFACTS_PATH: /models
+    volumes:
+      - objects:/data/objects
+      - ../contracts:/srv/contracts:ro
+      - ${PDF_MODEL_DIRECTORY:-./.local/pdf-models}:/models:ro
     depends_on:
       postgres: {condition: service_healthy}
       temporal: {condition: service_started}

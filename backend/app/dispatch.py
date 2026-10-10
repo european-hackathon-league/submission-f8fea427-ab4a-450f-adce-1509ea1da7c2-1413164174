@@ -8,9 +8,9 @@ from temporalio.common import WorkflowIDReusePolicy
 from temporalio.exceptions import WorkflowAlreadyStartedError
 from temporalio.service import RPCError
 
-from app.db import Command, Outbox, Run, RunSource, Session
+from app.db import Command, Outbox, Run, RunSource, Session, StageOutput
 from app.telemetry import tracer
-from app.workflows import AnalysisWorkflow
+from app.workflows import AnalysisWorkflow, DeliveryWorkflow
 
 
 async def dispatch_once(
@@ -34,7 +34,7 @@ async def dispatch_once(
         accepted = session.get(Command, intent.command_id)
         if accepted is None:
             raise ValueError("Outbox command missing")
-        run_id = accepted.result["run_id"]
+        run_id = accepted.run_id or accepted.result.get("run_id")
         run = session.get(Run, run_id)
         if run is None:
             raise ValueError("Outbox run missing")
@@ -49,7 +49,59 @@ async def dispatch_once(
                 )
             ),
         }
+        bindings = session.scalars(
+            select(RunSource).where(RunSource.run_id == run.id)
+        ).all()
+        if bindings:
+            revision = bindings[0].binding.get("workflow_revision")
+            if revision in {"ingestion-v1", "analysis-v1"} and all(
+                member.binding.get("workflow_revision") == revision
+                for member in bindings
+            ):
+                manifest["pipeline_version"] = revision
+        if accepted.operation != "runs":
+            resource_id = accepted.result.get("resource_id", accepted.id)
+            artifact_id = (
+                accepted.id if accepted.operation == "continuation" else resource_id
+            )
+            stage = session.scalar(
+                select(StageOutput).where(
+                    StageOutput.run_id == run.id,
+                    StageOutput.stage_key == f"{accepted.operation}:{artifact_id}",
+                )
+            )
+            if stage is None:
+                raise ValueError("Accepted command artifact missing")
+            manifest.update(
+                generation_id=stage.generation_id,
+                operation=accepted.operation,
+                resource_id=resource_id,
+                command_id=accepted.id,
+            )
         intent.attempts += 1
+        if accepted.operation == "continuation":
+            if stage is None:
+                raise ValueError("Continuation artifact missing")
+            initial = session.scalar(
+                select(Command).where(
+                    Command.run_id == run.id, Command.operation == "runs"
+                )
+            )
+            if initial is None:
+                raise ValueError("Analysis command missing")
+            try:
+                await client.get_workflow_handle("command-" + initial.id).signal(
+                    "continue_analysis",
+                    {
+                        "command_id": accepted.id,
+                        "checkpoint_id": str(stage.payload["checkpoint_id"]),
+                    },
+                    rpc_timeout=timedelta(seconds=5),
+                )
+            except RPCError, RuntimeError, TimeoutError:
+                return False
+            intent.delivered = acknowledge
+            return True
         with tracer.start_as_current_span(
             "command.dispatch",
             context=extract(accepted.trace_context),
@@ -77,7 +129,9 @@ async def _start(
     try:
         await asyncio.wait_for(
             client.start_workflow(
-                AnalysisWorkflow.run,
+                DeliveryWorkflow.run
+                if "operation" in manifest
+                else AnalysisWorkflow.run,
                 manifest,
                 id="command-" + command_id,
                 task_queue=task_queue,

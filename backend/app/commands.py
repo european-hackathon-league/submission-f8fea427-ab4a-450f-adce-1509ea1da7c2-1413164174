@@ -44,6 +44,8 @@ def command(
     key: str,
     body: dict[str, Any],
     effect: Callable[[DBSession, str], dict[str, Any]],
+    *,
+    run_id: str | None = None,
 ) -> dict[str, Any]:
     fingerprint = hashlib.sha256(
         json.dumps(body, sort_keys=True, separators=(",", ":")).encode()
@@ -89,7 +91,7 @@ def command(
                 body_hash=fingerprint,
                 body=body,
                 result=result,
-                run_id=result.get("run_id"),
+                run_id=run_id or result.get("run_id"),
                 trace_context=context,
             )
         )
@@ -98,7 +100,7 @@ def command(
             actor,
             operation,
             result.get("resource_id", command_id),
-            result.get("run_id"),
+            run_id or result.get("run_id"),
         )
         return result
 

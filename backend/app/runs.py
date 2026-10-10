@@ -19,6 +19,24 @@ def catalog() -> dict[str, Any]:
 def snapshot(identity: Actor, run_id: str) -> w.Snapshot:
     with Session() as session:
         run = owned_run(session, identity, run_id)
+        actions = []
+        if run.analysis_status == "waiting_for_pm" and identity.actor_type == "pm":
+            actions = ["continue_checkpoint"]
+        elif (
+            run.analysis_status == "proposals_ready"
+            and run.current_proposal_set_version is not None
+        ):
+            actions = ["export"]
+            if identity.actor_type == "pm":
+                actions = [
+                    "edit",
+                    "reimagine",
+                    "approve",
+                    "reject",
+                    "defer",
+                    "select",
+                    "export",
+                ]
         return w.Snapshot.model_validate(
             {
                 "run_id": run.id,
@@ -28,7 +46,7 @@ def snapshot(identity: Actor, run_id: str) -> w.Snapshot:
                 "revision": run.revision,
                 "last_event_sequence": run.event_sequence,
                 "current_proposal_set_version": run.current_proposal_set_version,
-                "available_actions": [],
+                "available_actions": actions,
                 "warnings": run.warnings,
                 "resource_links": {
                     name: f"/api/v1/runs/{run.id}/{name}"
@@ -38,6 +56,7 @@ def snapshot(identity: Actor, run_id: str) -> w.Snapshot:
                         "research",
                         "conflicts",
                         "proposals",
+                        "evidence",
                         "history",
                     )
                 },

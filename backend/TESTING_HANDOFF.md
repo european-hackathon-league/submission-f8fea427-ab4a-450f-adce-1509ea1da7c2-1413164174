@@ -149,3 +149,86 @@ The response contains dependency booleans and configuration flags for AI,
 research, renderer, OIDC, S3 and telemetry, without endpoint URLs or secret values.
 Configuration flags establish presence only; live feature behavior remains a
 separate integration gate. `/health` remains the API liveness probe.
+
+## Backend audit, 10 October 2026
+
+Audited against `backend_plan.md`, `plan.md`, the supplied brief and this runbook.
+Code tested: `441386b` on `main`. The backend has working local foundations and a
+successful live synthetic AI pipeline, but it has not passed all release gates.
+The fresh-image cumulative suite passed **207 tests in 137.58 seconds**. Ruff lint,
+formatting (89 files), strict mypy (38 files), generated contracts, Alembic upgrade
+and no-drift check all passed. The restarted API returned HTTP 200 from `/ready`
+with database and Temporal ready. Automated AI/search/renderer tests use controlled
+providers; the separate live evidence below identifies actual external calls.
+The machine used Windows with Docker Desktop, Python 3.14.8 in Linux containers,
+local PostgreSQL/Temporal and CPU PDF parsing; Docker had about 7.6 GiB memory
+and other running services. Provider calls used the configured real credentials.
+Private documents, passages, reference answers and credentials remain outside Git.
+
+### Corrections committed separately
+
+| Commit | Reproduced defect and correction |
+|---|---|
+| `d5d69a9` | OpenAI rejected the proposal schema with HTTP 400. Factor rationales now use closed, named properties in the provider schema. |
+| `6d13c1b` | The PDF evaluation CLI exited successfully on a failed reference gate. It now exits nonzero. |
+| `a26f90f` | Extraction/baseline calls ignored the endpoint frozen in run configuration. They now honor it. |
+| `7564dfc` | Proposal/research requests omitted the provider response-storage opt-out. Every such request now sends `store=False`. This does not establish a provider zero-retention agreement. |
+| `8d2b665` | Eight supplied country codes lost market scope. Mappings and EU membership were corrected, with a parser revision increment to invalidate old cached interpretations. |
+| `441386b` | Positive-only feedback could not support a requirement preserving that strength. Related positive evidence is now accepted; unrelated citations remain rejected and negative counts stay unchanged. |
+| `1d6513c` | Added endpoint acceptance coverage for PM edits, decisions, frozen exports, late rendering, history, event replay and workspace isolation. Proposals and renderer outcomes in this test are synthetic. |
+
+### Measured private-source checks
+
+| Input | Result |
+|---|---|
+| F70 feedback | 2,128 distinct records; 4,076 annotations; no unresolved annotations or coverage gaps. |
+| G60 feedback | 4,000 distinct records; 5,005 annotations; no unresolved annotations or coverage gaps. |
+| G70 feedback | 4,000 distinct records; 4,690 annotations; no unresolved annotations or coverage gaps. |
+| Study workbook | Both sheet layouts processed; 1,627 metrics, no unknown values. All cell meanings were not manually evaluated. |
+| Sales workbook | Three sheets; 36 metrics, including six literal zeros; partial coverage for unmapped country/region labels. |
+| F70 equipment PDF, page 13 | Six manual cases and locators matched; partial document coverage remains explicit. |
+| G60 equipment PDF, page 13 | Two manual availability cases and locators matched; partial coverage. |
+| G70 equipment PDF, page 14 | Two manually inspected availability cases and locators matched; partial coverage. |
+| Annual report, page 14 | Two manual text cases and locators matched. |
+
+Feedback distinct counts were independently reconciled from source/record IDs,
+rather than checked against parser output alone. Counts above are per input and
+do not imply that different profiles contain disjoint people. Excel checks took
+about 0.6–4.2 seconds per workbook. Sequential PDF samples took 23–47 seconds,
+with peak child RSS about 1.15–1.36 GiB. Offline PDF model checksums passed.
+Two concurrent PDF samples on the busy host exceeded the default 180-second
+parser deadline; sequential runs passed. Full-document PDF fidelity, especially
+the entire annual report, and sustained concurrent workload quality remain open.
+
+### Live connections and plan coverage
+
+| Plan area | Evidence and remaining gate |
+|---|---|
+| B1: API foundations | Local database/Temporal readiness, authenticated workspace checks, uploads, immutable configurations and reconnect behavior exercised. Production OIDC/JWKS rotation is unconfigured. |
+| B2: Evidence pipeline | Real workbooks normalized and PDF samples checked. Synthetic live extraction/review/grouping/reconciliation completed with resolving citations. Full-corpus semantic accuracy is not established. |
+| B3: Deep Dive | Real hosted search and safe retrieval of two public sources ran. One retrieval failed and the shared time budget expired before claim assessment: final status unavailable, zero validated claims. Validated capability/opinion quality and counterevidence are open. |
+| B4: Proposals | Live synthetic upload-to-proposals finished in 71 seconds with one finding, one change and one variant; decision stayed proposed and all citations resolved. Unknown baseline scope remained explicit. Real-feedback completion is still open. |
+| B5: Refinement | Endpoint tests verify exact versions, stale rejection, decisions, preserved proposals, history and frozen export. Guided/checkpoint and reuse behavior also have deterministic coverage; the whole guided AI flow was not tested live. |
+| B6: Renderer | Failure/unsupported outcomes and late-version behavior tested with controlled adapters. The other team's authenticated renderer is unconfigured. |
+| B7: Evaluation/recovery | Local real Temporal recovery/replay tests and replay of the successful live pipeline passed. Joint frontend scenarios, large-scale AI quality, backup/restore and business impact remain open. |
+
+The successful live synthetic run was `00619bef-5695-4ad1-9a28-1766b4f7f417`.
+A three-record real G60 sample reached findings/baselines but failed at proposal
+generation. A subsequent run after the preservation fix failed during extraction
+with provider connection-refused errors. Other attempts observed intermittent DNS
+failures. A test-container-only hostname override allowed the synthetic run;
+no permanent application networking override was committed. A connectivity smoke
+pass therefore does not establish reliable end-to-end service availability.
+
+Provider token usage was present for extraction and review stages, but complete
+pipeline cost and production throughput were not measured. The live sample used
+the existing synthetic vehicle/part catalog; it does not validate actual G60/F70/G70
+equipment applicability. Production S3, supported hosted Temporal, OTLP, renderer,
+HTTPS/data-region choices and backup/restore remain unconfigured or unchecked.
+
+The API was rebuilt/restarted with audited code. PostgreSQL, Temporal and all
+volumes were preserved. The global worker is stopped to avoid consuming accumulated
+test commands and making unintended provider calls; live tests used an isolated
+queue and dispatched only their own command. Starting normal processing requires
+reviewing that test backlog before starting the worker. This audit made local
+commits only; it did not deploy or push them.

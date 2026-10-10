@@ -143,12 +143,52 @@
       "input_tokens": 21,
       "output_tokens": 5
     },
-    "ai_structured_extraction": "not_verified",
-    "search": "not_verified",
+    "ai_structured_extraction": "verified_on_live_synthetic_pipeline; real_feedback_completion_open",
+    "search": "live_search_and_retrieval_exercised; validated_claims_not_verified",
     "oidc": "unconfigured",
     "s3": "unconfigured",
     "hosted_temporal": "unconfigured",
     "renderer": "unconfigured",
     "otlp": "unconfigured"
+  },
+  "backend_audit": {
+    "date": "2026-10-10",
+    "branch": "main",
+    "tested_code_commit": "441386b4efc6b8a36b0d67178026435d0f1cf218",
+    "report": "backend/TESTING_HANDOFF.md#backend-audit-10-october-2026",
+    "tests": "207 passed in 137.58s on Python 3.14.8 with local PostgreSQL and Temporal; external behavior in the automated suite uses controlled providers",
+    "checks": ["Fresh API/worker images built", "Ruff lint passed", "Ruff formatting: 89 files passed", "Strict mypy: 38 files passed", "Generated contracts check passed", "Alembic upgrade/check: no drift", "Restarted API /ready: HTTP 200, database and Temporal ready", "git diff --check passed"],
+    "fix_commits": ["d5d69a9", "6d13c1b", "a26f90f", "7564dfc", "8d2b665", "441386b"],
+    "acceptance_test_commit": "1d6513c",
+    "private_corpus": {
+      "feedback_records_per_profile": {"F70": 2128, "G60": 4000, "G70": 4000},
+      "feedback_annotations_per_profile": {"F70": 4076, "G60": 5005, "G70": 4690},
+      "feedback_distinct_counts_independently_reconciled": true,
+      "study_metrics": 1627,
+      "sales_metrics": 36,
+      "sales_zero_metrics": 6,
+      "sales_status": "partial_unknown_country_mapping",
+      "pdf_manual_cases_matched": 12,
+      "pdf_manual_locators_matched": 12,
+      "pdf_scope": "Sample pages in three derivative equipment PDFs and annual report; not full-document fidelity",
+      "pdf_concurrency": "Two concurrent samples exceeded parser deadline under host contention; sequential samples passed"
+    },
+    "live_pipeline": {
+      "synthetic_run_id": "00619bef-5695-4ad1-9a28-1766b4f7f417",
+      "synthetic_status": "proposals_ready",
+      "duration_seconds": 71,
+      "findings": 1,
+      "changes": 1,
+      "variants": 1,
+      "citations_resolve": true,
+      "human_approval_fabricated": false,
+      "temporal_replay": "passed",
+      "real_feedback_sample": "Reached findings/baselines then failed proposals; subsequent post-fix attempt failed extraction with provider connection refused",
+      "research": "Hosted search and two safe public-source retrievals exercised; budget expired before claim assessment; unavailable with zero validated claims"
+    },
+    "remaining_gates": ["Reliable provider connectivity and completed real-feedback pipeline", "Full private-corpus semantic accuracy and full-document PDF fidelity", "Validated Deep Dive claims and counterevidence quality", "Real vehicle/part/asset catalog and equipment applicability", "Live guided AI acceptance and joint frontend scenarios", "Production identity, storage, supported Temporal, OTLP and renderer", "Backup/restore, concurrent load, throughput and complete cost measurements"],
+    "runtime": "Audited API running; PostgreSQL/Temporal and private volumes preserved; global worker stopped to avoid consuming accumulated test jobs. Live tests used isolated queues.",
+    "publication": "Local commits only; no push or deployment",
+    "release_ready": false
   }
 }

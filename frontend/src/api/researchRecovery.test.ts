@@ -1,4 +1,6 @@
 import { afterEach, expect, it, vi } from "vitest";
+import Ajv2020 from "ajv/dist/2020";
+import openapi from "../../fixtures/openapi.json";
 import { createMockApi, createRealApi } from "./client";
 import scenarios from "../../fixtures/scenarios.json";
 import { wireFixtures } from "./fixtures";
@@ -295,4 +297,28 @@ it("regrouped proposal changes retain the accepted variant applicability scope w
     ["North America"],
   );
   expect(after.findings[0].cohort_ids).toEqual(["Europe"]);
+});
+
+it.each([false, true])("accepts explicit empty cohort scopes (clear all: %s) without changing feedback", async clearAll => {
+  const { api, root, runId } = await guided();
+  const before = await api.workspace(runId);
+  const assignments = Object.fromEntries(before.proposals.variants.map((variant, index) => [
+    variant.variant_id,
+    clearAll || index === 0 ? [] : variant.cohort_scope,
+  ]));
+  const command: Wire.Continuation = {
+    checkpoint_version: before.checkpoint!.version,
+    resolution: "regroup_variants",
+    cohort_assignments: assignments,
+  };
+  const validate = new Ajv2020({ strict: false }).compile(openapi.components.schemas.Continuation);
+  expect(validate(command)).toBe(true);
+  await api.request(`${root}/checkpoints/checkpoint-comfort/continue`, command, "clear-cohorts");
+  const after = await api.workspace(runId);
+  expect(after.proposals.proposal_set_version).toBe(before.proposals.proposal_set_version + 1);
+  expect(after.proposals.variants.map(variant => variant.cohort_scope)).toEqual(Object.values(assignments));
+  expect(after.proposals.variants[0].changes[0].wire?.scope.cohort_ids).toEqual([]);
+  expect(after.findings.map(finding => [finding.cohort_ids, finding.counts])).toEqual(
+    before.findings.map(finding => [finding.cohort_ids, finding.counts]),
+  );
 });

@@ -461,7 +461,7 @@ export function createMockTransport(scenario: string): {
         )
           throw new ApiError(
             "invalid_cohort",
-            "Choose existing cohorts for at least one variant.",
+            "Choose at least one existing variant for regrouping.",
             null,
             422,
           );
@@ -481,7 +481,6 @@ export function createMockTransport(scenario: string): {
               (variant) => variant.variant_id === variantId,
             ) ||
             !Array.isArray(ids) ||
-            !ids.length ||
             ids.some((id) => !cohortIds.has(id)) ||
             new Set(ids).size !== ids.length
           )

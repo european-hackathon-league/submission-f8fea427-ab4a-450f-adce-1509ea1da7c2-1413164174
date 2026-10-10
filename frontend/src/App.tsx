@@ -31,6 +31,7 @@ import HistoryPanel from "./components/HistoryPanel";
 import RenderPanel from "./components/RenderPanel";
 import ChangeExplanation from "./components/ChangeExplanation";
 import SceneCapabilities from "./components/SceneCapabilities";
+import AcceptanceEnvironment from "./components/AcceptanceEnvironment";
 import { recoverRun } from "./runRecovery";
 import { readSession, saveSession, clearSession } from "./session";
 import type { PendingRun, ProposalSelection } from "./session";
@@ -75,8 +76,8 @@ type ProposalDraft = { text: string; target: string; baseVersion: number };
 
 export default function App({ api: suppliedApi }: { api?: Api }) {
   const [connectedApi, setConnectedApi] = useState<Api | null>(suppliedApi ?? (import.meta.env.VITE_API_MODE === "real" ? null : createApi()));
-  if (!connectedApi) return <ApiAccess baseUrl={import.meta.env.VITE_API_BASE_URL || "/api/v1"} onConnect={(base, headers, sessionNamespace) => setConnectedApi(createRealApi(base, { headers: () => headers, sessionNamespace }))} />;
-  return <WorkspaceApp key={connectedApi.sessionNamespace ?? connectedApi.mode} api={connectedApi} onDisconnect={connectedApi.mode === "real" && !suppliedApi ? () => setConnectedApi(null) : undefined} />;
+  if (!connectedApi) return <><AcceptanceEnvironment/><ApiAccess baseUrl={import.meta.env.VITE_API_BASE_URL || "/api/v1"} onConnect={(base, headers, sessionNamespace) => setConnectedApi(createRealApi(base, { headers: () => headers, sessionNamespace }))} /></>;
+  return <><AcceptanceEnvironment/><WorkspaceApp key={connectedApi.sessionNamespace ?? connectedApi.mode} api={connectedApi} onDisconnect={connectedApi.mode === "real" && !suppliedApi ? () => setConnectedApi(null) : undefined} /></>;
 }
 
 function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconnect?: () => void }) {

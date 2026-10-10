@@ -2,7 +2,7 @@
 
 Build the backend in **four epics and sixteen sequential story PRs**. Each story contains small, independently understandable commits. Merge each verified story into `backend` before starting the next story. The frontend and renderer implementation remain with the other team.
 
-This is an implementation backlog, not a claim that the backend exists. On 2026-10-10 the repository contains plans and input documents, with no application code, dependency manifest, API, database migrations, or tests. The local `backend` branch exists; only `origin/main` was visible in the inspected remote-tracking refs. Verify the remote before publishing the integration branch.
+This is an implementation backlog, not a claim that the backend exists. On 2026-10-10 the repository contains plans and input documents, with no application code, dependency manifest, API, database migrations, or tests. The local `backend` branch and remote-tracking `origin/backend` exist. Verify the remote state before publishing story branches.
 
 The governing product and API requirements are [plan.md](plan.md) and [backend_plan.md](backend_plan.md); [frontend_plan.md](frontend_plan.md) defines the other team's ownership. [backlog.md](backlog.md) defines exclusions. This document adds execution order and concrete technology choices without replacing their wire contract. Older examples in `first_plan.md` and the original full plan do not override the current shared plan.
 
@@ -22,6 +22,72 @@ The governing product and API requirements are [plan.md](plan.md) and [backend_p
 The user's requested Codex GPT-6.1 Soul/Sol coding model is the **builder**. Before dispatching future work, resolve its exact provider/model ID from the orchestration catalog; do not guess from the display name or silently substitute. The application's inference model is a separate deployment setting. No model-specific throughput or completion-time promise is assumed here.
 
 Initial production topology: API + activity/workflow workers + application PostgreSQL + private S3 storage + managed Temporal. The outbox dispatcher can run with the worker deployment. Local Compose adds a persisted development Temporal service and the local storage adapter; a development server is not a production deployment. Begin with bounded worker/provider concurrency and isolate CPU-heavy parsing from the API event loop. Do not add a graph database, vector database, agent framework, Kubernetes, or a live Google Drive connector without a demonstrated need. The graph remains a relational projection; scoped retrieval starts with SQL filters and text search.
+
+## Workflow and agent design review 2026 10 10
+
+The recommended design is a durable application workflow containing bounded AI tasks and a tool-using research loop. The following decisions refine execution inside the existing product stages; they do not change public endpoints, frontend ownership, or the four-epic/sixteen-story delivery sequence. They are architecture recommendations for this corpus, not claims of measured performance before implementation.
+
+### Ownership and execution
+
+| Responsibility | Owner | Rule |
+|---|---|---|
+| Authorization, source identities, counts, scoring, version checks and publication | Application code and PostgreSQL | Models cannot override these rules or approve on behalf of a PM. |
+| Scheduling, retries, deadlines, guided waits and recovery | Temporal | Durable orchestration invokes Activities; model/tool calls never execute during workflow replay. |
+| Observation extraction, semantic grouping and requirement drafting | Typed, task-specific model calls | Return candidate records with evidence IDs; only validated records become application state. |
+| Deep Dive investigation | Bounded research agent inside an Activity/task sequence | It chooses the next question/search within the accepted scope; the application enforces budgets and publication. |
+| Facts, sources, tool outcomes and reusable artifacts | Versioned durable storage | A conversation summary or context window is never the authoritative evidence store. |
+
+Separate the durable record, model reasoning loop, and tool execution interfaces. New hosted agent services also separate these responsibilities; adopting their whole runtime is not required for this application's fixed API and human checkpoints. Keep task inputs/outputs independent of the provider so a measured improvement can replace the model or harness later. [Current managed-agent architecture](https://www.anthropic.com/engineering/managed-agents).
+
+### 1. Execute dependencies, not one long serial prompt chain
+
+Freeze the run's input manifest, then parse independent files concurrently under resource limits. Feedback, studies, sales, equipment, and strategy extraction can progress independently. Consolidation waits for the relevant source outcomes; baseline lookup can run alongside finding generation where its inputs are already known. Deep Dive starts from published scoped findings. Conflict handling and proposal generation join the required evidence and research snapshots. A failed companion file produces explicit coverage rather than discarding valid inputs.
+
+Keep the frontend's agreed stage names and events. Internally each output binds its input versions and generation ID. A visible snapshot contains one coherent generation; provisional results carry coverage and cannot silently mix old and new memberships. No valid evidence is a distinct failure outcome, not a successful empty proposal. Guided decisions suspend only their dependent work; independent parsing/retrieval can finish. Runtime concurrency is separate from the builder's sequential story PRs.
+
+### 2. Give the agent a narrow investigation loop
+
+Deep Dive follows: formulate a scoped question, search, retrieve supporting passages, assess applicability and counterevidence, then either ask the next useful question or stop. Persist the question, attempts, source references, remaining budget, and outcome after each completed step. Resume from durable outcomes after a crash. Stop on sufficient support, no new useful evidence, cancellation, deadline, or exhausted tool/token/cost limits; return supported claims plus explicit gaps.
+
+Expose only typed tools for scoped evidence search/read and permitted public-source retrieval. Enforce workspace, source version, market, vehicle, date, output size, and remaining budget in code, not in prompts alone. Tools return IDs, locators, content, and structured failure reasons. No arbitrary SQL, shell, publication, or PM-decision tools. Independent research questions may run concurrently with a shared budget reserved atomically; there is no default recursive agent delegation. Structured extraction and scoring do not require an autonomous agent. This applies the distinction between predictable workflows and open-ended investigation to our product. [Workflow and agent patterns](https://www.anthropic.com/engineering/building-effective-agents).
+
+### 3. Retrieve evidence on demand and preserve identity
+
+Build small context packages using scope filters and exact source references. A model can request nearby rows, table legends, footnotes, or report sections as needed. Preserve raw passages separately from translations and interpretations. Start with relational filters and text search; evaluate multilingual/paraphrase recall before adding embeddings or hybrid retrieval. Retrieval must be evaluated against known relevant evidence, including opposing evidence, rather than judged only by fluent answers. [Context selection patterns](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents).
+
+For thousands of feedback records, partition candidate grouping by relevant scope/topic and retrieve likely matches; avoid comparing every record with every other record or putting all workbooks in one prompt. Evaluate grouping across batch boundaries so partitioning cannot silently fragment a common need. Reconcile final group membership explicitly. Counts always come from record-ID sets. Cache extraction by workspace, content fingerprint, parser/model/prompt/schema versions and relevant configuration; a matching file hash permits reuse but does not establish respondent identity. External research reuse also binds its scope and freshness policy.
+
+### 4. Validate meaning before publishing
+
+Use separate gates for schema/ID/span validity, scope applicability, and whether the cited passage actually supports the claim. Literal quotation matching alone is insufficient. Code checks identities, quantities, units and scope; a bounded semantic assessment flags unsupported interpretations and contradictions. A model's confidence or agreement with another model is not proof. Keep source facts, observations, inferences, proposed targets, and PM-origin ideas distinguishable.
+
+Allow a bounded repair attempt for invalid model output, then preserve an explicit gap or failed batch. Never loop until a judge approves. Introduce a small manually checked evaluation set in BE-07/BE-08, extend it with baseline and research cases in BE-09/BE-10, and run regressions when prompts/models change. Include misleading citations, contradictory sources, multilingual feedback, repeated annotations, and missing denominators. Measure extraction/grouping quality, evidence support, coverage, latency and cost separately. Set documented release thresholds against the reference set before tuning; BE-16 expands this evaluation rather than introducing it for the first time. [Agent evaluation guidance](https://developers.openai.com/api/docs/guides/agent-evals).
+
+### 5. Make PM edits incremental and protect their work
+
+Persist artifact dependencies from source versions through observations, findings, research bundles, requirements, scores and render manifests. Implement this with ordinary versioned records/link tables, not a separate graph service. A target edit recalculates affected scores and marks affected renders stale; it does not reparse every workbook. Regrouping reuses evidence membership. A new unsupported idea remains PM-origin. Research only reruns through an explicitly accepted operation within the existing contract.
+
+Every asynchronous result carries its base proposal version and generation ID. Publishing compares those values with the current accepted generation in one transaction. A late model, research or renderer result may be retained for audit but cannot replace a newer PM-edited proposal. Cancelling provider work is best effort; preventing stale publication is mandatory. Existing versions remain readable during recomputation.
+
+### 6. Measure complexity before adding it
+
+Begin with one configurable application model and direct typed provider calls. Introduce cheaper-model routing, extra critique passes, hybrid search, or specialist agents only when the same reference tasks demonstrate a quality/cost/latency gain. Record the resolved model and policy per artifact. Distinguish provider retries from semantic repair; uncertain requests can incur duplicate external cost even when database effects are idempotent. Track that uncertainty and cap attempts. Workflow history, UI replay events and product audit serve different purposes; do not turn the entire application into an event-sourcing framework.
+
+### Story gates added by this review
+
+These are mandatory acceptance additions to the existing stories, implemented within their existing commit slices.
+
+| Story | Additional acceptance evidence |
+|---|---|
+| BE-04 | Independent tasks overlap under bounded concurrency; joins publish coherent generations; recovery reuses committed artifacts. |
+| BE-05–BE-07 | Reused parsing preserves source lineage and scoped identity; bounded parsing failures report coverage; PDF reference cases begin evaluation early. |
+| BE-08 | Cross-batch grouping and retrieval recall are evaluated; supporting/opposing membership reconciles; claim validation separates valid citations from supported meaning. |
+| BE-09 | Applicability cases test market/date/derivative mismatches and distinguish unknown from absent. |
+| BE-10 | Research resumes after a completed step, stops at all configured limits, preserves counterevidence, and cannot exceed shared budgets through concurrent tasks. |
+| BE-11 | A guided pause blocks dependent proposal publication while unrelated safe work can complete; repeated/stale decisions have one logical effect. |
+| BE-12 | Unsupported claims fail publication or remain explicit gaps; atomic publication rejects a superseded generation. |
+| BE-13–BE-14 | Tests prove minimal affected recomputation and reject late AI/research/render publication after a newer PM edit. |
+| BE-16 | Report reference-set quality and retrieval/grouping errors alongside runtime/cost; compare any added agent/model complexity against the simpler baseline. |
 
 ## Technology currency review 2026 10 10
 

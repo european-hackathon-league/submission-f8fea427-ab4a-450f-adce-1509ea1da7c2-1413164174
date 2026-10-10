@@ -1,7 +1,7 @@
 import {Component, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ErrorInfo, type ReactNode} from 'react';
 import {Canvas, useThree} from '@react-three/fiber';
 import {Environment, OrbitControls, RoundedBox, useGLTF} from '@react-three/drei';
-import {Color, Mesh, MeshStandardMaterial, Shape, ExtrudeGeometry, Vector3} from 'three';
+import {Color, DoubleSide, Mesh, MeshStandardMaterial, Shape, ExtrudeGeometry, Vector3} from 'three';
 import type {ComponentId, Period, VehicleView, VehicleViewerProps} from '../domain/contracts';
 import {componentHeatColor, componentForNodeName} from './modelMapping';
 import './vehicle-viewer.css';
@@ -9,7 +9,7 @@ import './vehicle-viewer.css';
 const labels: Record<ComponentId, string> = {steering:'Steering wheel',dashboard:'Dashboard',seats:'Seats',charging:'Charging port',body:'Body',lighting:'Lighting'};
 const areas: Record<VehicleView, ComponentId[]> = {exterior:['body','lighting','charging'],interior:['steering','dashboard','seats']};
 const allComponents: ComponentId[] = ['body','lighting','charging','steering','dashboard','seats'];
-const componentAnchors: Record<ComponentId,[number,number,number]> = {body:[.15,1.65,.73],lighting:[1.96,.84,.33],charging:[-1.67,.96,.69],steering:[.47,1.28,-.3],dashboard:[.62,1.28,-.25],seats:[-.72,1.32,.39]};
+const componentAnchors: Record<ComponentId,[number,number,number]> = {body:[.15,1.65,.73],lighting:[1.96,.84,.33],charging:[-1.67,.96,.69],steering:[.47,1.28,-.3],dashboard:[.88,1.28,-.24],seats:[-.72,1.32,.39]};
 
 class SceneBoundary extends Component<{children:ReactNode;onError:()=>void;fallback?:ReactNode},{failed:boolean}> {
   state = {failed:false};
@@ -25,20 +25,31 @@ function Paint({color='#536f8d',metalness=.68,roughness=.25}:{color?:string;meta
 function ProfileBody({color,onSelect,opacity=1}:{color:string;onSelect:(id:ComponentId)=>void;opacity?:number}){
   const geometry = useMemo(()=>{
     const shape = new Shape();
-    shape.moveTo(-2.25,.47); shape.lineTo(-2.12,.69); shape.quadraticCurveTo(-1.85,.82,-1.22,.86);
-    shape.lineTo(-.78,1.36); shape.quadraticCurveTo(-.6,1.52,-.28,1.54); shape.lineTo(.57,1.48);
-    shape.quadraticCurveTo(.81,1.43,.99,1.17); shape.lineTo(1.28,.83); shape.quadraticCurveTo(1.72,.77,2.03,.61);
-    shape.quadraticCurveTo(2.22,.54,2.23,.35); shape.lineTo(2.1,.2); shape.lineTo(-2.13,.2); shape.closePath();
+    shape.moveTo(-2.25,.46); shape.quadraticCurveTo(-2.18,.68,-1.96,.73);
+    shape.quadraticCurveTo(-1.64,.84,-1.18,.85); shape.lineTo(-.78,1.21);
+    shape.quadraticCurveTo(-.61,1.36,-.31,1.37); shape.lineTo(.28,1.34);
+    shape.quadraticCurveTo(.55,1.31,.72,1.08); shape.lineTo(1.04,.84);
+    shape.quadraticCurveTo(1.63,.82,1.97,.66); shape.quadraticCurveTo(2.2,.56,2.23,.37);
+    shape.lineTo(2.12,.22); shape.lineTo(-2.12,.22); shape.closePath();
     return new ExtrudeGeometry(shape,{depth:1.46,bevelEnabled:true,bevelSegments:4,steps:1,bevelSize:.07,bevelThickness:.07,curveSegments:10});
   },[]);
   useEffect(()=>()=>geometry.dispose(),[geometry]);
   return <mesh geometry={geometry} position={[0,0,-.73]} castShadow receiveShadow onClick={(e)=>{e.stopPropagation();onSelect('body');}}><meshPhysicalMaterial color={color} metalness={.72} roughness={.22} envMapIntensity={1.4} clearcoat={.75} transparent={opacity<1} opacity={opacity} depthWrite={opacity===1}/></mesh>;
 }
 
-function SideGlass({dark=true,opacity=.78}:{dark?:boolean;opacity?:number}){
-  const geo=useMemo(()=>{const s=new Shape();s.moveTo(-1.13,.91);s.lineTo(-.65,1.36);s.quadraticCurveTo(-.55,1.43,-.31,1.43);s.lineTo(.49,1.38);s.quadraticCurveTo(.65,1.36,.79,1.16);s.lineTo(.98,.91);s.closePath();return new ExtrudeGeometry(s,{depth:.012,bevelEnabled:true,bevelSegments:1,bevelSize:.012,bevelThickness:.012});},[]);
+function SideGlass(){
+  const geo=useMemo(()=>{const s=new Shape();s.moveTo(-1.08,.91);s.lineTo(-.69,1.24);s.quadraticCurveTo(-.57,1.32,-.33,1.32);s.lineTo(.24,1.29);s.quadraticCurveTo(.43,1.27,.58,1.08);s.lineTo(.78,.91);s.closePath();return new ExtrudeGeometry(s,{depth:.012,bevelEnabled:true,bevelSegments:1,bevelSize:.008,bevelThickness:.008});},[]);
   useEffect(()=>()=>geo.dispose(),[geo]);
-  return <group>{[-.704,.704].map((z)=><mesh key={z} geometry={geo} position={[0,0,z]} castShadow><meshPhysicalMaterial color={dark?'#101b27':'#9bb4c5'} metalness={.55} roughness={.16} transparent opacity={opacity} depthWrite={opacity>.5} clearcoat={1} clearcoatRoughness={.1}/></mesh>)}</group>;
+  return <group>{[-.828,.816].map((z)=><mesh key={z} geometry={geo} position={[0,0,z]} castShadow><meshPhysicalMaterial color="#09131d" metalness={.34} roughness={.12} clearcoat={1} clearcoatRoughness={.08}/></mesh>)}</group>;
+}
+
+function SlopedGlass({rear=false}:{rear?:boolean}){
+  const length=rear ? .5 : .91;
+  const center=rear?[-.55,1.29,-.04]:[.66,1.09,.03];
+  const angle=rear ? .33 : -.58;
+  return <mesh position={center as [number,number,number]} rotation={[Math.PI/2,0,angle]} onClick={(event)=>{event.stopPropagation();}}>
+    <planeGeometry args={[length,1.3]}/><meshPhysicalMaterial color="#111c28" metalness={.34} roughness={.12} clearcoat={1} clearcoatRoughness={.06} side={DoubleSide}/>
+  </mesh>;
 }
 
 function Wheel({x,z}:{x:number;z:number}){
@@ -48,21 +59,24 @@ function Wheel({x,z}:{x:number;z:number}){
     <group position={[0,0,side*.151]} rotation={[0,side<0?Math.PI:0,0]}>
       <mesh><torusGeometry args={[.355,.045,12,48]}/><meshStandardMaterial color="#c1c9d1" metalness={.86} roughness={.23}/></mesh>
       <mesh><circleGeometry args={[.31,48]}/><meshStandardMaterial color="#27313c" metalness={.65} roughness={.3}/></mesh>
-      {Array.from({length:10},(_,i)=><mesh key={i} position={[0,0,.014*side]} rotation={[0,0,i*Math.PI/5]}><boxGeometry args={[.035,.25,.028]}/><meshStandardMaterial color="#d5dbe2" metalness={.88} roughness={.22}/></mesh>)}
-      <mesh position={[0,0,.025*side]}><circleGeometry args={[.095,32]}/><meshStandardMaterial color="#6b7887" metalness={.7} roughness={.25}/></mesh>
+      {Array.from({length:10},(_,i)=><mesh key={i} position={[0,0,.014]} rotation={[0,0,i*Math.PI/5]}><boxGeometry args={[.035,.25,.028]}/><meshStandardMaterial color="#d5dbe2" metalness={.88} roughness={.22}/></mesh>)}
+      <mesh position={[0,0,.025]}><circleGeometry args={[.095,32]}/><meshStandardMaterial color="#6b7887" metalness={.7} roughness={.25}/></mesh>
     </group>
   </group>;
 }
 
-function Exterior({colors,onSelect,interior=false}:{colors:Record<ComponentId,string>;onSelect:(id:ComponentId)=>void;interior?:boolean}){
+function Exterior({colors,onSelect}:{colors:Record<ComponentId,string>;onSelect:(id:ComponentId)=>void}){
   const sideStripe = useMemo(()=>{
     const s=new Shape(); s.moveTo(-1.95,.67); s.quadraticCurveTo(-.4,.76,1.85,.53); s.lineTo(1.72,.48); s.quadraticCurveTo(-.4,.67,-1.95,.61); s.closePath(); return new ExtrudeGeometry(s,{depth:.008,bevelEnabled:false});
   },[]);
   useEffect(()=>()=>sideStripe.dispose(),[sideStripe]);
   return <group>
-    <ProfileBody color={colors.body} onSelect={onSelect} opacity={interior ? .27 : 1}/>
-    <SideGlass opacity={interior ? .24 : .78}/>
-    {[-.56,.56].map(z=><mesh key={z} geometry={sideStripe} position={[0,0,z]}><meshStandardMaterial color="#9cb5c7" metalness={.8} roughness={.28} transparent opacity={.55}/></mesh>)}
+    <ProfileBody color={colors.body} onSelect={onSelect}/>
+    <SideGlass/>
+    <SlopedGlass/><SlopedGlass rear/>
+    {[-.83,.83].map(z=><RoundedBox key={z} args={[.055,.4,.048]} radius={.02} smoothness={3} position={[-.12,1.12,z]} rotation={[0,0,.05]}><meshStandardMaterial color="#1a2631" metalness={.52} roughness={.28}/></RoundedBox>)}
+    {[-.81,.81].flatMap(z=>[-1.24,1.22].map(x=><mesh key={`${x}-${z}`} position={[x,.48,z]} onClick={(event)=>{event.stopPropagation();onSelect('body');}}><torusGeometry args={[.55,.036,9,48,Math.PI]}/><meshPhysicalMaterial color={colors.body} metalness={.7} roughness={.26} clearcoat={.8}/></mesh>))}
+    {[-.81,.81].map(z=><mesh key={z} geometry={sideStripe} position={[0,0,z]}><meshStandardMaterial color="#d2dbe4" metalness={.8} roughness={.28} transparent opacity={.42}/></mesh>)}
     <RoundedBox args={[.33,.17,.08]} radius={.065} smoothness={5} position={[2.16,.56,-.37]} rotation={[0,0,-.1]} onClick={(e)=>{e.stopPropagation();onSelect('lighting');}}><meshPhysicalMaterial color={colors.lighting} emissive={colors.lighting} emissiveIntensity={.38} roughness={.18} clearcoat={1}/></RoundedBox>
     <RoundedBox args={[.33,.17,.08]} radius={.065} smoothness={5} position={[2.16,.56,.37]} rotation={[0,0,-.1]} onClick={(e)=>{e.stopPropagation();onSelect('lighting');}}><meshPhysicalMaterial color={colors.lighting} emissive={colors.lighting} emissiveIntensity={.38} roughness={.18} clearcoat={1}/></RoundedBox>
     <RoundedBox args={[.24,.14,.09]} radius={.055} smoothness={5} position={[-2.17,.58,-.36]} rotation={[0,0,.1]} onClick={(e)=>{e.stopPropagation();onSelect('lighting');}}><meshStandardMaterial color="#b84348" emissive="#981d28" emissiveIntensity={.34}/></RoundedBox>
@@ -80,6 +94,8 @@ function Exterior({colors,onSelect,interior=false}:{colors:Record<ComponentId,st
 
 function Interior({colors,onSelect}:{colors:Record<ComponentId,string>;onSelect:(id:ComponentId)=>void}){
   return <group>
+    <RoundedBox args={[2.65,.16,1.22]} radius={.1} smoothness={5} position={[-.12,.4,0]} onClick={(e)=>{e.stopPropagation();onSelect('body');}}><meshStandardMaterial color="#222a32" metalness={.36} roughness={.44}/></RoundedBox>
+    <RoundedBox args={[.74,.17,.36]} radius={.08} smoothness={5} position={[.32,.53,0]}><meshStandardMaterial color="#303941" metalness={.48} roughness={.3}/></RoundedBox>
     <RoundedBox args={[1.92,.18,1.06]} radius={.08} smoothness={5} position={[-.08,.92,0]} rotation={[0,0,-.08]} onClick={(e)=>{e.stopPropagation();onSelect('dashboard');}}><meshStandardMaterial color={colors.dashboard} metalness={.36} roughness={.3}/></RoundedBox>
     <RoundedBox args={[.56,.09,.16]} radius={.035} smoothness={4} position={[.62,1.055,-.24]} rotation={[0,0,-.08]}><meshStandardMaterial color="#111c28" metalness={.2} roughness={.18}/></RoundedBox>
     <RoundedBox args={[.36,.075,.15]} radius={.025} smoothness={4} position={[.72,1.055,.25]} rotation={[0,0,-.08]}><meshStandardMaterial color="#172536" emissive="#193b61" emissiveIntensity={.6} metalness={.2}/></RoundedBox>
@@ -133,7 +149,7 @@ function CameraPreset({view,resetSignal,turn}:{view:VehicleView;resetSignal:numb
   useEffect(()=>{
     const narrow=size.width<560;const scale=narrow?1.32:1;
     const target=view==='exterior'?new Vector3(0,.72,0):new Vector3(0,.98,0);
-    const offset=(view==='exterior'?new Vector3(4.1,2.6,4.8):new Vector3(1.15,1.35,3.25)).multiplyScalar(scale).applyAxisAngle(new Vector3(0,1,0),turn*.14);
+    const offset=(view==='exterior'?new Vector3(4.1,2.6,4.8):new Vector3(1.05,1.02,2.65)).multiplyScalar(scale).applyAxisAngle(new Vector3(0,1,0),turn*.14);
     camera.position.copy(target).add(offset);
     camera.lookAt(target);
     if(controls.current){controls.current.target.copy(target);controls.current.minDistance=view==='interior'?2.7:4.2;controls.current.maxDistance=view==='interior'?7.5:10.5;controls.current.update();}
@@ -153,18 +169,15 @@ function VehicleScene({view,selected,heatmap,period,findings,onSelect,resetSigna
   return <>
     <color attach="background" args={['#151a21']}/><fog attach="fog" args={['#151a21',12,21]}/>
     <ambientLight intensity={.9}/><hemisphereLight args={['#dce8f5','#303945',1.25]}/>
-    <directionalLight position={[4,8,5]} intensity={3.1} castShadow shadow-mapSize={[1024,1024]} shadow-bias={-.00025}/>
-    <directionalLight position={[-5,4,-4]} intensity={2.3} color="#83a9d3"/>
-    <spotLight position={[1,5,-5]} intensity={65} angle={.48} penumbra={.85} distance={16} color="#dcecff"/>
-    <pointLight position={[3,1.6,0]} intensity={22} distance={6} color="#f5f8ff"/>
-    <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.12,0]} receiveShadow><planeGeometry args={[200,200]}/><meshStandardMaterial color="#191e25" roughness={.34} metalness={.28}/></mesh>
-    <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.105,0]}><ringGeometry args={[3.5,5.2,64]}/><meshBasicMaterial color="#303842" transparent opacity={.32}/></mesh>
+    <directionalLight position={[4,8,5]} intensity={2.4} castShadow shadow-mapSize={[1024,1024]} shadow-bias={-.00025}/>
+    <directionalLight position={[-5,4,-4]} intensity={1.35} color="#83a9d3"/>
+    <mesh rotation={[-Math.PI/2,0,0]} position={[0,-.12,0]} receiveShadow><planeGeometry args={[200,200]}/><meshStandardMaterial color="#191e25" roughness={.72} metalness={.08}/></mesh>
     <group>
-      {!modelUrl||assetError||!modelLoaded?<Exterior colors={colors} onSelect={click} interior={view==='interior'}/>:null}
-      {!modelUrl||assetError||!modelLoaded?<Interior colors={colors} onSelect={click}/>:null}
-      {modelUrl&&!assetError?<SceneBoundary key={modelUrl} onError={modelFailed}><Suspense fallback={null}><ImportedModel url={modelUrl} onLoaded={modelReady} onSelect={click} colors={colors}/></Suspense></SceneBoundary>:null}
+      {view==='exterior'&&(!modelUrl||assetError||!modelLoaded)?<Exterior colors={colors} onSelect={click}/>:null}
+      {view==='interior'?<Interior colors={colors} onSelect={click}/>:null}
+      {view==='exterior'&&modelUrl&&!assetError?<SceneBoundary key={modelUrl} onError={modelFailed}><Suspense fallback={null}><ImportedModel url={modelUrl} onLoaded={modelReady} onSelect={click} colors={colors}/></Suspense></SceneBoundary>:null}
     </group>
-    <Hotspot id={firstHotspot} label={labels[firstHotspot]} color={colors[firstHotspot]} selected={selected===firstHotspot} position={view==='exterior'?[.15,1.65,.73]:[.62,1.28,-.25]} onSelect={click}/>
+    <Hotspot id={firstHotspot} label={labels[firstHotspot]} color={colors[firstHotspot]} selected={selected===firstHotspot} position={view==='exterior'?[.15,1.65,.73]:[.88,1.28,-.24]} onSelect={click}/>
     <Hotspot id={secondHotspot} label={labels[secondHotspot]} color={colors[secondHotspot]} selected={selected===secondHotspot} position={view==='exterior'?[1.96,.84,.33]:[.47,1.28,-.3]} onSelect={click}/>
     {selected!==firstHotspot&&selected!==secondHotspot?<Hotspot id={selected} label={labels[selected]} color="#1c69d4" selected position={componentAnchors[selected]} onSelect={click}/>:null}
     <CameraPreset view={view} resetSignal={resetSignal} turn={keyboardTurn}/>
@@ -176,18 +189,24 @@ function metricText(finding:VehicleViewerProps['findings'][number]|undefined,per
   return sample.total?`${sample.negative}/${sample.total} mentions`:'No sample';
 }
 
+function WebGLFallback({onFallback}:{onFallback:()=>void}){
+  useEffect(()=>onFallback(),[onFallback]);
+  return <div className="vehicle-viewer__fallback" role="img" aria-label="3D view unavailable. Use component controls below."><div className="vehicle-viewer__fallback-car"><div className="vehicle-viewer__fallback-roof"/><div className="vehicle-viewer__fallback-body"/><i/><i/></div><p>3D view unavailable</p><span>Use component controls below to explore the study.</span></div>;
+}
+
 export default function VehicleViewer({selectedComponent,onSelectComponent,view,onViewChange,heatmap,period,findings,className,modelUrl,onStatusChange}:VehicleViewerProps){
   const [resetSignal,setResetSignal]=useState(0);
-  const [webglFailed,setWebglFailed]=useState(false);
+  const [webglFailed,setWebglFailed]=useState(()=>typeof window!=='undefined'&&typeof window.WebGLRenderingContext==='undefined'&&typeof window.WebGL2RenderingContext==='undefined');
   const [keyboardTurn,setKeyboardTurn]=useState(0);
   const root=useRef<HTMLElement>(null);
   const report=useCallback((status:'ready'|'fallback')=>onStatusChange?.(status),[onStatusChange]);
+  useEffect(()=>{if(webglFailed)report('fallback');},[webglFailed,report]);
   useEffect(()=>{if(!root.current)return;const canvas=root.current.querySelector('canvas');if(!canvas)return;const key=(event:KeyboardEvent)=>{if(event.target instanceof HTMLElement&&event.target.closest('button'))return;const delta=event.key==='ArrowLeft'?-1:event.key==='ArrowRight'?1:0;if(delta){event.preventDefault();setKeyboardTurn(v=>v+delta);}};canvas.addEventListener('keydown',key);return()=>canvas.removeEventListener('keydown',key);},[]);
   const currentFinding=findings.find(f=>f.id===selectedComponent);
-  const failed=useCallback(()=>{setWebglFailed(true);report('fallback');},[report]);
+  const failed=useCallback(()=>setWebglFailed(true),[]);
   return <section className={`vehicle-viewer ${className??''}`} ref={root} aria-label="Illustrative vehicle viewer">
     <header className="vehicle-viewer__toolbar">
-      <div><span className="vehicle-viewer__eyebrow">DESIGN STUDY · LOCAL SYNTHETIC DATA</span><div className="vehicle-viewer__title">Illustrative vehicle <span>G60 case</span></div></div>
+      <div><span className="vehicle-viewer__eyebrow">Illustrative design study · synthetic local data</span><div className="vehicle-viewer__title">Illustrative vehicle <span>G60 case</span></div></div>
       <div className="vehicle-viewer__view-toggle" role="group" aria-label="Vehicle view">
         {(['exterior','interior'] as const).map(option=><button key={option} type="button" aria-pressed={view===option} onClick={()=>onViewChange(option)}>{option==='exterior'?'Exterior':'Interior'}</button>)}
       </div>
@@ -195,7 +214,7 @@ export default function VehicleViewer({selectedComponent,onSelectComponent,view,
     </header>
     <div className="vehicle-viewer__stage" data-view={view}>
       {!webglFailed?<SceneBoundary onError={failed} fallback={<div className="vehicle-viewer__fallback" role="img" aria-label="3D view unavailable. Use component controls below."><div className="vehicle-viewer__fallback-car"><div className="vehicle-viewer__fallback-roof"/><div className="vehicle-viewer__fallback-body"/><i/><i/></div><p>3D view unavailable</p><span>Use component controls below to explore the study.</span></div>}>
-        <Canvas dpr={[1,1.5]} shadows frameloop="demand" camera={{position:[4.1,2.6,4.8],fov:34,near:.1,far:100}} gl={{antialias:true,alpha:false,powerPreference:'high-performance'}} onCreated={({gl})=>{gl.domElement.tabIndex=0;gl.domElement.setAttribute('aria-label','3D vehicle view. Use arrow keys to rotate.');report('ready');}} fallback={<div className="vehicle-viewer__fallback">3D view unavailable. Use component controls below.</div>}>
+        <Canvas dpr={[1,1.5]} shadows frameloop="demand" camera={{position:[4.1,2.6,4.8],fov:34,near:.1,far:100}} gl={{antialias:true,alpha:false,powerPreference:'high-performance'}} onCreated={({gl})=>{gl.domElement.tabIndex=0;gl.domElement.setAttribute('aria-label','3D vehicle view. Use arrow keys to rotate.');gl.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();failed();},{once:true});report('ready');}} fallback={<WebGLFallback onFallback={failed}/> }>
           <VehicleScene view={view} selected={selectedComponent} heatmap={heatmap} period={period} findings={findings} onSelect={onSelectComponent} resetSignal={resetSignal} modelUrl={modelUrl} onModelStatus={report} keyboardTurn={keyboardTurn}/>
         </Canvas>
       </SceneBoundary>:<div className="vehicle-viewer__fallback" role="img" aria-label="3D view unavailable. Use component controls below."><div className="vehicle-viewer__fallback-car"><div className="vehicle-viewer__fallback-roof"/><div className="vehicle-viewer__fallback-body"/><i/><i/></div><p>3D view unavailable</p><span>Use component controls below to explore the study.</span></div>}

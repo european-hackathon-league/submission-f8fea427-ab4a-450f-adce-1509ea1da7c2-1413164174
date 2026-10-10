@@ -1,7 +1,9 @@
 from concurrent.futures import ThreadPoolExecutor
+from io import BytesIO
 from uuid import uuid4
 
 import pytest
+from openpyxl import load_workbook
 from sqlalchemy import func, select
 from test_ingestion import upload
 from test_uploads import workbook
@@ -22,6 +24,14 @@ from app.wire import CellLocator, Scope
 
 def frozen_run(client, namespace=None, data=None):
     namespace = namespace or str(uuid4())
+    if data is None:
+        # Mock parser outputs must not share a content cache between unrelated tests.
+        book = load_workbook(BytesIO(workbook()))
+        book.properties.identifier = str(uuid4())
+        buffer = BytesIO()
+        book.save(buffer)
+        book.close()
+        data = buffer.getvalue()
     source_id = upload(client, namespace, data=data).json()["sources"][0]["source_id"]
     response = client.post(
         "/api/v1/runs",

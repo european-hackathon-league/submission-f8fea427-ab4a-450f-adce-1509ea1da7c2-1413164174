@@ -12,10 +12,10 @@ def test_private_validation_input_is_not_returned_or_logged(client, caplog):
 def test_unexpected_error_is_sanitized_and_has_request_id(client, monkeypatch, caplog):
     import app.main as main
 
-    def fail():
+    def fail(*args, **kwargs):
         raise RuntimeError("synthetic-private-text")
 
-    monkeypatch.setattr(main, "pending", fail)
+    monkeypatch.setattr(main.control, "get_proposals", fail)
     response = client.get("/api/v1/runs/synthetic/proposals")
     assert response.status_code == 500
     assert response.json()["code"] == "internal_error"
@@ -66,10 +66,10 @@ def test_native_traces_exclude_private_urls_inputs_and_exception_messages(
     trace.get_tracer_provider().add_span_processor(SimpleSpanProcessor(exporter))
     private = "synthetic-private-text-secret"
 
-    def fail():
+    def fail(*args, **kwargs):
         raise RuntimeError(private)
 
-    monkeypatch.setattr(main, "pending", fail)
+    monkeypatch.setattr(main.control, "get_proposals", fail)
     assert client.get(f"/health?private={private}").status_code == 200
     assert (
         client.post(

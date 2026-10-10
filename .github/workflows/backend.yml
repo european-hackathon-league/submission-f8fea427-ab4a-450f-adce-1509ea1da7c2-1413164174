@@ -1,9 +1,9 @@
 name: Backend
 on:
   pull_request:
-    branches: [backend]
+    branches: [backend, main]
   push:
-    branches: [backend, 'be/**']
+    branches: [backend, main, 'be/**']
 permissions:
   contents: read
 jobs:

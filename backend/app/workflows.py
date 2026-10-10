@@ -59,6 +59,7 @@ class AnalysisWorkflow:
             )
             if manifest.get("pipeline_version") in {"ingestion-v1", "analysis-v1"}:
                 semaphore = asyncio.Semaphore(2)
+                ingestion_hours = 4 if workflow.patched("pdf-checkpoints-v2") else 1
 
                 async def ingest(version: str) -> str:
                     async with semaphore:
@@ -67,7 +68,7 @@ class AnalysisWorkflow:
                             await workflow.execute_activity(
                                 "ingest_source",
                                 [run_id, generation, version],
-                                start_to_close_timeout=timedelta(hours=1),
+                                start_to_close_timeout=timedelta(hours=ingestion_hours),
                                 heartbeat_timeout=timedelta(minutes=15),
                                 retry_policy=retry,
                                 result_type=str,

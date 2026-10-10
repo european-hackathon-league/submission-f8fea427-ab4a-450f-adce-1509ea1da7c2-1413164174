@@ -59,6 +59,27 @@ def test_analysis_runs_all_dependent_stages_in_order(monkeypatch):
     )
 
 
+@pytest.mark.parametrize("extended", [False, True])
+def test_document_ingestion_budget_preserves_existing_workflow_replay(
+    monkeypatch, extended
+):
+    analysis_activity(monkeypatch)
+    execute = module.workflow.execute_activity
+    timeouts = []
+
+    async def checked(name, args, **options):
+        if name == "ingest_source":
+            timeouts.append(options["start_to_close_timeout"])
+        return await execute(name, args, **options)
+
+    monkeypatch.setattr(module.workflow, "execute_activity", checked)
+    monkeypatch.setattr(
+        module.workflow, "patched", lambda name: name != "pdf-checkpoints-v2" or extended
+    )
+    asyncio.run(module.AnalysisWorkflow().run(analysis_manifest()))
+    assert timeouts == [timedelta(hours=4 if extended else 1)] * 2
+
+
 @pytest.mark.parametrize("failed_stage", ["extract_findings", "establish_baselines"])
 @pytest.mark.parametrize("status", ["failed", "superseded"])
 def test_failed_analysis_stops_later_stages_and_failure_is_visible(

@@ -1,6 +1,6 @@
 # Frontend requirement acceptance ledger
 
-Status as inspected 10 October 2026, before F1 implementation. Scope: `frontend_plan.md`, `plan.md`, `backlog.md`; frontend-only authority from the implementation request. Each package updates its rows with exact executed evidence before its PR gate. A screen or happy-path mock does not establish acceptance.
+Updated 10 October 2026 through the F1 verification gate. Scope: `frontend_plan.md`, `plan.md`, `backlog.md`; frontend-only authority from the implementation request. Each package updates its rows with exact executed evidence before its PR gate. A screen or happy-path mock does not establish acceptance.
 
 ## Status and evidence rules
 
@@ -9,7 +9,7 @@ Status as inspected 10 October 2026, before F1 implementation. Scope: `frontend_
 - **Frontend verified / external blocked**: frontend behavior passes contract-valid tests; live dependency remains unavailable. Use only after recorded checks.
 - **Verified**: requirement passes recorded applicable checks, including live evidence when claimed.
 
-Initial inspection is static evidence, not a fresh test execution. Existing checks below are pointers, not newly certified passing results. No row initially claims frontend completion.
+Initial inspection is static evidence, not a fresh test execution. Existing checks below are pointers, not newly certified passing results. Later-package rows retain initial gaps until their own verification gate.
 
 Common code pointers: `frontend/src/App.tsx` (workspace, panels and commands), `frontend/src/api/{client,contracts,fixtures}.ts` (API boundary), `frontend/src/App.test.tsx` (workspace tests), `frontend/src/api/client.test.ts` (adapter tests), `frontend/src/viewer/{BmwAssetViewer,modelMapping}.ts*` (vehicle navigation/mapping). All tests and changes stay within frontend-owned paths.
 
@@ -30,13 +30,13 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 | ID | Required acceptance behavior | Code / existing test pointers | Initial status / gap | External dependency |
 |---|---|---|---|---|
-| F1.01 | Types, payloads, errors, IDs, versions and fixtures match published shared contract | `api/contracts.ts`, `api/fixtures.ts`, `api/client.test.ts` | Partial: local DTOs differ; full schema/fixture validation missing | Pinned contracts |
-| F1.02 | One API boundary; configuration selects mock/real | `api/client.ts:createApi`, `frontend/.env.example`; real adapter test | Partial: selection exists; end-to-end parity unverified | AUTH |
-| F1.03 | Uploads support partial/rejected packages, completed source IDs, saved config and available actions | `App.tsx:uploadFiles`, run setup, `can`; upload/setup tests | Partial: published multipart/envelope alignment and interrupted-upload retry missing | Upload API; API-501 downstream |
-| F1.04 | Required event transport, replay, dedup, expired cursor and coherent snapshots | `api/client.ts:withWorkspace`, `App.tsx` polling | Missing: polling only; no SSE replay/gap recovery tests | Published events |
-| F1.05 | Run identity, selections, camera and unsaved drafts survive supported reconnect/reload | `App.tsx` state/draft refs; unsaved/stale draft tests; viewer camera refs | Partial: memory retention only; reload/camera restoration missing | Backend persisted run; ASSETS |
-| F1.06 | Contract authentication/access errors handled without invented auth infrastructure | `createRealApi`, `ApiError`; real adapter test | Partial: credentials exist; full error/recovery behavior missing | AUTH |
-| F1.07 | Duplicate/out-of-order events, interrupted requests, stale state and recovery tested | `api/client.test.ts`, `App.test.tsx` | Partial: stale proposal tested; transport/recovery cases missing | Published events |
+| F1.01 | Types, payloads, errors, IDs, versions and fixtures match published shared contract | `api/wire.ts`, `normalize.ts`, pinned `fixtures/`, `contractsValidation.test.ts`, `api/published.test.ts` | Frontend verified / external blocked: exact published wire fields, immutable IDs/versions, multipart/envelopes, numeric targets and schema-valid fixtures; incompatible snapshot versions rejected | Pinned contracts; API-501 for live resource acceptance |
+| F1.02 | One API boundary; configuration selects mock/real | `api/client.ts`, `api/mock.ts`, `ApiAccess.tsx`, `.env.example`; published adapter/header tests | Frontend verified / external blocked: same projection for synthetic/real wire transports; configuration selection, runtime Bearer/workspace headers | AUTH; real service deployment |
+| F1.03 | Uploads support partial/rejected packages, completed source IDs, saved config and available actions | `App.tsx:createRun/uploadFiles`; `App.test.tsx` partial/rejected/frozen/uncertain/second-run cases | Frontend verified / external blocked: completed source IDs, explicit rejected formats, saved configuration/actions, accepted identity frozen before snapshot; unknown outcome retries original key/body through reload | Upload API; API-501 downstream |
+| F1.04 | Required event transport, replay, dedup, expired cursor and coherent snapshots | `runRecovery.ts/test`, `api/client.ts:events/workspace`, published pagination/coherence tests | Frontend verified / external blocked: authenticated SSE, exclusive cursor replay, dedup/order/gap/410 reconciliation, bounded setup and polling fallback | Live SSE deployment |
+| F1.05 | Run identity, selections, camera and unsaved drafts survive supported reconnect/reload | `session.ts/test`, App real-mode remount test, viewer camera tests/browser toggle | Frontend verified / external blocked: API/workspace-isolated same-tab run/selections/drafts; original pending config retained; actual validated SDK camera cache; storage-disabled memory fallback | Persisted backend run; hosted asset/SDK availability |
+| F1.06 | Contract authentication/access errors handled without invented auth infrastructure | `ApiAccess.test.tsx`, `api/published.test.ts`, `runRecovery.test.ts`, App restored-access test | Frontend verified / external blocked: runtime headers; full error metadata/request ID, access denial stops retries, manual reconnect restarts; no token storage or auth infrastructure | Existing identity provider/workspace membership |
+| F1.07 | Duplicate/out-of-order events, interrupted requests, stale state and recovery tested | `runRecovery.test.ts`, `api/published.test.ts`, `App.test.tsx` uncertain/stale/remount cases | Frontend verified / external blocked: replay duplicates/order/expiry, bounded interrupted requests with same key, stale snapshots and access recovery tested | Live replay/persistence acceptance |
 
 ## F2 — Baseline workspace, graph, tags and evidence
 
@@ -120,4 +120,4 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 ## Package gates and handoff evidence
 
-No package gate passed in this initial ledger. Each package records commit/PR/base dependency, executed test counts, typecheck/build, applicable browser checks, separate reviewer findings and resolution, CI result, plus precise remaining external acceptance. Dependent work starts only after predecessor verification/PR gate; do not merge without user approval.
+F1 gate: 79 tests across 9 files pass; `npm run typecheck`, `npm run build`, `git diff --check` pass. See [F1 verification](F1-VERIFICATION.md). Separate sub-agent review found setup/retry/access/session/opaque-ID issues; all fixed with regression tests. F2–F6 gates pending. Each package records commit/PR/base dependency, executed test counts, typecheck/build, applicable browser checks, separate reviewer findings and resolution, CI result, plus precise remaining external acceptance. Dependent work starts only after predecessor verification/PR gate; do not merge without user approval.

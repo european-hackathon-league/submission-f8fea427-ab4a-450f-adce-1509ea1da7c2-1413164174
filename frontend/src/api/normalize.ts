@@ -30,6 +30,7 @@ export function vehicle(wire: Wire.Vehicle): View.Vehicle {
   };
 }
 export function snapshot(wire: Wire.Snapshot): View.Snapshot {
+  if (wire.contract_version !== "1") throw new Error("Unsupported snapshot contract version. Expected 1.");
   return {
     ...wire,
     wire,

@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import App from "./App";
 import { createMockApi } from "./api/client";
 
-afterEach(cleanup);
+afterEach(() => { cleanup(); sessionStorage.clear(); });
 
 async function createRun(
   options: { deepDive?: boolean; guided?: boolean; scenario?: string } = {},
@@ -23,7 +23,7 @@ async function createRun(
     await user.click(screen.getByRole("radio", { name: "Guided" }));
   await user.upload(
     screen.getByLabelText("Upload files"),
-    new File(["feedback"], "regional-feedback.csv", { type: "text/csv" }),
+    new File(["feedback"], "regional-feedback.xlsx", { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" }),
   );
   await screen.findByText("ready");
   await user.click(screen.getByRole("button", { name: "Create run" }));
@@ -84,7 +84,7 @@ describe("frontend plan workspace", () => {
     render(<App />);
     await user.upload(screen.getByLabelText("Upload files"), [
       new File(["x"], "bad.exe"),
-      new File(["x"], "good.csv"),
+      new File(["x"], "good.xlsx"),
     ]);
     expect(await screen.findByText(/Unsupported file/)).toBeInTheDocument();
     await waitFor(() =>
@@ -145,7 +145,7 @@ describe("frontend plan workspace", () => {
       await screen.findByText(/Render proposal version 1/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Digital change: annotation only/),
+      screen.getByText(/Annotation only/),
     ).toBeInTheDocument();
     expect(screen.getByText(/Not validated or approved/)).toBeInTheDocument();
   });
@@ -200,7 +200,7 @@ describe("frontend plan workspace", () => {
       screen.queryByRole("button", { name: "Choose approach" }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "History" }));
-    expect(screen.getByText("PM selected variant-digital")).toBeInTheDocument();
+    expect(screen.getByText("PM selected continue")).toBeInTheDocument();
   });
 
   it("keeps an older render labeled after proposal edits", async () => {
@@ -218,4 +218,112 @@ describe("frontend plan workspace", () => {
     ).toBeInTheDocument();
     expect(screen.getByText("Render proposal version 1")).toBeInTheDocument();
   });
+});
+
+it("restores real-mode run identity, selected panel and unsaved versioned proposal after remount", async () => {
+  const api = { ...createMockApi(), mode: "real" as const };
+  const user = userEvent.setup();
+  const first = render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["feedback"], "regional.pdf"));
+  await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Create run" }));
+  await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("tab", { name: "Proposals" }));
+  await user.clear(screen.getByLabelText("Proposal text"));
+  await user.type(screen.getByLabelText("Proposal text"), "Retain across reload");
+  first.unmount();
+  render(<App api={api} />);
+  await screen.findByText("Saved configuration");
+  expect(await screen.findByLabelText("Proposal text")).toHaveValue("Retain across reload");
+  expect(screen.getByText("run-synthetic")).toBeInTheDocument();
+  sessionStorage.clear();
+});
+
+it("restarts event recovery after restored access and Reconnect", async () => {
+  const mock = createMockApi();
+  let streams = 0;
+  const api = {
+    ...mock, mode: "real" as const, sessionNamespace: "access-recovery-test",
+    workspace: async (id: string) => {
+      const w = await mock.workspace(id);
+      if (streams > 1) { w.snapshot.stage = "Stream resumed"; w.snapshot.revision += 1; w.snapshot.last_event_sequence += 1; }
+      return w;
+    },
+    events: async (id: string, sequence: number) => {
+      if (++streams === 1) return new Response(JSON.stringify({ code: "forbidden", message: "Workspace access denied" }), { status: 403 });
+      const event = { contract_version: "1", event_id: `e${sequence+1}`, sequence: sequence+1, run_id: id, type: "analysis.updated", resource: { type: "run", id, revision: 3 } };
+      return new Response(`data: ${JSON.stringify(event)}\n\n`, { headers: { "Content-Type": "text/event-stream" } });
+    },
+  };
+  const user = userEvent.setup();
+  render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf"));
+  await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Create run" }));
+  await screen.findByText("Workspace access denied");
+  await user.click(screen.getByRole("button", { name: "Reconnect" }));
+  await screen.findByText("Stream resumed");
+  expect(streams).toBe(2);
+});
+
+it("starts an independent second synthetic run after New run", async () => {
+  const user = await createRun();
+  await user.click(screen.getByRole("button", { name: "New run" }));
+  await user.upload(screen.getByLabelText("Upload files"), new File(["second"], "second.xlsx"));
+  await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Create run" }));
+  await screen.findByText("proposals_ready");
+  expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+});
+
+it("creates server-supported configurations even when local visual asset is unavailable", async () => {
+  const base = createMockApi();
+  const api = { ...base, request: async <T,>(path: string, body?: unknown, key?: string): Promise<T> => {
+    if (path === "/vehicles") return { items: [{ vehicle_id: "server-vehicle", title: "Server vehicle", baseline_asset_id: "server-asset", part_catalog_version: "server-catalog", capabilities: [] }], next_cursor: null } as T;
+    if (path === "/runs") return { run_id: "server-run" } as T;
+    return base.request<T>(path, body, key);
+  }, workspace: async () => { throw new Error("Snapshot temporarily interrupted"); } };
+  const user = userEvent.setup();
+  render(<App api={api} />);
+  await screen.findByRole("option", { name: "Server vehicle" });
+  await user.selectOptions(screen.getByLabelText("Vehicle"), "server-vehicle");
+  await user.upload(screen.getByLabelText("Upload files"), new File(["s"], "s.pdf"));
+  await screen.findByText("ready");
+  expect(screen.getByRole("button", { name: "Create run" })).toBeEnabled();
+  await user.click(screen.getByRole("button", { name: "Create run" }));
+  await screen.findByRole("alert");
+  expect(screen.getByLabelText("Vehicle")).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Create run" })).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "New run" })).toBeEnabled();
+});
+
+it("retries an uncertain accepted run with original frozen command and key", async () => {
+  const base = createMockApi();
+  const commands: Array<{ key?: string; body: unknown }> = [];
+  const api = { ...base, mode: "real" as const, sessionNamespace: "uncertain-create", request: async <T,>(path: string, body?: unknown, key?: string): Promise<T> => {
+    const result = await base.request<T>(path, body, key);
+    if (path === "/runs") {
+      commands.push({ key, body });
+      if (commands.length === 1) throw new TypeError("Response interrupted");
+    }
+    return result;
+  } };
+  const user = userEvent.setup();
+  const first = render(<App api={api} />);
+  await user.click(screen.getByRole("radio", { name: "Guided" }));
+  await user.click(screen.getByRole("checkbox", { name: "Deep Dive" }));
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf"));
+  await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Create run" }));
+  await screen.findByRole("alert");
+  expect(screen.getByLabelText("Vehicle")).toBeDisabled();
+  first.unmount();
+  render(<App api={api} />);
+  expect(screen.getByLabelText("Vehicle")).toBeDisabled();
+  expect(screen.getByRole("radio", { name: "Guided" })).toBeChecked();
+  expect(screen.getByRole("checkbox", { name: "Deep Dive" })).toBeChecked();
+  await user.click(screen.getByRole("button", { name: "Retry run creation" }));
+  await screen.findByText("waiting_for_pm");
+  expect(commands).toHaveLength(2);
+  expect(commands[1]).toEqual(commands[0]);
 });

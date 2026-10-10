@@ -99,6 +99,7 @@ def validated_draft(
             identifier
             for finding in related
             for identifier in finding.supporting_evidence_ids
+            + finding.opposing_evidence_ids
         } | {
             identifier
             for finding in related

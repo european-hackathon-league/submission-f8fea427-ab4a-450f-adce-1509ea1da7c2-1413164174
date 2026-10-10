@@ -1,14 +1,22 @@
-# Frontend epics
+# Frontend epics and integration map
 
-| ID | Outcome / deliverables | Acceptance | Depends on |
+Current state: local pitch prototype; all feedback and research fixtures are synthetic. The selected demonstration context is BMW i5 M60 / G60. It does not establish vehicle-specific customer outcomes or production approval.
+
+| Epic | Current scope | Next gate | Depends on |
 |---|---|---|---|
-| FE-01 | Context, navigation, visual tokens, evidence-linked fixtures | Five destinations; vehicle/market/period visible; responsive and keyboard usable | Shared contracts |
-| FE-02 | Exterior/interior viewer, component selection, heat overlay | Named selections sync with UI; red/amber/teal/gray legend; reset; WebGL fallback | FE-01, 3D spec |
-| FE-03 | Overview, explorer, comparable periods/markets | Counts and denominators visible; 68→25 displays −43pp and 63.2% reduction; missing comparison handled | FE-01, FE-02 |
-| FE-04 | Evidence drawer, Deep Research, Reimagine | Citations and hypotheses separate; prepared results labeled; draft requirement created | FE-03 |
-| FE-05 | Requirements review, data/history, exports | Rationale-bound decisions; immutable versions; CSV and print presentation | FE-04 |
-| FE-06 | Pitch polish and integration | Build/typecheck/tests pass; desktop/mobile/reduced motion/fallback checked; demo rehearsed | FE-01–05 |
+| FE-01 Context and navigation | Five destinations, responsive workspace, market/period/baseline controls. | Bind context to validated vehicle and source records. | Shared context contract |
+| FE-02 Vehicle view | Hosted creator-uploaded i5 M60 exterior; bundled preview fallback; separate static G60 520i cabin photo. Component severity appears in HTML list and photo markers; no verified mesh coloring. | Approve matched assets and verify semantic part mapping for each derivative. | Asset/license review, viewer tests |
+| FE-03 Insights and comparison | Synthetic component metrics; Europe has 2025/26 comparison, China/US have 2026 snapshots only. Market populations are unmatched. | Connect source denominators, coverage, and comparability metadata. | FE-01, source data |
+| FE-04 Evidence and research | Prepared synthetic quotes, explicit stance labels, hypotheses, gaps, and three draft concepts. No live research job. | Add source locators and asynchronous research status/results. | FE-03, evidence contract |
+| FE-05 Decisions and data | Rationale-required decisions; prior versions and decisions in browser storage; filtered CSV and print; upload retains file names only for this session. | Add authenticated server audit, import/parsing, and cross-user persistence. | FE-04, backend/auth |
+| FE-06 Release checks | Responsive and keyboard behavior implemented; visual/browser verification remains pending. | Run tests/build and verify desktop/mobile, failure fallback, print, reduced motion, and full demo path. | FE-01–05 |
 
-This build implements synthetic local workflows. Later integration replaces fixture adapter with backend-owned parsing, research jobs, identity, persistence, and source locators. Do not claim production approval authority or actual BMW measurements.
+## Later orchestrator priorities
 
-Parallel ownership: viewer agent owns `frontend/src/viewer/`; UI agent owns `App.tsx`, UI styles/components and local workflow tests; integrator owns contracts, fixtures, configuration, documentation, and final verification. UI styling must not target viewer internals.
+1. Define vehicle/derivative, market, period, eligibility denominator, evidence locator, and confidence contracts before replacing fixtures. Preserve unknown coverage as unknown.
+2. Choose a target derivative; confirm licensed exterior and interior assets, source provenance, and component mapping. Do not equate a cabin photo with an interactive matching-trim model.
+3. Replace upload metadata stub with backend-owned parsing and source linkage. Uploaded files must never inherit synthetic findings.
+4. Add identity, server persistence, research-job states, and auditable approvals. Browser-local decisions are demo state only.
+5. Complete integrated tests and browser review before describing workflow as production-ready.
+
+See [UI specification](UI-SPEC.md), [3D specification](3D-SPEC.md), and [asset coverage](MODEL-COVERAGE.md). Styling stays outside viewer internals.

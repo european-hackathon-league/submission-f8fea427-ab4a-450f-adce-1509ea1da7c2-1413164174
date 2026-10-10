@@ -1,8 +1,9 @@
-# vehicle-requirements-ai
-AI-assisted vehicle requirements planning: turn customer feedback and market evidence into prioritized proposals with linked sources, product manager review, and a decision audit trail.
+# Vehicle requirements planning
 
-## Project plan
+AI-assisted planning prototype for turning customer feedback into evidence-linked product proposals. Current pitch uses a BMW i5 M60 / G60 visual context, synthetic feedback and prepared research. It does not process the supplied workbooks, establish BMW issue rates, or grant production approval authority.
 
-[Full product, architecture, and hackathon implementation plan](doc/BMW_AI_Requirements_Full_Plan.md)
+Run frontend: `cd frontend && npm ci && npm run dev`. Checks: `npm test` and `npm run build`.
 
-The plan covers eight solution approaches, a reusable vehicle and market strategy, the complete evidence-to-decision pipeline, prioritization, PM review, audit history, four implementation phases, synthetic sample requirements, and a six-minute demonstration script.
+Read [frontend handoff](doc/frontend/README.md), [epics](doc/frontend/EPICS.md), [UI specification](doc/frontend/UI-SPEC.md), [3D scope](doc/frontend/3D-SPEC.md), and [vehicle/asset coverage](doc/frontend/MODEL-COVERAGE.md). Backend parsing, live research, identity, server persistence, and review authority remain future integration work.
+
+See [full product and hackathon plan](doc/BMW_AI_Requirements_Full_Plan.md) for broader product direction.

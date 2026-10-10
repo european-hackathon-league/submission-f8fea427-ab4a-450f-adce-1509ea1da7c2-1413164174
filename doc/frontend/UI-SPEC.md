@@ -1,14 +1,23 @@
 # UI specification
 
-## Direction
-BMW.de inspiration: vehicle-first composition, ample white space, strong sans-serif type, thin rules, blue primary actions. Tokens: white #fff; page #f5f6f8; ink #18212b; muted #69717d; blue #1c69d4; stage #151a21. Restrained 6–10px radii; body 16px; 8px spacing grid; visible focus and 44px primary controls. Normal English product copy; no caveman inside product.
+## Product direction
 
-## Layout and behavior
-Left navigation: Overview, Vehicle Explorer, Compare, Requirements, Data & History. Context bar: G60 illustrative case, market, period, baseline. Overview opens with a large vehicle stage and a concise insight panel; three priority findings and executive metrics follow. Desktop uses asymmetric panels; mobile stacks with list-based component access.
+BMW.de-inspired planning workspace: white canvas, large restrained typography, thin rules, blue actions, squared controls, and an authentic vehicle stage. Keep labels and product copy in normal English. Core demo context: **BMW i5 M60 / G60**. Mark all findings, comparisons, research, and requirements as illustrative or synthetic; do not imply BMW endorsement or measured i5 M60 outcomes.
 
-Explorer pairs vehicle with component list and evidence detail. Compare supports periods and markets; labeled charts, sample counts and comparability context. Evidence opens a focus-managed drawer and preserves drafts. Deep Research presents prepared summary, supporting/contradictory evidence, hypotheses and validation gaps. Reimagine shows three proposals and creates a draft requirement. Requirement decisions require rationale and preserve prior version content; filters/search and CSV export work. Data view lists fixture sources, run history and honest upload limitations. Upload accepts local file metadata, then explains that actual analysis needs backend; never assigns fixture results to uploaded files. Presentation mode reduces chrome; print gives executive report.
+## Destinations and behavior
 
-## Contracts and acceptance
-Use typed shared fixtures; selected component drives viewer and panel. Metric = negative feedback records / eligible feedback records, not failure rate. Distinguish percentage points and relative reduction; population/period changes and missing data remain visible. All synthetic/prepared content labeled. No runtime network required for main demo. Loading/empty/error states give next action. Focus trapping, Escape close, live announcements, reduced motion and readable charts required.
+Horizontal navigation: Overview, Vehicle Explorer, Compare, Requirements, Data & History. Keep vehicle, market, period, and baseline context visible outside presentation mode. Overview pairs vehicle view with selected-component insight, then priority findings and metrics. Explorer combines exterior/interior mode, component controls, evidence, and research.
 
-Tests: selection/context sync, comparison math via shared helpers, create/review requirement with rationale and preserved version, filtering/export, upload honesty. Primary verifies browser at 1440/1280/390px and keyboard interactions.
+Component selection must stay synchronized across viewer, insight panel, Compare, evidence, and draft creation. Compare shows the selected component, period values, denominators, percentage-point change, relative change, and population caveat. Europe supports 2025/26 longitudinal fixtures; China and United States have 2026 snapshots only. Do not compare identical periods or invent missing baselines.
+
+Evidence drawer shows synthetic quotes and their source market/period. Deep Research is a prepared example, not a live job: keep supporting/counter stance tied to each quote; separate hypotheses and validation gaps. Reimagine offers three concepts with assumptions/trade-offs and creates a visible draft.
+
+Requirement search and status filters work together. Review decisions require rationale; prior title, status, rationale, and evidence IDs remain inspectable by version. CSV reflects visible filtered requirements. Requirement decisions/history persist in this browser only. Data & History explains fixture provenance and upload limits. Upload records file names for the current session; analysis needs backend integration. Presentation reduces chrome; print produces the current destination’s report.
+
+## Data and acceptance
+
+Metric is negative feedback records / eligible records, not failure rate. Show counts with percentages; distinguish percentage points from relative change. Synthetic content and missing data stay explicit. Do not assign fixture outcomes to uploaded files. No identity, backend, live research, or production approval authority is connected.
+
+Accessible controls need labels, visible focus, keyboard use, Escape/return focus for drawers, live status announcements, reduced-motion behavior, and non-color chart equivalents. Empty/error states offer a next action. Charts include text/sample equivalents. Responsive layout must retain component access and readable context.
+
+Before calling the prototype release-ready, run workflow tests and build; verify 1440/1280/390px, keyboard/drawer flows, same-period handling, selected-component comparison, creation under active filters, asset/network fallback, and print.

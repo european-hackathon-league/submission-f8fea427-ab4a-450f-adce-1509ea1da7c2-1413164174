@@ -38,13 +38,36 @@
       "status": "merged",
       "branch": "be/S2-ingestion",
       "merged_commit": "e128bf8364c93bd73c2f60388583993202950bb2",
-      "local_followups": {"status": "implementation_complete_checks_pending", "branch": "be/backend-completion", "tested_commit": null, "merge_sha": null, "validation_state": "Additional local ingestion/evidence/recovery fixes are unpublished and require final cumulative verification"},
-      "implementation_paths": ["backend/app/ingestion.py", "backend/app/excel.py", "backend/app/excel_process.py", "backend/app/pdf.py", "backend/app/pdf_worker.py", "backend/app/evidence.py", "backend/migrations/versions/0005_ingestion_cache.py"],
-      "tests_written": ["backend/tests/test_ingestion_execution.py", "backend/tests/test_ingestion_cache.py", "backend/tests/test_ingestion_join.py", "backend/tests/test_evidence.py", "backend/tests/test_evidence_security.py", "backend/tests/test_pdf_evaluation.py"],
-      "validation_state": "Final cumulative checks pending; private PDF/corpus quality evaluation and recovery acceptance remain open",
+      "local_followups": {
+        "status": "verified_locally_release_gates_open",
+        "branch": "main",
+        "tested_commit": "378e57889c6a3da7404c5d5af099102913aa1aa2",
+        "merge_sha": null,
+        "validation_state": "219 tests passed in both Docker images; independent source-cell fidelity and local restore verified; PDF and semantic limits documented"
+      },
+      "implementation_paths": [
+        "backend/app/ingestion.py",
+        "backend/app/excel.py",
+        "backend/app/excel_process.py",
+        "backend/app/pdf.py",
+        "backend/app/pdf_worker.py",
+        "backend/app/evidence.py",
+        "backend/migrations/versions/0005_ingestion_cache.py"
+      ],
+      "tests_written": [
+        "backend/tests/test_ingestion_execution.py",
+        "backend/tests/test_ingestion_cache.py",
+        "backend/tests/test_ingestion_join.py",
+        "backend/tests/test_evidence.py",
+        "backend/tests/test_evidence_security.py",
+        "backend/tests/test_pdf_evaluation.py"
+      ],
+      "validation_state": "219 tests passed in both Docker images; independent source-cell fidelity and local restore verified; PDF and semantic limits documented",
       "pr_url": "https://github.com/indkhan/vehicle-requirements-ai/pull/3",
-      "tested_commit": null,
-      "tests": [],
+      "tested_commit": "378e57889c6a3da7404c5d5af099102913aa1aa2",
+      "tests": [
+        "See backend_audit and TESTING_HANDOFF.md follow-up evidence"
+      ],
       "merge_sha": "12c1ade5dd3829cd6f48d7336091f954207f161f",
       "blocker": null
     },
@@ -54,14 +77,22 @@
         "BE-08",
         "BE-09"
       ],
-      "status": "implementation_complete_checks_pending",
-      "branch": "be/backend-completion",
-      "implementation_paths": ["backend/app/findings.py", "backend/app/artifacts.py", "backend/app/main.py"],
-      "tests_written": ["backend/tests/test_findings.py"],
-      "validation_state": "Final cumulative and structured live inference quality checks pending; no tested commit recorded",
+      "status": "verified_locally_release_gates_open",
+      "branch": "main",
+      "implementation_paths": [
+        "backend/app/findings.py",
+        "backend/app/artifacts.py",
+        "backend/app/main.py"
+      ],
+      "tests_written": [
+        "backend/tests/test_findings.py"
+      ],
+      "validation_state": "Local verification passed; remaining product and production gates are explicit",
       "pr_url": null,
-      "tested_commit": null,
-      "tests": [],
+      "tested_commit": "378e57889c6a3da7404c5d5af099102913aa1aa2",
+      "tests": [
+        "219 tests passed in API and parser images; actual live integrations are identified separately in backend_audit"
+      ],
       "merge_sha": null,
       "blocker": null
     },
@@ -72,14 +103,25 @@
         "BE-11",
         "BE-12"
       ],
-      "status": "implementation_complete_checks_pending",
-      "branch": "be/backend-completion",
-      "implementation_paths": ["backend/app/research.py", "backend/app/proposals.py", "backend/app/control.py", "backend/app/workflows.py"],
-      "tests_written": ["backend/tests/test_proposal_scoring.py", "backend/tests/test_research_security.py", "backend/tests/test_research_budget.py"],
-      "validation_state": "Final cumulative checks pending; guided recovery, research/search capability and all-scenario endpoint acceptance not yet verified",
+      "status": "verified_locally_release_gates_open",
+      "branch": "main",
+      "implementation_paths": [
+        "backend/app/research.py",
+        "backend/app/proposals.py",
+        "backend/app/control.py",
+        "backend/app/workflows.py"
+      ],
+      "tests_written": [
+        "backend/tests/test_proposal_scoring.py",
+        "backend/tests/test_research_security.py",
+        "backend/tests/test_research_budget.py"
+      ],
+      "validation_state": "Local verification passed; remaining product and production gates are explicit",
       "pr_url": null,
-      "tested_commit": null,
-      "tests": [],
+      "tested_commit": "378e57889c6a3da7404c5d5af099102913aa1aa2",
+      "tests": [
+        "219 tests passed in API and parser images; actual live integrations are identified separately in backend_audit"
+      ],
       "merge_sha": null,
       "blocker": null
     },
@@ -90,14 +132,24 @@
         "BE-14",
         "BE-15"
       ],
-      "status": "implementation_complete_checks_pending",
-      "branch": "be/backend-completion",
-      "implementation_paths": ["backend/app/control.py", "backend/app/rendering.py", "backend/app/exports.py", "backend/app/evidence.py"],
-      "tests_written": ["backend/tests/test_control_delivery.py", "backend/tests/test_evidence_external.py"],
-      "validation_state": "Final cumulative checks pending; simultaneous edits, late results, renderer integration and exact-version export reconciliation not yet verified",
+      "status": "verified_locally_release_gates_open",
+      "branch": "main",
+      "implementation_paths": [
+        "backend/app/control.py",
+        "backend/app/rendering.py",
+        "backend/app/exports.py",
+        "backend/app/evidence.py"
+      ],
+      "tests_written": [
+        "backend/tests/test_control_delivery.py",
+        "backend/tests/test_evidence_external.py"
+      ],
+      "validation_state": "Local verification passed; remaining product and production gates are explicit",
       "pr_url": null,
-      "tested_commit": null,
-      "tests": [],
+      "tested_commit": "378e57889c6a3da7404c5d5af099102913aa1aa2",
+      "tests": [
+        "219 tests passed in API and parser images; actual live integrations are identified separately in backend_audit"
+      ],
       "merge_sha": null,
       "blocker": null
     },
@@ -106,35 +158,84 @@
       "work_packages": [
         "BE-16"
       ],
-      "status": "in_progress",
-      "branch": "be/backend-completion",
-      "implementation_paths": ["backend/TESTING_HANDOFF.md", "backend/app/pdf_evaluation.py", "backend/app/excel_evaluation.py", "backend/README.md"],
-      "validation_state": "Validation was deferred during implementation at the user's request; final checks are in progress, full acceptance is not claimed",
-      "outstanding_gates": ["Final cumulative lint, formatting, types, migrations, contracts and backend tests", "All ten named scenarios through actual endpoints with labeled external fakes", "Crash recovery, guided-wait recovery, lost acknowledgements and workflow replay after code update", "Private real-corpus extraction/grouping/retrieval/baseline quality and resource measurements", "Configured live OIDC, production storage, hosted Temporal, structured inference/search, OTLP and real renderer", "Joint frontend/assets/renderer acceptance and production readiness/backup/restore configuration"],
+      "status": "verified_locally_release_gates_open",
+      "branch": "main",
+      "implementation_paths": [
+        "backend/TESTING_HANDOFF.md",
+        "backend/app/pdf_evaluation.py",
+        "backend/app/excel_evaluation.py",
+        "backend/README.md"
+      ],
+      "validation_state": "Local verification passed; remaining product and production gates are explicit",
+      "outstanding_gates": [
+        "Full-corpus AI semantic accuracy, cross-language baseline retrieval and live research counterevidence quality",
+        "Real vehicle/part/asset catalog and equipment applicability",
+        "Default-budget G60 PDF page 14 coverage and unresolved table/text ambiguity",
+        "Joint frontend and successful authenticated renderer acceptance",
+        "Configured production identity, storage, hosted Temporal and telemetry",
+        "Concurrent load, production throughput, full-corpus provider cost and production backup policy"
+      ],
       "pr_url": null,
-      "tested_commit": null,
-      "tests": [],
+      "tested_commit": "378e57889c6a3da7404c5d5af099102913aa1aa2",
+      "tests": [
+        "219 tests passed in API and parser images; actual live integrations are identified separately in backend_audit"
+      ],
       "merge_sha": null,
       "blocker": null
     }
   ],
   "working_tree_validation": {
-    "date": "2026-10-10",
-    "branch": "be/backend-completion",
-    "focused_tests": "60 passed in 6.92s: pipeline_wiring, demo_readiness, proposal_scoring, research_security, findings, dispatch_wiring, control_delivery, evidence_external",
-    "test_dependencies": "PostgreSQL integration and deterministic AI/Temporal/renderer fakes; no live structured inference/search or renderer verification",
-    "static_checks": "Ruff lint/format passed; generated contracts refreshed; strict mypy passed all 38 source files",
-    "remaining": "Full cumulative suite, all scenario endpoints, crash/replay, private corpus and configured live integrations deferred to testing phase"
+    "date": "2026-10-11",
+    "branch": "main",
+    "tested_code_commit": "378e57889c6a3da7404c5d5af099102913aa1aa2",
+    "tests": "219 passed in each fresh API/parser image",
+    "test_dependencies": "Real PostgreSQL/local Temporal; automated provider/renderer cases use controlled adapters. Separate live OpenAI, search, normal worker and HTTP acceptance are recorded below.",
+    "static_checks": [
+      "Fresh API/parser images: 219 tests passed in each (88.84s / 236.91s)",
+      "Ruff lint and formatting passed (91 files)",
+      "Strict mypy passed (38 source files)",
+      "Generated contracts passed",
+      "Repeatable Alembic upgrade/check: no drift",
+      "API database and Temporal readiness verified",
+      "Dependency advisories checked; CPU Torch wheel versions checked separately; no binary security certification",
+      "git diff --check passed"
+    ],
+    "remaining": [
+      "Full-corpus AI semantic accuracy, cross-language baseline retrieval and live research counterevidence quality",
+      "Real vehicle/part/asset catalog and equipment applicability",
+      "Default-budget G60 PDF page 14 coverage and unresolved table/text ambiguity",
+      "Joint frontend and successful authenticated renderer acceptance",
+      "Configured production identity, storage, hosted Temporal and telemetry",
+      "Concurrent load, production throughput, full-corpus provider cost and production backup policy"
+    ]
   },
   "main_integration": {
     "branch": "main",
     "tested_code_commit": "e9d6d4235dbb086a54c9ad433902921a466bc1b5",
-    "sources": ["origin/backend", "be/backend-completion"],
+    "sources": [
+      "origin/backend",
+      "be/backend-completion"
+    ],
     "frontend_changes": false,
     "tests": "Full backend suite: 192 passed in 71.16s on Python 3.14.8 with PostgreSQL and local Temporal; AI/research/renderer external behavior uses deterministic fakes",
-    "checks": ["Ruff lint passed", "Ruff formatting passed for 85 files", "Strict mypy passed for 38 source files", "Generated contracts check passed", "Alembic upgrade/repeated upgrade/check passed with no schema drift", "git diff --check passed"],
-    "fixed": ["Placeholder-era API and privacy tests now exercise implemented proposal reads", "Mock parser fixtures use distinct input bytes to avoid cross-test content-cache contamination"],
-    "remaining_gates": ["Live structured inference/search and real renderer integration", "Production identity/storage/Temporal/telemetry and backup/restore configuration", "Full private-corpus semantic quality evaluation", "Joint frontend acceptance; frontend branches were excluded"]
+    "checks": [
+      "Ruff lint passed",
+      "Ruff formatting passed for 85 files",
+      "Strict mypy passed for 38 source files",
+      "Generated contracts check passed",
+      "Alembic upgrade/repeated upgrade/check passed with no schema drift",
+      "git diff --check passed"
+    ],
+    "fixed": [
+      "Placeholder-era API and privacy tests now exercise implemented proposal reads",
+      "Mock parser fixtures use distinct input bytes to avoid cross-test content-cache contamination"
+    ],
+    "remaining_gates": [
+      "Live structured inference/search and real renderer integration",
+      "Production identity/storage/Temporal/telemetry and backup/restore configuration",
+      "Full private-corpus semantic quality evaluation",
+      "Joint frontend acceptance; frontend branches were excluded"
+    ]
   },
   "live_integrations": {
     "ai_connectivity": {
@@ -143,8 +244,8 @@
       "input_tokens": 21,
       "output_tokens": 5
     },
-    "ai_structured_extraction": "verified_on_live_synthetic_pipeline; real_feedback_completion_open",
-    "search": "live_search_and_retrieval_exercised; validated_claims_not_verified",
+    "ai_structured_extraction": "verified_on_real_feedback_HTTP_and_native_PDF_samples_plus_guided_synthetic_flow; full_corpus_semantics_open",
+    "search": "two_live_validated_claims; partial_applicability_and_zero_validated_counterevidence",
     "oidc": "unconfigured",
     "s3": "unconfigured",
     "hosted_temporal": "unconfigured",
@@ -152,17 +253,49 @@
     "otlp": "unconfigured"
   },
   "backend_audit": {
-    "date": "2026-10-10",
+    "date": "2026-10-11",
     "branch": "main",
-    "tested_code_commit": "441386b4efc6b8a36b0d67178026435d0f1cf218",
-    "report": "backend/TESTING_HANDOFF.md#backend-audit-10-october-2026",
-    "tests": "207 passed in 137.58s on Python 3.14.8 with local PostgreSQL and Temporal; external behavior in the automated suite uses controlled providers",
-    "checks": ["Fresh API/worker images built", "Ruff lint passed", "Ruff formatting: 89 files passed", "Strict mypy: 38 files passed", "Generated contracts check passed", "Alembic upgrade/check: no drift", "Restarted API /ready: HTTP 200, database and Temporal ready", "git diff --check passed"],
-    "fix_commits": ["d5d69a9", "6d13c1b", "a26f90f", "7564dfc", "8d2b665", "441386b"],
+    "tested_code_commit": "378e57889c6a3da7404c5d5af099102913aa1aa2",
+    "report": "backend/TESTING_HANDOFF.md#backend-audit-follow-up-11-october-2026",
+    "tests": "219 passed in 88.84s in API and 236.91s in parser image; automated external cases use controlled providers",
+    "checks": [
+      "Fresh API/parser images: 219 tests passed in each (88.84s / 236.91s)",
+      "Ruff lint and formatting passed (91 files)",
+      "Strict mypy passed (38 source files)",
+      "Generated contracts passed",
+      "Repeatable Alembic upgrade/check: no drift",
+      "API database and Temporal readiness verified",
+      "Dependency advisories checked; CPU Torch wheel versions checked separately; no binary security certification",
+      "git diff --check passed"
+    ],
+    "fix_commits": [
+      "d5d69a9",
+      "6d13c1b",
+      "a26f90f",
+      "7564dfc",
+      "8d2b665",
+      "441386b",
+      "a19ad53",
+      "f7216f8",
+      "b923e6a",
+      "7ba8234",
+      "344c7b1",
+      "b04d170",
+      "3ac5bd3",
+      "378e578"
+    ],
     "acceptance_test_commit": "1d6513c",
     "private_corpus": {
-      "feedback_records_per_profile": {"F70": 2128, "G60": 4000, "G70": 4000},
-      "feedback_annotations_per_profile": {"F70": 4076, "G60": 5005, "G70": 4690},
+      "feedback_records_per_profile": {
+        "F70": 2128,
+        "G60": 4000,
+        "G70": 4000
+      },
+      "feedback_annotations_per_profile": {
+        "F70": 4076,
+        "G60": 5005,
+        "G70": 4690
+      },
       "feedback_distinct_counts_independently_reconciled": true,
       "study_metrics": 1627,
       "sales_metrics": 36,
@@ -170,8 +303,11 @@
       "sales_status": "partial_unknown_country_mapping",
       "pdf_manual_cases_matched": 12,
       "pdf_manual_locators_matched": 12,
-      "pdf_scope": "Sample pages in three derivative equipment PDFs and annual report; not full-document fidelity",
-      "pdf_concurrency": "Two concurrent samples exceeded parser deadline under host contention; sequential samples passed"
+      "pdf_scope": "Full native PDF ingestion in progress; default-budget missing G60 page 14 remains explicit",
+      "pdf_concurrency": "Default parser budgets preserved; dense single-page G60 probe recovered 25 passages under 600 seconds (267s wall / 463s CPU), still partial tables",
+      "annotation_texts_and_identities_checked": 13771,
+      "metrics_and_raw_references_checked": 1663,
+      "raw_cell_locator_comparisons": 173346
     },
     "live_pipeline": {
       "synthetic_run_id": "00619bef-5695-4ad1-9a28-1766b4f7f417",
@@ -183,12 +319,85 @@
       "citations_resolve": true,
       "human_approval_fabricated": false,
       "temporal_replay": "passed",
-      "real_feedback_sample": "Reached findings/baselines then failed proposals; subsequent post-fix attempt failed extraction with provider connection refused",
-      "research": "Hosted search and two safe public-source retrievals exercised; budget expired before claim assessment; unavailable with zero validated claims"
+      "real_feedback_sample": "86baabd2-6f21-4d88-ba8a-5541c9450a1c: three real G60 records, three findings/changes, one variant, 195s, resolving citations and replay",
+      "research": {
+        "run_id": "c69dbed8-e87a-47db-954b-1679d9a6c5cf",
+        "validated_claims": 2,
+        "sources": 2,
+        "counterevidence": 0,
+        "status": "partial",
+        "reserved_tokens": 6000,
+        "reserved_budget_is_billing": false,
+        "timeout_seconds": 180,
+        "default_60_second_assessment_budget_limitation": true
+      },
+      "real_http": {
+        "run_id": "716d50dc-2a4c-431d-92e1-95fb62f4402b",
+        "records": 6,
+        "annotations": 7,
+        "findings": 6,
+        "changes": 5,
+        "variants": 3,
+        "context": "Complete real study and sales workbooks; demo vehicle/catalog",
+        "worker_restart_edit_recovery": true,
+        "versioned_exports": true,
+        "stale_and_idempotent_commands": true,
+        "workspace_isolation": true
+      },
+      "native_pdf": {
+        "run_id": "58122149-2fca-461e-9076-1db2c75e8c17",
+        "pdf_pages": 23,
+        "real_feedback_records": 3,
+        "findings": 9,
+        "changes": 5,
+        "variants": 1,
+        "seconds": 554,
+        "context": "Real F70 PDF and feedback; synthetic study/sales and demo catalog",
+        "citations_resolve": true,
+        "temporal_replay": "passed",
+        "provider_responses": 38,
+        "input_tokens": 657944,
+        "output_tokens": 20973,
+        "proposal_provider_calls": 1,
+        "uncertain_provider_outcomes_observed": 0
+      },
+      "guided": {
+        "run_id": "415ed95b-7e6d-430e-89c5-57ef7ddf5043",
+        "fixture": "synthetic",
+        "conflicts": 1,
+        "wait_and_idempotent_continue": "passed",
+        "variants": 2
+      },
+      "baseline_target_review": {
+        "live_reviewer": "accepted",
+        "assessment": "reused validated fixture",
+        "baseline_state": "unknown",
+        "source_target_scope_kept_separate": true
+      }
     },
-    "remaining_gates": ["Reliable provider connectivity and completed real-feedback pipeline", "Full private-corpus semantic accuracy and full-document PDF fidelity", "Validated Deep Dive claims and counterevidence quality", "Real vehicle/part/asset catalog and equipment applicability", "Live guided AI acceptance and joint frontend scenarios", "Production identity, storage, supported Temporal, OTLP and renderer", "Backup/restore, concurrent load, throughput and complete cost measurements"],
-    "runtime": "Audited API running; PostgreSQL/Temporal and private volumes preserved; global worker stopped to avoid consuming accumulated test jobs. Live tests used isolated queues.",
+    "remaining_gates": [
+      "Full-corpus AI semantic accuracy, cross-language baseline retrieval and live research counterevidence quality",
+      "Real vehicle/part/asset catalog and equipment applicability",
+      "Default-budget G60 PDF page 14 coverage and unresolved table/text ambiguity",
+      "Joint frontend and successful authenticated renderer acceptance",
+      "Configured production identity, storage, hosted Temporal and telemetry",
+      "Concurrent load, production throughput, full-corpus provider cost and production backup policy"
+    ],
+    "runtime": "Default API port 8000; global worker stopped to avoid accumulated test commands. Isolated acceptance API port 8001 and normal worker active. Original volumes preserved; unrelated Docker projects untouched.",
     "publication": "Local commits only; no push or deployment",
-    "release_ready": false
+    "release_ready": false,
+    "acceptance_test_commits": [
+      "1d6513c",
+      "5263454"
+    ],
+    "local_restore": {
+      "database_tables": 17,
+      "database_rows": 8619,
+      "all_sorted_row_values_matched": true,
+      "object_files": 19,
+      "object_bytes": 383137,
+      "source_versions_digest_matched": 17,
+      "scope": "Separate restore destinations; acceptance snapshot before guided run; originals preserved; not production backup policy"
+    }
   }
 }

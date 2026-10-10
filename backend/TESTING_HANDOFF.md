@@ -236,12 +236,12 @@ commits only; it did not deploy or push them.
 ## Backend audit follow-up, 11 October 2026
 
 This section supersedes the earlier live-connection results. Tested application
-code: `5263454`. Real provider calls used the private environment file mounted
+code: `378e578`. Real provider calls used the private environment file mounted
 as a Docker secret. Private inputs, passages and reference answers remain ignored.
 Full PDF corpus ingestion is still running; this is an interim evidence record.
 
-Fresh-image regressions passed in both environments: **218 tests in 105.60s**
-in the API image and **218 tests in 130.94s** in the parser image. Ruff lint,
+Fresh-image regressions passed in both environments: **219 tests in 88.84s**
+in the API image and **219 tests in 236.91s** in the parser image. Ruff lint,
 formatting (91 files), strict mypy (38 source files), generated contracts,
 repeatable Alembic upgrade/no-drift and `git diff --check` passed.
 
@@ -256,6 +256,8 @@ repeatable Alembic upgrade/no-drift and `git diff --check` passed.
 | `344c7b1` | A failed page pair dropped readable pages. Exhausted pairs split into single-page checkpoints; successful caches retain their identity. A single-page failure stays explicit. |
 | `b04d170` | Research assessment saw navigation prefixes instead of substantive body text. It now selects an exact, bounded lexical match to the need. Synonym recall remains limited. |
 | `5263454` | Added controlled assessment coverage for exact quotes, scoped applicability, opinion/counterevidence retention, unchanged feedback counts and idempotent reuse. |
+| `3ac5bd3` | Live preservation proposals cited positive feedback only as opposition and were rejected. Prompt and correction errors now explicitly require related supporting citations for every change, including preservation. Validation remains strict. |
+| `378e578` | Baseline review omitted the operator's target scope, incorrectly treating configured target context as unsupported. Assessment and review now receive the same frozen target context; source scope remains separate. |
 
 ### Live AI and HTTP acceptance
 
@@ -270,6 +272,7 @@ keeps its existing volumes and API at port 8000. Both APIs returned `/ready` HTT
 |---|---|
 | Real G60 sample | Run `86baabd2-6f21-4d88-ba8a-5541c9450a1c`: three independent records, three findings, three changes, one variant; proposals ready in 195 seconds; citations resolved and history replay passed. |
 | Real F70/G60/G70 HTTP pipeline | Run `716d50dc-2a4c-431d-92e1-95fb62f4402b`: six independent records with seven retained annotation rows, plus the complete study and sales workbooks; six findings, five changes, three variants. Upload-to-edit/export acceptance took 482 seconds, including a deliberately stopped worker. |
+| Native PDF plus real feedback | Run `58122149-2fca-461e-9076-1db2c75e8c17`: actual 23-page F70 PDF and three real F70 records, plus synthetic demo study/sales context; nine findings, five changes and one variant in 554 seconds. Citations resolved, decisions stayed proposed and real Temporal replay passed. |
 | Refinement/recovery | The edit remained queued while the worker was stopped and completed after restart. Version one and findings stayed unchanged; version two published. Idempotent retries, stale edits, score recomputation and citation resolution passed. |
 | PM decisions/export/events | Explicit test decision deferred a change. JSON/XLSX downloads, frozen version two, history, exclusive SSE replay and nonmember denial passed. No approval was fabricated. |
 | Live guided conflict | Synthetic run `415ed95b-7e6d-430e-89c5-57ef7ddf5043`: four contrasting records produced one conflict; processing waited for PM; an idempotent `preserve_alternatives` continuation published two variants, still proposed. The fixture first used an unsupported workbook layout, which was correctly rejected; an invalid resolution was also rejected. |
@@ -287,6 +290,25 @@ complaint and overlapping annotations were preserved without invented physical
 part mappings. The two live research claims were checked against the selected
 manufacturer passage; they distinguish a qualified comfort claim from a described
 seat feature and do not claim proven sustained comfort or current market fit.
+
+The native PDF/feedback run recorded 38 distinct provider responses: 657,944 input
+and 20,973 output tokens, including one proposal-provider call. No uncertain
+provider outcome was observed in that run. This is measured token usage for one
+sample, not full-corpus cost or production throughput. English need text can
+retrieve irrelevant German equipment passages; review rejected unsupported
+baseline claims and retained unknown states. Cross-language retrieval quality
+remains a limitation. Research at the default 60-second budget can run out of
+assessment time after retrieval; the validated live research used 180 seconds.
+
+After the target-context correction, a real SDK baseline review accepted a reused
+validated assessment with the original bounded source selection, retaining its
+unknown baseline. Assessment was reused in this focused check; it was not another
+complete paid pipeline. A separate live assessment rejected feedback citations
+offered as equipment-baseline evidence, as required.
+
+XLSX export already neutralizes untrusted formula-like strings. Existing tests
+verify literal string cells, numeric values, nulls and deterministic output; no
+additional export implementation was needed.
 
 ### Cleaning, source integrity and recovery
 

@@ -11,7 +11,7 @@ import type {
 afterEach(() => vi.unstubAllGlobals());
 
 async function setup(api: Api, guided = false, deepDive = false) {
-  const upload = await api.upload(new File(["feedback"], "regional.csv"));
+  const upload = await api.upload(new File(["feedback"], "regional.xlsx"));
   const config: RunConfig = {
     vehicle_id: "g60-i5-m60",
     baseline_asset_id: "i5-m60-exterior-v1",
@@ -34,14 +34,14 @@ async function setup(api: Api, guided = false, deepDive = false) {
 describe("application API boundary", () => {
   it("uses completed upload IDs and does not count duplicate file contents twice", async () => {
     const api = createMockApi();
-    const first = await api.upload(new File(["same records"], "germany.csv"));
-    const second = await api.upload(new File(["same records"], "europe.csv"));
+    const first = await api.upload(new File(["same records"], "germany.xlsx"));
+    const second = await api.upload(new File(["same records"], "europe.xlsx"));
     expect(first.source_id).toBe(second.source_id);
     const { config } = await setup(api);
     await expect(
       api.request(
         "/runs",
-        { ...config, source_ids: ["/Users/customer/feedback.csv"] },
+        { ...config, source_ids: ["/Users/customer/feedback.xlsx"] },
         "invalid-upload",
       ),
     ).rejects.toMatchObject({ code: "invalid_sources" });
@@ -170,10 +170,15 @@ describe("application API boundary", () => {
       if (url.endsWith("/uploads"))
         return new Response(
           JSON.stringify({
-            source_id: "server-source",
-            filename: "input.csv",
-            status: "ready",
-            reason: null,
+            sources: [
+              {
+                source_id: "server-source",
+                filename: "input.xlsx",
+                detected_type: "xlsx",
+                status: "ready",
+                reason: null,
+              },
+            ],
           }),
           { status: 200 },
         );
@@ -188,22 +193,29 @@ describe("application API boundary", () => {
     });
     const api = createRealApi("/api/v1");
     expect(
-      (await api.upload(new File(["feedback"], "input.csv"))).source_id,
+      (await api.upload(new File(["feedback"], "input.xlsx"))).source_id,
     ).toBe("server-source");
     expect(requests[0].init.body).toBeInstanceOf(FormData);
     await expect(
       api.request(
         "/runs/r/instructions",
-        { base_proposal_set_version: 6 },
+        {
+          operation: "edit_change",
+          base_proposal_set_version: 6,
+          target_ids: ["change-1"],
+          changed_fields: { after: "Updated" },
+        },
         "edit-key",
       ),
     ).rejects.toEqual(
-      new ApiError("stale_version", "Refresh current proposal.", 7),
+      new ApiError("stale_version", "Refresh current proposal.", 7, 409),
     );
-    expect(requests[1].init.headers).toMatchObject({
-      "Idempotency-Key": "edit-key",
-      "Content-Type": "application/json",
-    });
+    expect(new Headers(requests[1].init.headers).get("Idempotency-Key")).toBe(
+      "edit-key",
+    );
+    expect(new Headers(requests[1].init.headers).get("Content-Type")).toBe(
+      "application/json",
+    );
     expect(requests[1].init.credentials).toBe("include");
   });
 });

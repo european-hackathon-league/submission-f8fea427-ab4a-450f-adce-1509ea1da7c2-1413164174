@@ -2,11 +2,11 @@ import {act,cleanup, fireEvent, render, screen, waitFor} from '@testing-library/
 import {afterEach, describe, expect, it, vi} from 'vitest';
 import BmwAssetViewer, {BMW_I5_MODEL_UID,frameCameraForAspect,normalizeSketchfabNodeMap} from './BmwAssetViewer';
 import {findings as apiFindings} from '../api/fixtures';
-const findings=apiFindings.flatMap(f=>f.part_ids.map(id=>({id,counts:f.counts})));
+const findings=apiFindings.flatMap(f=>f.part_ids.map(id=>({id,counts:{intensity_value:0,intensity_scale_id:"synthetic-test",low_evidence:false,provisional:false,...f.counts}})));
 
 type InitOptions={success:(api:any)=>void;error:()=>void};
 
-afterEach(()=>cleanup());
+afterEach(()=>{cleanup();sessionStorage.clear();vi.restoreAllMocks();});
 
 describe('normalizeSketchfabNodeMap',()=>{
   it('accepts documented flattened nodes and object-wrapped node maps',()=>{
@@ -96,7 +96,7 @@ describe('BmwAssetViewer', () => {
     expect(onSelectComponent).toHaveBeenCalledTimes(1);
   });
 
-  it('reinitializes the hosted model after switching away from and back to exterior', async () => {
+  it('keeps hosted camera and iframe when switching views or refreshing aggregate data', async () => {
     const events:Record<string,(value?:any)=>void>={};
     const api={
       start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
@@ -110,10 +110,94 @@ describe('BmwAssetViewer', () => {
     const props={selectedComponent:'body' as const,onSelectComponent:vi.fn(),view:'exterior' as const,onViewChange:vi.fn(),heatmap:false,findings};
     const {rerender}=render(<BmwAssetViewer {...props}/>);
     await waitFor(()=>expect(init).toHaveBeenCalledTimes(1));
+    act(()=>events.viewerready());
+    const frame=screen.getByTitle('Interactive 3D model of the 2023 BMW i5 M60');
+    api.setCameraLookAt.mockClear();
     rerender(<BmwAssetViewer {...props} view="interior"/>);
-    rerender(<BmwAssetViewer {...props}/>);
-    await waitFor(()=>expect(init).toHaveBeenCalledTimes(2));
+    expect(frame).toBeInTheDocument();
+    expect(frame).not.toBeVisible();
+    rerender(<BmwAssetViewer {...props} findings={[...findings].reverse()}/>);
+    expect(frame).toBeVisible();
+    expect(init).toHaveBeenCalledTimes(1);
+    expect(api.setCameraLookAt).not.toHaveBeenCalled();
     expect(api.stop).toHaveBeenCalled();
+  });
+
+
+  it.each(['camerastop','pagehide'])('restores the actual SDK camera saved on %s after a same-tab reload without changing the reset preset',async event=>{
+    let camera={position:[2,2,4],target:[0,0,0]};
+    const events:Record<string,()=>void>={};
+    const api={
+      start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:()=>void)=>{events[name]=callback;}),
+      getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,camera),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),
+      setCameraLookAt:vi.fn((position:number[],target:number[])=>{camera={position,target};}),
+      setBackground:vi.fn(),recenterCamera:vi.fn(),
+    };
+    class SketchfabMock {init(_uid:string,options:InitOptions){options.success(api);}}
+    Object.assign(window,{Sketchfab:SketchfabMock});
+    const props={selectedComponent:'body' as const,onSelectComponent:vi.fn(),view:'exterior' as const,onViewChange:vi.fn(),heatmap:false,findings};
+    const first=render(<BmwAssetViewer {...props}/>);
+    await waitFor(()=>expect(events.viewerready).toBeTypeOf('function'));
+    act(()=>events.viewerready());
+    camera={position:[9,-3,7],target:[1,2,0]};
+    expect(events.camerastop).toBeTypeOf('function');
+    act(()=>{if(event==='pagehide')window.dispatchEvent(new Event('pagehide'));else events.camerastop();});
+    first.unmount();
+    camera={position:[2,2,4],target:[0,0,0]};
+    api.setCameraLookAt.mockClear();
+    delete events.viewerready;
+    render(<BmwAssetViewer {...props}/>);
+    await waitFor(()=>expect(events.viewerready).toBeTypeOf('function'));
+    act(()=>events.viewerready());
+    expect(api.setCameraLookAt).toHaveBeenCalledWith([9,-3,7],[1,2,0],0);
+    fireEvent.click(screen.getByRole('button',{name:'Reset view'}));
+    expect(api.setCameraLookAt).toHaveBeenLastCalledWith([2,2,4],[0,0,0],expect.any(Number));
+  });
+
+  it.each([
+    '{invalid',
+    JSON.stringify({position:[1,2],target:[0,0,0]}),
+    JSON.stringify({position:[null,2,3],target:[0,0,0]}),
+    JSON.stringify({position:[0,0,0],target:[0,0,0]}),
+  ])('ignores an invalid cached camera and keeps SDK navigation usable: %s',async cached=>{
+    sessionStorage.setItem('vehicle-camera:'+BMW_I5_MODEL_UID,cached);
+    const events:Record<string,()=>void>={};
+    const api={
+      start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:()=>void)=>{events[name]=callback;}),
+      getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),
+      setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
+    };
+    class SketchfabMock {init(_uid:string,options:InitOptions){options.success(api);}}
+    Object.assign(window,{Sketchfab:SketchfabMock});
+    render(<BmwAssetViewer selectedComponent="body" onSelectComponent={vi.fn()} view="exterior" onViewChange={vi.fn()} heatmap={false} findings={findings}/>);
+    await waitFor(()=>expect(events.viewerready).toBeTypeOf('function'));
+    act(()=>events.viewerready());
+    expect(api.setCameraLookAt).not.toHaveBeenCalled();
+    expect(screen.getByRole('button',{name:'Zoom in'})).toBeEnabled();
+  });
+
+
+  it('keeps camera controls usable when session storage access is denied',async()=>{
+    const getItem=vi.spyOn(Storage.prototype,'getItem').mockImplementation(()=>{throw new DOMException('Blocked','SecurityError');});
+    const setItem=vi.spyOn(Storage.prototype,'setItem').mockImplementation(()=>{throw new DOMException('Blocked','SecurityError');});
+    const events:Record<string,()=>void>={};
+    const api={
+      start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:()=>void)=>{events[name]=callback;}),
+      getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),
+      setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
+    };
+    class SketchfabMock {init(_uid:string,options:InitOptions){options.success(api);}}
+    Object.assign(window,{Sketchfab:SketchfabMock});
+    render(<BmwAssetViewer selectedComponent="body" onSelectComponent={vi.fn()} view="exterior" onViewChange={vi.fn()} heatmap={false} findings={findings}/>);
+    await waitFor(()=>expect(events.viewerready).toBeTypeOf('function'));
+    act(()=>events.viewerready());
+    act(()=>events.camerastop());
+    fireEvent.click(screen.getByRole('button',{name:'Zoom in'}));
+    expect(api.setCameraLookAt).toHaveBeenCalledWith([1.6,1.6,3.2],[0,0,0],expect.any(Number));
+    getItem.mockRestore();setItem.mockRestore();
   });
 
   it('reports initialization failure and keeps verified preview available', async () => {

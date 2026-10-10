@@ -24,7 +24,11 @@ import {
   WandSparkles,
   X,
 } from "lucide-react";
-import { ApiError, commandKey, createApi } from "./api/client";
+import { ApiError, commandKey, createApi, createRealApi } from "./api/client";
+import ApiAccess from "./ApiAccess";
+import { recoverRun } from "./runRecovery";
+import { readSession, saveSession, clearSession } from "./session";
+import type { PendingRun } from "./session";
 import type {
   Api,
   Change,
@@ -33,6 +37,7 @@ import type {
   Instruction,
   Page,
   RenderResult,
+  RunConfig,
   Upload,
   Vehicle,
   Workspace,
@@ -57,6 +62,24 @@ type UploadRow = {
   source_id?: string;
   reason?: string | null;
 };
+function requestError(error: unknown): string {
+  if (!(error instanceof Error)) return "Request failed. Retry.";
+  if (!(error instanceof ApiError)) return error.message;
+  const fields = error.field_errors
+    .map((field) =>
+      Object.entries(field)
+        .map(([name, value]) => `${name}: ${value}`)
+        .join(" · "),
+    )
+    .join("; ");
+  return [
+    error.message,
+    fields,
+    error.requestId ? `Request ID: ${error.requestId}` : "",
+  ]
+    .filter(Boolean)
+    .join(" — ");
+}
 type ProposalDraft = {
   text: string;
   target: string;
@@ -65,7 +88,51 @@ type ProposalDraft = {
 };
 
 export default function App({ api: suppliedApi }: { api?: Api }) {
+  const [connectedApi, setConnectedApi] = useState<Api | null>(
+    suppliedApi ??
+      (import.meta.env.VITE_API_MODE === "real" ? null : createApi()),
+  );
+  if (!connectedApi)
+    return (
+      <ApiAccess
+        baseUrl={import.meta.env.VITE_API_BASE_URL || "/api/v1"}
+        onConnect={(base, headers, sessionNamespace) =>
+          setConnectedApi(
+            createRealApi(base, { headers: () => headers, sessionNamespace }),
+          )
+        }
+      />
+    );
+  return (
+    <WorkspaceApp
+      key={connectedApi.sessionNamespace ?? connectedApi.mode}
+      api={connectedApi}
+      onDisconnect={
+        connectedApi.mode === "real" && !suppliedApi
+          ? () => setConnectedApi(null)
+          : undefined
+      }
+    />
+  );
+}
+
+function WorkspaceApp({
+  api: suppliedApi,
+  onDisconnect,
+}: {
+  api: Api;
+  onDisconnect?: () => void;
+}) {
   const [api, setApi] = useState(() => suppliedApi ?? createApi());
+  const sessionNamespace =
+    api.sessionNamespace ??
+    `real:${import.meta.env.VITE_API_BASE_URL || "/api/v1"}`;
+  const [restored] = useState(() =>
+    api.mode === "real" ? readSession(sessionNamespace) : null,
+  );
+  const [pendingRun, setPendingRun] = useState<PendingRun | null>(
+    restored?.pendingRun ?? null,
+  );
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
   const [vehicleError, setVehicleError] = useState("");
   const [vehicleRetry, setVehicleRetry] = useState(0);
@@ -74,18 +141,29 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
   const [mode, setMode] = useState<"autonomous" | "guided">("autonomous");
   const [uploads, setUploads] = useState<UploadRow[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
-  const [runId, setRunId] = useState<string | null>(null);
-  const [tab, setTab] = useState<Tab>("Findings");
-  const [selectedFindingId, setSelectedFindingId] =
-    useState("finding-dashboard");
-  const [selectedComponent, setSelectedComponent] =
-    useState<ComponentId>("dashboard");
-  const [view, setView] = useState<VehicleView>("exterior");
-  const [variantId, setVariantId] = useState("variant-digital");
+  const [runId, setRunId] = useState<string | null>(restored?.runId ?? null);
+  const [tab, setTab] = useState<Tab>(
+    tabs.some((t) => t.title === restored?.tab)
+      ? (restored!.tab as Tab)
+      : "Findings",
+  );
+  const [selectedFindingId, setSelectedFindingId] = useState(
+    restored?.selectedFindingId ?? "finding-dashboard",
+  );
+  const [selectedComponent, setSelectedComponent] = useState<ComponentId>(
+    (restored?.selectedComponent as ComponentId) ?? "dashboard",
+  );
+  const [view, setView] = useState<VehicleView>(
+    restored?.view === "interior" ? "interior" : "exterior",
+  );
+  const [variantId, setVariantId] = useState(
+    restored?.variantId ?? "variant-digital",
+  );
   const [heatmap, setHeatmap] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [connection, setConnection] = useState("");
+  const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const [source, setSource] = useState<Evidence | null>(null);
   const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
   const [exportJob, setExportJob] = useState<{
@@ -95,14 +173,22 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     download_url?: string;
   } | null>(null);
   const lock = useRef(false);
-  const startAttempt = useRef<{ input: string; key: string } | null>(null);
-  const proposalDrafts = useRef(new Map<string, ProposalDraft>());
+  const proposalDrafts = useRef(
+    new Map<string, ProposalDraft>(
+      (restored?.proposalDrafts ?? []).map(([key, draft]) => [
+        key,
+        { ...draft, dirty: true },
+      ]),
+    ),
+  );
   const scopeDrafts = useRef(new Map<string, string>());
-  const [dirtyDrafts, setDirtyDrafts] = useState(new Set<string>());
+  const [dirtyDrafts, setDirtyDrafts] = useState(
+    new Set<string>((restored?.proposalDrafts ?? []).map(([key]) => key)),
+  );
   const [confirmNewRun, setConfirmNewRun] = useState(false);
   const [savedConfigExpanded, setSavedConfigExpanded] = useState(false);
   const [vehicleExpanded, setVehicleExpanded] = useState(false);
-  const [ideaDraft, setIdeaDraft] = useState("");
+  const [ideaDraft, setIdeaDraft] = useState(restored?.ideaDraft ?? "");
   const hasUnsavedWork = dirtyDrafts.size > 0 || !!ideaDraft.trim();
   const rememberDirty = useCallback((key: string, dirty: boolean) => {
     setDirtyDrafts((old) => {
@@ -124,13 +210,17 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     return () => window.removeEventListener("beforeunload", warn);
   }, [hasUnsavedWork]);
   const run = workspace?.snapshot;
+  const savedConfig = run?.config ?? pendingRun?.config;
   const vehicle = vehicles.find(
-    (v) => v.vehicle_id === (run?.config.vehicle_id ?? vehicleId),
+    (v) => v.vehicle_id === (savedConfig?.vehicle_id ?? vehicleId),
   );
   const baselineAvailable =
     vehicle?.vehicle_id === sceneCatalog.vehicle_id &&
     vehicle.baseline_asset_id === sceneCatalog.baseline_asset_id &&
     vehicle.part_catalog_version === sceneCatalog.catalog_version;
+  const configurationAvailable =
+    !!vehicle?.baseline_asset_id && !!vehicle.part_catalog_version;
+  const setupLocked = !!runId || !!pendingRun;
   const finding =
     workspace?.findings.find((f) => f.finding_id === selectedFindingId) ??
     workspace?.findings[0];
@@ -156,7 +246,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
         ? "Vehicle options unavailable. Retry loading vehicles to continue."
         : !vehicles.length
           ? "Loading vehicle options…"
-          : !baselineAvailable
+          : !configurationAvailable
             ? "No baseline asset for this vehicle. Choose a vehicle with an available baseline."
             : uploadingCount
               ? `Uploading ${uploadingCount} ${uploadingCount === 1 ? "file" : "files"}. Wait for uploads to finish.`
@@ -174,6 +264,11 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
       .then((result) => {
         if (active) {
           setVehicles(result.items);
+          setVehicleId((current) =>
+            result.items.some((v) => v.vehicle_id === current)
+              ? current
+              : (result.items[0]?.vehicle_id ?? current),
+          );
           if (!result.items.length)
             setVehicleError(
               "No vehicles available. Retry or contact your workspace administrator.",
@@ -205,31 +300,58 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
 
   useEffect(() => {
     if (!runId) return;
-    let cancelled = false;
-    let timer: ReturnType<typeof setTimeout>;
-    async function poll() {
-      try {
-        const next = await api.workspace(runId!);
-        if (!cancelled) {
+    const controller = new AbortController();
+    void recoverRun(
+      api,
+      runId,
+      {
+        workspace: (next) =>
           setWorkspace((old) =>
-            old && old.snapshot.revision > next.snapshot.revision ? old : next,
-          );
-          setConnection("");
-        }
-      } catch {
-        if (!cancelled)
-          setConnection(
-            "Connection interrupted. Retrying; your drafts remain here.",
-          );
-      }
-      if (!cancelled) timer = setTimeout(poll, 2000);
-    }
-    void poll();
+            old?.snapshot.run_id === runId &&
+            old.snapshot.revision > next.snapshot.revision
+              ? old
+              : next,
+          ),
+        status: setConnection,
+      },
+      controller.signal,
+    );
+    return () => controller.abort();
+  }, [api, runId, recoveryAttempt]);
+
+  const persistSession = useCallback(() => {
+    if (api.mode !== "real") return;
+    saveSession(sessionNamespace, {
+      pendingRun,
+      runId,
+      tab,
+      selectedFindingId,
+      selectedComponent,
+      view,
+      variantId,
+      ideaDraft,
+      proposalDrafts: [...proposalDrafts.current],
+    });
+  }, [
+    api.mode,
+    sessionNamespace,
+    pendingRun,
+    runId,
+    tab,
+    selectedFindingId,
+    selectedComponent,
+    view,
+    variantId,
+    ideaDraft,
+  ]);
+  useEffect(persistSession, [persistSession]);
+  useEffect(() => {
+    window.addEventListener("pagehide", persistSession);
     return () => {
-      cancelled = true;
-      clearTimeout(timer);
+      persistSession();
+      window.removeEventListener("pagehide", persistSession);
     };
-  }, [api, runId]);
+  }, [persistSession]);
 
   useEffect(() => {
     if (
@@ -242,7 +364,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     const timer = setInterval(() => {
       api
         .request<RenderResult>(
-          `/runs/${runId}/renders/${encodeURIComponent(renderResult.render_request_id)}`,
+          `/runs/${encodeURIComponent(runId!)}/renders/${encodeURIComponent(renderResult.render_request_id)}`,
         )
         .then((result) => {
           if (!cancelled) setRenderResult(result);
@@ -268,7 +390,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     const timer = setInterval(() => {
       api
         .request<{ export_id: string; status: string; download_url?: string }>(
-          `/runs/${runId}/exports/${encodeURIComponent(exportJob.export_id)}`,
+          `/runs/${encodeURIComponent(runId!)}/exports/${encodeURIComponent(exportJob.export_id)}`,
         )
         .then((result) => {
           if (!cancelled) setExportJob((old) => old && { ...old, ...result });
@@ -292,7 +414,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
       await action();
       return true;
     } catch (e) {
-      setError(e instanceof Error ? e.message : "Request failed. Retry.");
+      setError(requestError(e));
       if (e instanceof ApiError && e.code === "stale_version" && runId)
         await refresh(runId).catch(() =>
           setConnection("Refresh failed. Retry; your draft remains here."),
@@ -340,6 +462,33 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     );
   }
 
+  async function createRun(config?: RunConfig) {
+    const command = pendingRun ?? { key: commandKey(), config: config! };
+    if (!command.config) return;
+    setPendingRun(command);
+    await act(async () => {
+      let result: { run_id: string };
+      try {
+        result = await api.request<{ run_id: string }>(
+          "/runs",
+          command.config,
+          command.key,
+        );
+      } catch (error) {
+        if (
+          error instanceof ApiError &&
+          !error.retryable &&
+          error.status !== null
+        )
+          setPendingRun(null);
+        throw error;
+      }
+      setRunId(result.run_id);
+      setPendingRun(null);
+      await refresh(result.run_id);
+    });
+  }
+
   function selectFinding(next: Finding) {
     setSelectedFindingId(next.finding_id);
     if (next.part_ids[0]) {
@@ -364,7 +513,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     let savedVersion: number | null = null;
     await act(async () => {
       await api.request(
-        `/runs/${runId}/instructions`,
+        `/runs/${encodeURIComponent(runId!)}/instructions`,
         instruction,
         commandKey(),
       );
@@ -374,7 +523,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
   }
 
   const reset = () => {
-    startAttempt.current = null;
+    clearSession(sessionNamespace);
     proposalDrafts.current.clear();
     scopeDrafts.current.clear();
     setDirtyDrafts(new Set());
@@ -383,6 +532,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     setVehicleExpanded(false);
     setTab("Findings");
     setIdeaDraft("");
+    setPendingRun(null);
     setWorkspace(null);
     setRunId(null);
     setUploads([]);
@@ -395,7 +545,10 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     setMode("autonomous");
     setSelectedFindingId("finding-dashboard");
     setVariantId("variant-digital");
-    setApi(suppliedApi ?? createApi());
+    if (api.mode === "mock") {
+      api.dispose?.();
+      setApi(createApi());
+    }
   };
 
   return (
@@ -408,6 +561,16 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
           <strong className="wordmark">FWD</strong>
           <span>Vehicle requirements</span>
         </div>
+        {onDisconnect && (
+          <button
+            onClick={() => {
+              persistSession();
+              onDisconnect();
+            }}
+          >
+            Change API access
+          </button>
+        )}
         <span className="environment">
           {api.mode === "mock" ? "Synthetic workspace" : "Connected workspace"}
         </span>
@@ -416,9 +579,9 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
         <section className="run-setup" aria-label="Run setup">
           <div className="section-title">
             <h1 tabIndex={-1}>
-              {run ? "Saved configuration" : "New analysis run"}
+              {setupLocked ? "Saved configuration" : "New analysis run"}
             </h1>
-            {run && (
+            {setupLocked && (
               <button onClick={() => setConfirmNewRun(true)} disabled={busy}>
                 <Plus size={16} />
                 New run
@@ -470,8 +633,8 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                 Vehicle
                 <select
                   aria-label="Vehicle"
-                  value={run?.config.vehicle_id ?? vehicleId}
-                  disabled={!!runId || busy}
+                  value={savedConfig?.vehicle_id ?? vehicleId}
+                  disabled={setupLocked || busy}
                   onChange={(e) => setVehicleId(e.target.value)}
                 >
                   {vehicles.length ? (
@@ -490,7 +653,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                 </select>
               </label>
               <fieldset
-                disabled={!!runId || busy}
+                disabled={setupLocked || busy}
                 aria-describedby={!run ? "participation-help" : undefined}
               >
                 <legend>Participation</legend>
@@ -499,7 +662,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                     type="radio"
                     name="participation"
                     checked={
-                      (run?.config.participation_mode ?? mode) === "autonomous"
+                      (savedConfig?.participation_mode ?? mode) === "autonomous"
                     }
                     onChange={() => setMode("autonomous")}
                   />
@@ -510,7 +673,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                     type="radio"
                     name="participation"
                     checked={
-                      (run?.config.participation_mode ?? mode) === "guided"
+                      (savedConfig?.participation_mode ?? mode) === "guided"
                     }
                     onChange={() => setMode("guided")}
                   />
@@ -521,8 +684,8 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                 <input
                   type="checkbox"
                   aria-describedby={!run ? "deep-dive-help" : undefined}
-                  checked={run?.config.deep_dive.enabled ?? deepDive}
-                  disabled={!!runId || busy}
+                  checked={savedConfig?.deep_dive.enabled ?? deepDive}
+                  disabled={setupLocked || busy}
                   onChange={(e) => setDeepDive(e.target.checked)}
                 />
                 Deep Dive
@@ -553,8 +716,8 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                 </div>
                 <h2 className="setup-step">2. Add source files</h2>
                 <p id="upload-help" className="muted">
-                  CSV, XLSX, XLS, PDF, TXT or DOCX. Add one or more files;
-                  partial packages are welcome.
+                  XLSX or PDF. Add one or more files; partial packages are
+                  welcome.
                 </p>
                 <div className="upload-zone">
                   <label className="upload-control">
@@ -564,8 +727,9 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                       aria-label="Upload files"
                       aria-describedby="upload-help"
                       type="file"
+                      accept=".xlsx,.pdf"
                       multiple
-                      disabled={busy || !!runId}
+                      disabled={busy || setupLocked}
                       onChange={(e) => {
                         void uploadFiles(Array.from(e.target.files ?? []));
                         e.target.value = "";
@@ -593,7 +757,9 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                       className="icon-button"
                       aria-label={`Remove ${row.filename}`}
                       title="Remove file"
-                      disabled={row.status === "uploading" || busy || !!runId}
+                      disabled={
+                        row.status === "uploading" || busy || setupLocked
+                      }
                       onClick={() =>
                         setUploads((old) => old.filter((u) => u.id !== row.id))
                       }
@@ -628,39 +794,28 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                     aria-describedby="start-run-readiness"
                     disabled={
                       busy ||
+                      !!pendingRun ||
                       (!runId &&
-                        (!baselineAvailable ||
+                        (!configurationAvailable ||
                           !!vehicleError ||
                           !readySourceIds.length ||
                           uploadingCount > 0))
                     }
                     onClick={() =>
-                      void act(async () => {
-                        if (runId) {
-                          await refresh(runId);
-                          return;
-                        }
-                        const config = {
-                          vehicle_id: vehicle!.vehicle_id,
-                          baseline_asset_id: vehicle!.baseline_asset_id,
-                          part_catalog_version: vehicle!.part_catalog_version,
-                          source_ids: readySourceIds,
-                          market_context: [],
-                          participation_mode: mode,
-                          deep_dive: { enabled: deepDive },
-                        };
-                        const input = JSON.stringify(config);
-                        if (startAttempt.current?.input !== input) {
-                          startAttempt.current = { input, key: commandKey() };
-                        }
-                        const result = await api.request<{ run_id: string }>(
-                          "/runs",
-                          config,
-                          startAttempt.current.key,
-                        );
-                        setRunId(result.run_id);
-                        await refresh(result.run_id);
-                      })
+                      runId
+                        ? void act(async () => {
+                            await refresh(runId);
+                          })
+                        : void createRun({
+                            vehicle_id: vehicle!.vehicle_id,
+                            baseline_asset_id: vehicle!.baseline_asset_id!,
+                            part_catalog_version:
+                              vehicle!.part_catalog_version!,
+                            source_ids: readySourceIds,
+                            market_context: [],
+                            participation_mode: mode,
+                            deep_dive: { enabled: deepDive },
+                          })
                     }
                   >
                     {busy ? (
@@ -680,6 +835,32 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
               </>
             )}
           </div>
+          {pendingRun && !runId && (
+            <div role="status" className="notice">
+              Run creation outcome pending. Settings frozen; retry original
+              request to recover its result.
+              <button disabled={busy} onClick={() => void createRun()}>
+                Retry run creation
+              </button>
+            </div>
+          )}
+          {run && (
+            <dl aria-label="Saved source package">
+              <dt>Completed source IDs</dt>
+              <dd>{run.config.source_ids.join(", ")}</dd>
+              <dt>Baseline asset</dt>
+              <dd>{run.config.baseline_asset_id}</dd>
+              <dt>Part catalog</dt>
+              <dd>{run.config.part_catalog_version}</dd>
+              <dt>Market context</dt>
+              <dd>{run.config.market_context.join(", ") || "Not supplied"}</dd>
+            </dl>
+          )}
+          {runId && !run && (
+            <p role="status">
+              Run {runId} accepted. Recovering saved configuration…
+            </p>
+          )}
           {run && (
             <div className="run-progress" role="status">
               <span className="status">{run.analysis_status}</span>
@@ -719,6 +900,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
               onClick={() =>
                 void act(async () => {
                   await refresh(runId!);
+                  setRecoveryAttempt((old) => old + 1);
                 })
               }
             >
@@ -752,7 +934,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                   const job = await api.request<{
                     render_request_id: string;
                   }>(
-                    `/runs/${runId}/renders`,
+                    `/runs/${encodeURIComponent(runId!)}/renders`,
                     {
                       proposal_set_version: version,
                       variant_ids: [variant!.variant_id],
@@ -762,7 +944,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                   );
                   setRenderResult(
                     await api.request<RenderResult>(
-                      `/runs/${runId}/renders/${encodeURIComponent(job.render_request_id)}`,
+                      `/runs/${encodeURIComponent(runId!)}/renders/${encodeURIComponent(job.render_request_id)}`,
                     ),
                   );
                   await refresh(runId!);
@@ -962,7 +1144,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                             onClick={() =>
                               void act(async () => {
                                 await api.request(
-                                  `/runs/${runId}/checkpoints/${workspace.checkpoint!.checkpoint_id}/continue`,
+                                  `/runs/${encodeURIComponent(runId!)}/checkpoints/${encodeURIComponent(workspace.checkpoint!.checkpoint_id)}/continue`,
                                   {
                                     checkpoint_version:
                                       workspace.checkpoint!.version,
@@ -1055,7 +1237,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                           title="Opposing observations"
                           onOpen={setSource}
                         />
-                        {run?.config.deep_dive.enabled && (
+                        {savedConfig?.deep_dive.enabled && (
                           <section className="research-section">
                             <h3>Deep Dive</h3>
                             {workspace.research
@@ -1080,7 +1262,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                                             void act(async () =>
                                               setSource(
                                                 await api.request<Evidence>(
-                                                  `/runs/${runId}/evidence/${encodeURIComponent(id)}`,
+                                                  `/runs/${encodeURIComponent(runId!)}/evidence/${encodeURIComponent(id)}`,
                                                 ),
                                               ),
                                             )
@@ -1203,6 +1385,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                                   variant.variant_id + ":" + change.change_id,
                                   draft.dirty,
                                 );
+                                persistSession();
                               }}
                               key={variant.variant_id + ":" + change.change_id}
                               change={change}
@@ -1273,7 +1456,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                               const job = await api.request<{
                                 export_id: string;
                               }>(
-                                `/runs/${runId}/exports`,
+                                `/runs/${encodeURIComponent(runId!)}/exports`,
                                 {
                                   proposal_set_version: version,
                                   variant_ids: [variant!.variant_id],
@@ -1291,7 +1474,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                                 status: string;
                                 download_url?: string;
                               }>(
-                                `/runs/${runId}/exports/${encodeURIComponent(job.export_id)}`,
+                                `/runs/${encodeURIComponent(runId!)}/exports/${encodeURIComponent(job.export_id)}`,
                               );
                               setExportJob({
                                 ...result,
@@ -1378,7 +1561,7 @@ function FindingDetails({ finding: f }: { finding: Finding }) {
         /{" "}
         {f.counts.negative_share === null
           ? "Unknown share"
-          : `${f.counts.negative_share}% negative`}
+          : `${(f.counts.negative_share * 100).toLocaleString()}% negative`}
       </p>
       <div className="tag-row">
         {f.provisional && <span className="status">Provisional</span>}
@@ -1423,7 +1606,7 @@ function EvidenceList({
     Promise.all(
       ids.map((id) =>
         api.request<Evidence>(
-          `/runs/${runId}/evidence/${encodeURIComponent(id)}`,
+          `/runs/${encodeURIComponent(runId!)}/evidence/${encodeURIComponent(id)}`,
         ),
       ),
     )

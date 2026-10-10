@@ -1,6 +1,10 @@
+import type * as Wire from "./wire";
 import type { ComponentId, FeedbackCount } from "../domain/contracts";
 
+// UI view models. Exact server payloads are defined in wire.ts.
+// Normalizers retain full wire payloads; semantic IDs and numeric counts are never rewritten.
 export interface Vehicle {
+  wire?: Wire.Vehicle;
   vehicle_id: string;
   title: string;
   baseline_asset_id: string | null;
@@ -27,11 +31,17 @@ export interface Snapshot {
   contract_version: "1";
   config: RunConfig;
   analysis_status:
-    "queued" | "processing" | "waiting_for_pm" | "proposals_ready" | "failed";
+    | "queued"
+    | "processing"
+    | "waiting_for_pm"
+    | "proposals_ready"
+    | "failed";
   stage: string;
   revision: number;
   last_event_sequence: number;
-  current_proposal_set_version: number;
+  current_proposal_set_version: number | null;
+  resource_links?: Record<string, string>;
+  wire?: Wire.Snapshot;
   available_actions: string[];
   warnings: string[];
   part_aggregates: Array<{ part_id: ComponentId; counts: FeedbackCount }>;
@@ -45,7 +55,12 @@ export interface Finding {
   cohort_ids: string[];
   supporting_evidence_ids: string[];
   opposing_evidence_ids: string[];
-  counts: FeedbackCount;
+  counts: Pick<
+    FeedbackCount,
+    "negative_records" | "total_records" | "negative_share"
+  > &
+    Partial<FeedbackCount>;
+  wire?: Wire.Finding;
   coverage: string;
   provisional: boolean;
   baseline: string;
@@ -55,6 +70,7 @@ export interface Evidence {
   evidence_id: string;
   source_version_id: string;
   source_kind: "uploaded" | "external";
+  wire?: Wire.Evidence;
   locator: { type: string; label: string };
   scope: string;
   excerpt: string;
@@ -63,9 +79,15 @@ export interface Evidence {
 }
 export interface Research {
   research_id: string;
+  wire?: Wire.Research;
   finding_id: string;
   status:
-    "queued" | "searching" | "checking" | "ready" | "partial" | "unavailable";
+    | "queued"
+    | "searching"
+    | "checking"
+    | "ready"
+    | "partial"
+    | "unavailable";
   competitor_scope: string;
   claims: Array<{
     type: "fact" | "opinion" | "inference";
@@ -80,6 +102,7 @@ export interface Research {
 }
 export interface Change {
   change_id: string;
+  wire?: Wire.Change;
   finding_id: string;
   origin: "ai" | "pm";
   part_ids: ComponentId[];
@@ -94,6 +117,7 @@ export interface Change {
 }
 export interface Variant {
   variant_id: string;
+  wire?: Wire.Variant;
   title: string;
   cohort_scope: string[];
   assumptions: string[];
@@ -101,10 +125,14 @@ export interface Variant {
 }
 export interface ProposalSet {
   proposal_set_version: number;
+  wire?: Wire.Proposals;
   variants: Variant[];
   unresolved_conflicts: string[];
 }
 export interface Graph {
+  revision?: number;
+  next_cursor?: string | null;
+  wire?: Wire.Graph;
   nodes: Array<{
     node_id: string;
     entity_type: string;
@@ -121,18 +149,22 @@ export interface Graph {
 }
 export interface Checkpoint {
   checkpoint_id: string;
+  wire?: Wire.Checkpoint;
+  conflicts?: Wire.Conflict[];
   version: number;
   question: string;
   alternatives: Array<{ id: string; title: string; tradeoff: string }>;
 }
 export interface AuditEntry {
+  wire?: Wire.Audit;
   event_id: string;
   occurred_at: string;
   actor: string;
   description: string;
-  proposal_set_version: number;
+  proposal_set_version: number | null;
 }
 export interface RenderResult {
+  wire?: Wire.RenderResult;
   render_request_id: string;
   proposal_set_version: number;
   variant_ids: string[];
@@ -162,6 +194,8 @@ export interface Instruction {
   };
 }
 export interface Workspace {
+  counts?: Wire.Counts;
+  conflicts?: Wire.Conflicts;
   snapshot: Snapshot;
   findings: Finding[];
   graph: Graph;
@@ -176,6 +210,15 @@ export interface Page<T> {
 }
 export interface Api {
   mode: "mock" | "real";
+  sessionNamespace?: string;
+  events?(
+    runId: string,
+    sequence: number,
+    lastEventId: string | null,
+    signal: AbortSignal,
+  ): Promise<Response>;
+  sourceUrl?(sourceId: string): string;
+  dispose?(): void;
   request<T>(path: string, body?: unknown, key?: string): Promise<T>;
   upload(file: File): Promise<Upload>;
   workspace(runId: string): Promise<Workspace>;

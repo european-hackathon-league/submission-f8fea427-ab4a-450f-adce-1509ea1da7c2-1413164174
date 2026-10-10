@@ -123,7 +123,7 @@
     "branch": "be/backend-completion",
     "focused_tests": "60 passed in 6.92s: pipeline_wiring, demo_readiness, proposal_scoring, research_security, findings, dispatch_wiring, control_delivery, evidence_external",
     "test_dependencies": "PostgreSQL integration and deterministic AI/Temporal/renderer fakes; no live structured inference/search or renderer verification",
-    "static_checks": "Ruff lint/format passed; generated contracts refreshed; final strict mypy result pending",
+    "static_checks": "Ruff lint/format passed; generated contracts refreshed; strict mypy passed all 38 source files",
     "remaining": "Full cumulative suite, all scenario endpoints, crash/replay, private corpus and configured live integrations deferred to testing phase"
   },
   "live_integrations": {

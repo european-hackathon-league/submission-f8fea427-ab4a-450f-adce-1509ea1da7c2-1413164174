@@ -6,7 +6,8 @@ from openai import APIStatusError, OpenAI
 from test_control_delivery import ready_run
 from test_findings import aggregate, observation
 
-from app import proposals, research, wire as w
+from app import proposals, research
+from app import wire as w
 from app.config import Settings
 from app.db import Run, Session
 

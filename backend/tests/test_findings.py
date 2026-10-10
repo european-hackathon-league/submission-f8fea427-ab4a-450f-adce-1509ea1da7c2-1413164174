@@ -1,0 +1,194 @@
+import pytest
+
+from app import findings as module
+from app import wire as w
+from app.config import Settings
+from app.findings import (
+    Disposition,
+    Observation,
+    aggregate,
+    applicability,
+    validate_extraction,
+)
+
+
+def observation(evidence, record, sentiment="negative", parts=None, cohorts=None):
+    return {
+        **Observation(
+            evidence_id=evidence,
+            quote="Synthetic seat comfort",
+            topic_key="seat-comfort",
+            title="Seat comfort",
+            customer_need="Sit comfortably",
+            sentiment=sentiment,
+            need_kind="usability",
+            part_ids=parts or ["part_seat"],
+            mapping_kind="physical",
+            mapping_rationale="The comment directly mentions a seat",
+        ).model_dump(),
+        "observation_id": evidence + "-observation",
+        "record_id": record,
+        "scope": w.Scope(cohort_ids=cohorts or ["DE", "EU"]).model_dump(),
+    }
+
+
+def test_annotation_overlap_counts_distinct_records_and_preserves_opposition():
+    rows = [
+        observation("one", "respondent-one", parts=["part_seat", "part_interior"]),
+        observation("repeat", "respondent-one"),
+        observation("positive", "respondent-two", "positive"),
+    ]
+    result = aggregate(rows, [], "run")
+    assert result["counts"]["total_records"] == 2
+    assert result["counts"]["negative_records"] == 1
+    assert result["counts"]["negative_share"] == 0.5
+    finding = w.Finding.model_validate(result["findings"][0])
+    assert finding.opposing_evidence_ids == ["positive"]
+    assert finding.counts.record_ids == ["respondent-one", "respondent-two"]
+    filtered = aggregate(rows, [], "run", part_id="part_interior", cohort_id="EU")
+    assert filtered["counts"]["total_records"] == 1
+    assert (
+        filtered["parts"][0]["intensity_scale_id"]
+        == result["parts"][0]["intensity_scale_id"]
+    )
+
+
+def test_external_and_unresolved_feedback_never_increase_comment_counts():
+    row = observation("unresolved", None)
+    result = aggregate([row], ["unresolved_record_identity"], "run")
+    assert result["counts"]["total_records"] == 0
+    assert result["counts"]["negative_share"] is None
+    assert result["findings"][0]["provisional"]
+
+
+def test_fabricated_quote_or_catalog_part_is_rejected_before_publication():
+    row = Observation.model_validate(
+        {
+            key: value
+            for key, value in observation("one", "record").items()
+            if key not in {"record_id", "scope", "observation_id"}
+        }
+    )
+    evidence = [{"evidence_id": "one", "excerpt": "Synthetic seat comfort"}]
+    validate_extraction([row], [], evidence, {"part_seat"})
+    with pytest.raises(ValueError):
+        validate_extraction(
+            [row.model_copy(update={"quote": "fabricated"})],
+            [],
+            evidence,
+            {"part_seat"},
+        )
+    with pytest.raises(ValueError):
+        validate_extraction(
+            [row.model_copy(update={"part_ids": ["fabricated"]})],
+            [],
+            evidence,
+            {"part_seat"},
+        )
+
+
+def test_german_baseline_cannot_establish_us_availability_or_unknown_scope_absence():
+    scope = w.Scope(vehicle_ids=["G60"], markets=["DE"], year=2026)
+    assert (
+        applicability(scope, {"vehicle_id": "G60", "market_context": ["US"]}, 2026)[0]
+        == "mismatch"
+    )
+    assert (
+        applicability(w.Scope(), {"vehicle_id": "G60", "market_context": ["US"]}, 2026)[
+            0
+        ]
+        == "unknown"
+    )
+
+
+def test_empty_or_omitted_observation_cannot_silently_remove_source_coverage():
+    evidence = [{"evidence_id": "one", "excerpt": "Synthetic seat comfort"}]
+    with pytest.raises(ValueError):
+        validate_extraction([], [], evidence, {"part_seat"})
+    validate_extraction(
+        [],
+        [Disposition(evidence_id="one", reason="out_of_scope")],
+        evidence,
+        {"part_seat"},
+    )
+
+
+def test_multiple_topics_and_cohorts_keep_independent_membership_without_double_count():
+    first = observation("one", "respondent-one")
+    second = observation(
+        "two", "respondent-one", parts=["part_digital"], cohorts=["US"]
+    )
+    second["topic_key"] = "digital-access"
+    second["title"] = "Digital access"
+    result = aggregate([first, second], [], "run")
+    assert len(result["findings"]) == 2
+    assert result["counts"]["total_records"] == 1
+    assert len(result["membership"]) == 2
+    assert (
+        aggregate([first, second], [], "run", cohort_id="DE")["parts"][0]["part_id"]
+        == "part_seat"
+    )
+    assert (
+        aggregate([first, second], [], "run", cohort_id="US")["parts"][0]["part_id"]
+        == "part_digital"
+    )
+
+
+def test_baseline_equipment_software_and_date_conditions_remain_visible():
+    state, gaps = applicability(
+        w.Scope(
+            vehicle_ids=["G60"],
+            markets=["US"],
+            year=2025,
+            equipment=["optional_package"],
+            software="v1",
+        ),
+        {"vehicle_id": "G60", "market_context": ["US"]},
+        2026,
+    )
+    assert state == "mismatch"
+    assert set(gaps) == {
+        "baseline_date_mismatch",
+        "equipment_conditions_unverified",
+        "software_version_unverified",
+    }
+
+
+def test_missing_provider_credentials_publish_explicit_failure_without_fake_findings(
+    monkeypatch,
+):
+    captured = {}
+    policy = {
+        "model": "synthetic-model",
+        "prompt_revision": "findings-v1",
+        "schema_revision": "findings-v1",
+        "catalog": {"parts": [{"part_id": "part_seat"}]},
+    }
+    monkeypatch.setattr(module, "Settings", lambda: Settings(openai_api_key=""))
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(
+        module, "get_stage", lambda run, generation, key: captured.get(key)
+    )
+    monkeypatch.setattr(module, "_inputs", lambda *args: (policy, [], {}))
+    monkeypatch.setattr(
+        module,
+        "put_stage",
+        lambda run, generation, key, payload, **kwargs: captured.update({key: payload}),
+    )
+    assert (
+        module.extract_findings(["synthetic-run", "synthetic-generation"]) == "failed"
+    )
+    assert captured["findings"]["status"] == "failed"
+    assert captured["findings"]["findings"] == []
+    assert "ai_credentials_unavailable" in captured["findings"]["coverage"]
+
+
+@pytest.mark.parametrize("stage", [module.extract_findings, module.establish_baselines])
+def test_existing_stage_returns_persisted_status_and_stale_generation_stops(
+    stage, monkeypatch
+):
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(module, "get_stage", lambda *args: {"status": "partial"})
+    assert stage(["synthetic-run", "synthetic-generation"]) == "partial"
+    monkeypatch.setattr(module, "_current_generation", lambda *args: False)
+    assert stage(["synthetic-run", "synthetic-generation"]) == "superseded"

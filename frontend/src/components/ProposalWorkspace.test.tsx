@@ -607,6 +607,19 @@ it("confirms removal before posting, returns cancel focus, and retains stale fai
     within(dialog).getByRole("button", { name: "Remove proposal" }),
   ).toBeDisabled();
 });
+it("returns removal cancel focus to an opener that pointer activation did not focus", async () => {
+  const user = userEvent.setup();
+  const { request } = setup();
+  const remove = screen.getByRole("button", { name: "Remove change 1" });
+  expect(remove).not.toHaveFocus();
+  fireEvent.click(remove);
+  expect(
+    screen.getByRole("dialog", { name: "Remove proposal?" }),
+  ).toBeInTheDocument();
+  await user.keyboard("{Escape}");
+  expect(remove).toHaveFocus();
+  expect(request).not.toHaveBeenCalled();
+});
 it("reports dirty text, target, grouping and PM ideas across variants and clears saved text after recomputation", async () => {
   const user = userEvent.setup();
   const { props, rerender } = setup();

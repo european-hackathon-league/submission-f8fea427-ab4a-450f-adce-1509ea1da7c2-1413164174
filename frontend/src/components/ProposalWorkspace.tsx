@@ -786,13 +786,14 @@ function ProposalWorkspaceSession(
                         aria-label={`Remove change ${index + 1}`}
                         title="Remove change"
                         disabled={inputsLocked || !canEdit || stale}
-                        onClick={() =>
+                        onClick={(event) => {
+                          event.currentTarget.focus();
                           setRemoval({
                             changeId: change.change_id,
                             variantId,
                             baseVersion: draft.baseVersion,
-                          })
-                        }
+                          });
+                        }}
                       >
                         <Trash2 size={16} />
                       </button>
@@ -1008,9 +1009,9 @@ function RemovalConfirmation({
     >
       <h2>Remove proposal?</h2>
       <p>
-        This removes this proposal from every variant that references it, including its
-        unsaved edits. Removal cannot be undone here. Customer evidence stays
-        unchanged.
+        This removes this proposal from every variant that references it,
+        including its unsaved edits. Removal cannot be undone here. Customer
+        evidence stays unchanged.
       </p>
       {failed && (
         <p role="alert">

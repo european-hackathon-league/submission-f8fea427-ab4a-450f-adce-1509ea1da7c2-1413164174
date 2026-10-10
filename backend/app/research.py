@@ -4,6 +4,7 @@ import hashlib
 import http.client
 import ipaddress
 import json
+import re
 import socket
 import ssl
 import time
@@ -24,6 +25,24 @@ from app.commands import emit, owned_run
 from app.config import Settings
 from app.db import Session, StageOutput
 from app.ingestion import locked_run, stable_id
+
+
+def relevant_excerpt(passage: str, need: str) -> str:
+    # shortcut: lexical matching misses synonyms; upgrade when research recall is evaluated.
+    terms = {word.lower() for word in re.findall(r"\w{4,}", need)}
+    starts = {0}
+    starts.update(
+        max(0, match.start() - 100)
+        for match in re.finditer(r"\w{4,}", passage)
+        if match.group().lower() in terms
+    )
+    start = max(
+        sorted(starts),
+        key=lambda offset: len(
+            terms & set(re.findall(r"\w{4,}", passage[offset : offset + 400].lower()))
+        ),
+    )
+    return passage[start : start + 400]
 
 
 class Text(HTMLParser):
@@ -442,7 +461,9 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                         {
                             "evidence_id": item.evidence_id,
                             "url": item.source_url,
-                            "excerpt": item.excerpt[:400],
+                            "excerpt": relevant_excerpt(
+                                item.excerpt, finding.customer_need
+                            ),
                         }
                         for item in evidence.values()
                     ]

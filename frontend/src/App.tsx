@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CSSProperties } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -26,6 +25,10 @@ import {
 } from "lucide-react";
 import { ApiError, commandKey, createApi, createRealApi } from "./api/client";
 import ApiAccess from "./ApiAccess";
+import FindingDetails from "./components/FindingDetails";
+import EvidenceList from "./components/EvidenceList";
+import GraphPanel from "./components/GraphPanel";
+import SourceDialog from "./components/SourceDialog";
 import { recoverRun } from "./runRecovery";
 import { readSession, saveSession, clearSession } from "./session";
 import type { PendingRun } from "./session";
@@ -68,6 +71,7 @@ function requestError(error: unknown): string {
   const fields = error.field_errors.map(field => Object.entries(field).map(([name, value]) => `${name}: ${value}`).join(" · ")).join("; ");
   return [error.message, fields, error.requestId ? `Request ID: ${error.requestId}` : ""].filter(Boolean).join(" — ");
 }
+const spatialPartIds = new Set<string>(["body", "lighting", "charging", "steering", "dashboard", "seats"]);
 type ProposalDraft = { text: string; target: string; baseVersion: number };
 
 export default function App({ api: suppliedApi }: { api?: Api }) {
@@ -90,9 +94,9 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   const [runId, setRunId] = useState<string | null>(restored?.runId ?? null);
   const [tab, setTab] = useState<Tab>(tabs.some(t => t.title === restored?.tab) ? restored!.tab as Tab : "Findings");
   const [selectedFindingId, setSelectedFindingId] =
-    useState(restored?.selectedFindingId ?? "finding-dashboard");
+    useState<string | null>(restored ? restored.selectedFindingId : "");
   const [selectedComponent, setSelectedComponent] =
-    useState<ComponentId>((restored?.selectedComponent as ComponentId) ?? "dashboard");
+    useState<ComponentId | null>(spatialPartIds.has(restored?.selectedComponent ?? "") && sceneCatalog.parts.some(p => p.part_id === restored?.selectedComponent) ? restored!.selectedComponent as ComponentId : null);
   const [view, setView] = useState<VehicleView>(restored?.view === "interior" ? "interior" : "exterior");
   const [variantId, setVariantId] = useState(restored?.variantId ?? "variant-digital");
   const [heatmap, setHeatmap] = useState(true);
@@ -100,6 +104,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   const [error, setError] = useState("");
   const [connection, setConnection] = useState("");
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
+  const [findingFocusRequest, setFindingFocusRequest] = useState(0);
   const [source, setSource] = useState<Evidence | null>(null);
   const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
   const [exportJob, setExportJob] = useState<{
@@ -118,13 +123,12 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   );
   const baselineAvailable =
     vehicle?.vehicle_id === sceneCatalog.vehicle_id &&
-    vehicle.baseline_asset_id === sceneCatalog.baseline_asset_id &&
-    vehicle.part_catalog_version === sceneCatalog.catalog_version;
+    (savedConfig?.baseline_asset_id ?? vehicle.baseline_asset_id) === sceneCatalog.baseline_asset_id &&
+    (savedConfig?.part_catalog_version ?? vehicle.part_catalog_version) === sceneCatalog.part_catalog_version;
   const configurationAvailable = !!vehicle?.baseline_asset_id && !!vehicle.part_catalog_version;
   const setupLocked = !!runId || !!pendingRun;
   const finding =
-    workspace?.findings.find((f) => f.finding_id === selectedFindingId) ??
-    workspace?.findings[0];
+    selectedFindingId === null ? undefined : selectedFindingId ? workspace?.findings.find((f) => f.finding_id === selectedFindingId) : workspace?.findings[0];
   const variant =
     workspace?.proposals.variants.find((v) => v.variant_id === variantId) ??
     workspace?.proposals.variants[0];
@@ -139,12 +143,11 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
 
   useEffect(() => {
     let active = true;
-    api
-      .request<Page<Vehicle>>("/vehicles")
+    (api.vehicles ? api.vehicles() : api.request<Page<Vehicle>>("/vehicles").then(page => page.items))
       .then((result) => {
         if (active) {
-          setVehicles(result.items);
-          setVehicleId(current => result.items.some(v => v.vehicle_id === current) ? current : result.items[0]?.vehicle_id ?? current);
+          setVehicles(result);
+          setVehicleId(current => result.some(v => v.vehicle_id === current) ? current : result[0]?.vehicle_id ?? current);
         }
       })
       .catch((e) => {
@@ -182,7 +185,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
 
   const persistSession = useCallback(() => {
     if (api.mode !== "real") return;
-    saveSession(sessionNamespace, { pendingRun, runId, tab, selectedFindingId, selectedComponent, view, variantId, ideaDraft, proposalDrafts: [...proposalDrafts.current] });
+    saveSession(sessionNamespace, { pendingRun, runId, tab, selectedFindingId, selectedComponent: selectedComponent ?? "", view, variantId, ideaDraft, proposalDrafts: [...proposalDrafts.current] });
   }, [api.mode, sessionNamespace, pendingRun, runId, tab, selectedFindingId, selectedComponent, view, variantId, ideaDraft]);
   useEffect(persistSession, [persistSession]);
   useEffect(() => {
@@ -318,24 +321,28 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   }
 
   function selectFinding(next: Finding) {
+    setFindingFocusRequest(old => old + 1);
     setSelectedFindingId(next.finding_id);
-    if (next.part_ids[0]) {
-      setSelectedComponent(next.part_ids[0]);
-      setView(
-        ["dashboard", "steering", "seats"].includes(next.part_ids[0])
-          ? "interior"
-          : "exterior",
-      );
-    }
+    const mapped = baselineAvailable && next.part_ids.find(id => spatialPartIds.has(id) && sceneCatalog.parts.some(part => part.part_id === id && part.capabilities.some(c => c === "list_annotation" || c === "photo_annotation")));
+    setSelectedComponent(mapped || null);
+    if (mapped) setView(["dashboard", "steering", "seats"].includes(mapped) ? "interior" : "exterior");
   }
+
   function selectPart(id: ComponentId) {
     setSelectedComponent(id);
-    const next = workspace?.findings.find((f) => f.part_ids.includes(id));
-    setSelectedFindingId(next?.finding_id ?? `unreported-${id}`);
+    const matches = workspace?.findings.filter(f => f.part_ids.includes(id)) ?? [];
+    const existing = matches.find(f => f.finding_id === selectedFindingId);
+    setSelectedFindingId(existing?.finding_id ?? (matches.length === 1 ? matches[0].finding_id : null));
+    if (matches.length > 1 && !existing) setTab("Findings");
   }
-  const selectedFinding = selectedFindingId.startsWith("unreported-")
-    ? undefined
-    : finding;
+  const selectedFinding = finding;
+
+  useEffect(() => {
+    if (findingFocusRequest && tab === "Evidence") document.getElementById("panel-Evidence")?.focus();
+  }, [findingFocusRequest, tab]);
+  useEffect(() => {
+    if (selectedComponent && (!baselineAvailable || (selectedFindingId && !finding?.part_ids.includes(selectedComponent)))) setSelectedComponent(null);
+  }, [baselineAvailable, finding, selectedFindingId, selectedComponent]);
 
   async function submitInstruction(instruction: Instruction) {
     let savedVersion: number | null = null;
@@ -365,7 +372,8 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
     setConnection("");
     setDeepDive(false);
     setMode("autonomous");
-    setSelectedFindingId("finding-dashboard");
+    setSelectedFindingId("");
+    setSelectedComponent(null);
     setVariantId("variant-digital");
     if (api.mode === "mock") { api.dispose?.(); setApi(createApi()); }
   };
@@ -602,6 +610,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
                   findings={(run?.part_aggregates ?? []).map((a) => ({
                     id: a.part_id,
                     counts: a.counts,
+                    cohort_ids: a.wire?.cohort_ids ?? [],
                   }))}
                 />
               </Suspense>
@@ -744,6 +753,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
             <div
               className="analysis-panel"
               role="tabpanel"
+              tabIndex={-1}
               id={`panel-${tab}`}
               aria-labelledby={`tab-${tab}`}
             >
@@ -793,43 +803,26 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
                         <h2>Customer findings</h2>
                         <span className="muted">Feedback records</span>
                       </div>
-                      <div className="finding-list">
-                        {workspace.findings.map((f) => (
-                          <button
-                            className="finding-item"
-                            key={f.finding_id}
-                            aria-pressed={selectedFindingId === f.finding_id}
-                            onClick={() => {
-                              selectFinding(f);
-                              setTab("Evidence");
-                            }}
-                          >
-                            <span
-                              className="feedback-dot"
-                              style={
-                                {
-                                  "--intensity": f.counts.intensity_value,
-                                } as CSSProperties
-                              }
-                            />
-                            <span>
-                              <strong>{f.title}</strong>
-                              <small>{f.customer_need}</small>
-                              <small>
-                                {f.counts.negative_records} of{" "}
-                                {f.counts.total_records} negative feedback
-                                records{f.provisional ? " / provisional" : ""}
-                                {f.counts.low_evidence ? " / low evidence" : ""}
-                              </small>
-                            </span>
-                            <ArrowRight size={16} />
-                          </button>
-                        ))}
-                      </div>
+                      {[
+                        { title: "Part findings", matches: (f: Finding) => f.part_ids.length > 0 && f.part_ids.every(id => baselineAvailable && spatialPartIds.has(id) && sceneCatalog.parts.some(p => p.part_id === id)) },
+                        { title: "Vehicle-wide findings", matches: (f: Finding) => f.part_ids.length === 0 },
+                        { title: "Unmapped or non-geometric findings", matches: (f: Finding) => f.part_ids.length > 0 && f.part_ids.some(id => !baselineAvailable || !spatialPartIds.has(id) || !sceneCatalog.parts.some(p => p.part_id === id)) },
+                      ].map(group => <section key={group.title} aria-label={group.title}>
+                        <h3>{group.title}</h3>
+                        <div className="finding-list">
+                          {workspace.findings.filter(group.matches).map(f => <button className="finding-item" key={f.finding_id} aria-pressed={finding?.finding_id === f.finding_id} onClick={() => { selectFinding(f); setTab("Evidence"); }}>
+                            <BookOpen size={16} aria-hidden="true" />
+                            <span><strong>{f.title}</strong><small>{f.customer_need}</small><small>{f.counts.negative_records} of {f.counts.total_records} negative feedback records{f.provisional ? " / provisional" : ""}</small><small>{f.part_ids.length ? `Part IDs: ${f.part_ids.join(", ")}` : "Vehicle-wide; no geometric mapping"}</small></span>
+                            <ArrowRight size={16} aria-hidden="true" />
+                          </button>)}
+                          {!workspace.findings.some(group.matches) && <p className="muted">No findings in this group.</p>}
+                        </div>
+                      </section>)}
                     </>
                   )}
                   {tab === "Graph" && (
                     <GraphPanel
+                      api={api} runId={runId!} onOpen={setSource}
                       workspace={workspace}
                       onSelect={(id) => {
                         const f = workspace.findings.find(
@@ -845,7 +838,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
                   {tab === "Evidence" &&
                     (selectedFinding ? (
                       <>
-                        <FindingDetails finding={selectedFinding} />
+                        <FindingDetails finding={selectedFinding} aggregates={run?.part_aggregates} changes={workspace.proposals.variants.flatMap(v => v.changes)} />
                         <EvidenceList
                           api={api}
                           runId={runId!}
@@ -926,8 +919,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
                       </>
                     ) : (
                       <div className="empty-state">
-                        No finding mapped to this part. Vehicle-wide findings
-                        remain available in Findings.
+                        {selectedFindingId ? "Selected finding is unavailable in this snapshot. Return to Findings or reconnect to retry." : "No finding mapped to this part. Vehicle-wide findings remain available in Findings."}
                       </div>
                     ))}
                   {tab === "Proposals" && (
@@ -1115,171 +1107,9 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
         </div>
       </main>
       {source && (
-        <SourceDialog evidence={source} onClose={() => setSource(null)} />
+        <SourceDialog api={api} evidence={source} onClose={() => setSource(null)} />
       )}
     </div>
-  );
-}
-
-function FindingDetails({ finding: f }: { finding: Finding }) {
-  return (
-    <section className="finding-detail">
-      <h2>{f.title}</h2>
-      <p>{f.customer_need}</p>
-      <p>
-        <strong>
-          {f.counts.negative_records} of {f.counts.total_records} negative
-          feedback records
-        </strong>{" "}
-        /{" "}
-        {f.counts.negative_share === null
-          ? "Unknown share"
-          : `${(f.counts.negative_share * 100).toLocaleString()}% negative`}
-      </p>
-      <div className="tag-row">
-        {f.provisional && <span className="status">Provisional</span>}
-        {f.counts.low_evidence && <span className="status">Low evidence</span>}
-        <span>{f.cohort_ids.join(", ")}</span>
-      </div>
-      <dl>
-        <dt>Coverage</dt>
-        <dd>{f.coverage}</dd>
-        <dt>Baseline</dt>
-        <dd>{f.baseline}</dd>
-        <dt>Applicability</dt>
-        <dd>{f.applicability}</dd>
-      </dl>
-    </section>
-  );
-}
-
-function EvidenceList({
-  api,
-  runId,
-  ids,
-  title,
-  onOpen,
-}: {
-  api: Api;
-  runId: string;
-  ids: string[];
-  title: string;
-  onOpen: (e: Evidence) => void;
-}) {
-  const [rows, setRows] = useState<Evidence[]>([]);
-  const [error, setError] = useState("");
-  const idKey = ids.join("|");
-  useEffect(() => {
-    let active = true;
-    setRows([]);
-    setError("");
-    Promise.all(
-      ids.map((id) =>
-        api.request<Evidence>(
-          `/runs/${encodeURIComponent(runId!)}/evidence/${encodeURIComponent(id)}`,
-        ),
-      ),
-    )
-      .then((data) => {
-        if (active) setRows(data);
-      })
-      .catch((e) => {
-        if (active) setError(e.message);
-      });
-    return () => {
-      active = false;
-    };
-  }, [api, runId, idKey]);
-  return (
-    <section className="evidence-section">
-      <h3>{title}</h3>
-      {error && <p role="alert">{error}</p>}
-      {!ids.length && <p className="muted">No observations supplied.</p>}
-      {rows.map((e) => (
-        <article key={e.evidence_id} className="evidence-card">
-          <strong>
-            {e.source_kind === "uploaded"
-              ? "Customer evidence"
-              : "External evidence"}
-          </strong>
-          <blockquote>{e.excerpt}</blockquote>
-          <p className="muted">
-            {e.scope} / {e.locator.label}
-          </p>
-          <button onClick={() => onOpen(e)}>
-            <BookOpen size={14} />
-            Open source {e.evidence_id}
-          </button>
-        </article>
-      ))}
-    </section>
-  );
-}
-
-function GraphPanel({
-  workspace,
-  onSelect,
-}: {
-  workspace: Workspace;
-  onSelect: (id: string) => void;
-}) {
-  const [filter, setFilter] = useState("all");
-  const nodes = workspace.graph.nodes.filter(
-    (n) => filter === "all" || n.entity_type === filter,
-  );
-  return (
-    <>
-      <div className="section-title">
-        <h2>Evidence graph</h2>
-        <label>
-          Node type
-          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
-            <option value="all">All</option>
-            {[...new Set(workspace.graph.nodes.map((n) => n.entity_type))].map(
-              (type) => (
-                <option key={type}>{type}</option>
-              ),
-            )}
-          </select>
-        </label>
-      </div>
-      <div className="graph-nodes">
-        {nodes.map((node) => (
-          <button
-            key={node.node_id}
-            className={`graph-node node-${node.entity_type}`}
-            onClick={() => onSelect(node.finding_id)}
-          >
-            <small>{node.entity_type}</small>
-            <strong>{node.label}</strong>
-          </button>
-        ))}
-      </div>
-      <ul className="graph-edges">
-        {workspace.graph.edges
-          .filter((edge) =>
-            nodes.some(
-              (n) => n.node_id === edge.from_id || n.node_id === edge.to_id,
-            ),
-          )
-          .map((edge) => (
-            <li key={edge.edge_id}>
-              <span>
-                {workspace.graph.nodes.find((n) => n.node_id === edge.from_id)
-                  ?.label ?? edge.from_id}
-              </span>
-              <span>
-                <ArrowRight size={14} />
-                {edge.relationship}
-              </span>
-              <span>
-                {workspace.graph.nodes.find((n) => n.node_id === edge.to_id)
-                  ?.label ?? edge.to_id}
-              </span>
-            </li>
-          ))}
-      </ul>
-    </>
   );
 }
 
@@ -1474,64 +1304,6 @@ function ScopeEditor({
         together.
       </p>
     </div>
-  );
-}
-
-function SourceDialog({
-  evidence,
-  onClose,
-}: {
-  evidence: Evidence;
-  onClose: () => void;
-}) {
-  const ref = useRef<HTMLDialogElement>(null);
-  useEffect(() => {
-    const opener = document.activeElement as HTMLElement | null;
-    if (ref.current?.showModal) ref.current.showModal();
-    else ref.current?.setAttribute("open", "");
-    ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    return () => opener?.focus();
-  }, []);
-  return (
-    <dialog
-      ref={ref}
-      aria-label="Source reference"
-      onCancel={(e) => {
-        e.preventDefault();
-        onClose();
-      }}
-      onKeyDown={(e) => {
-        if (e.key === "Escape") {
-          e.preventDefault();
-          onClose();
-        }
-      }}
-    >
-      <div className="section-title">
-        <h2>Source reference</h2>
-        <button
-          className="icon-button"
-          aria-label="Close source"
-          title="Close source"
-          onClick={onClose}
-        >
-          <X size={18} />
-        </button>
-      </div>
-      <p>{evidence.source_version_id}</p>
-      <p>{evidence.locator.label}</p>
-      <blockquote>{evidence.excerpt}</blockquote>
-      <p>{evidence.limitations}</p>
-      {evidence.source_url && safeUrl(evidence.source_url) ? (
-        <a href={evidence.source_url} target="_blank" rel="noreferrer">
-          Open original source
-        </a>
-      ) : (
-        <p className="muted">
-          Original file link unavailable; exact source locator retained.
-        </p>
-      )}
-    </dialog>
   );
 }
 

@@ -1,6 +1,6 @@
 # Frontend requirement acceptance ledger
 
-Updated 10 October 2026 through the F1 verification gate. Scope: `frontend_plan.md`, `plan.md`, `backlog.md`; frontend-only authority from the implementation request. Each package updates its rows with exact executed evidence before its PR gate. A screen or happy-path mock does not establish acceptance.
+Updated 10 October 2026 through the F2 implementation gate. Scope: `frontend_plan.md`, `plan.md`, `backlog.md`; frontend-only authority from the implementation request. Each package updates its rows with exact executed evidence before its PR gate. A screen or happy-path mock does not establish acceptance.
 
 ## Status and evidence rules
 
@@ -42,14 +42,14 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 | ID | Required acceptance behavior | Code / existing test pointers | Initial status / gap | External dependency |
 |---|---|---|---|---|
-| F2.01 | Vehicle navigation, graph navigation/filtering/progressive detail and contract pagination | Viewer camera controls/tests; `App.tsx:GraphPanel`; `client.ts:readPages` | Partial: graph full payload only; progressive navigation/pagination missing | API-501 graph/findings |
-| F2.02 | Finding/part/graph/evidence identities remain consistent | `selectFinding`, `selectPart`, `GraphPanel`, `EvidenceList` | Partial: graph DTO incompatible; unknown ID may select fallback finding | Published IDs; ASSETS |
-| F2.03 | Selection/camera survive data updates | App selected IDs; viewer camera refs | Partial: ordinary rerenders retain state; refresh/reorder/missing-selection/camera tests missing | ASSETS |
-| F2.04 | Keyboard equivalents and non-color cues expose spatial findings | Finding/component buttons; viewer semantic camera tests | Partial: controls exist; full keyboard/focus/browser acceptance missing | None |
-| F2.05 | Display backend counts, denominator, provisional status, coverage, uncertainty; no local scoring/global part sums | `FindingDetails`, finding list, viewer summaries; Deep Dive count test | Partial: raw aggregate metadata incorrectly bundled in counts; null/overlap cases missing | Published aggregate contract |
-| F2.06 | Vehicle-wide, unmapped and non-geometric findings usable | Findings list; synthetic unmapped finding | Partial: unknown semantic part mappings and explicit grouping/fallback tests missing | ASSETS |
-| F2.07 | Exact source references and authorized source-opening interactions | `EvidenceList`, `SourceDialog`, `safeUrl`; locator/focus test | Partial: structured locators/scope unsupported; per-source failure/retry/loading missing | API-501 evidence; authorized source links |
-| F2.08 | Validate supported assets/part mappings; explicit fallback; no relabeled vehicle | Catalog triple check; `modelMapping`; unavailable vehicle/viewer failure tests | Partial: unavailable vehicles honest; guessed mesh aliases need verification gate | ASSETS |
+| F2.01 | Vehicle navigation, graph navigation/filtering/progressive detail and contract pagination | Viewer controls; `components/GraphPanel.tsx/test`; `api/client.ts`, `published.test.ts` | Frontend verified / external blocked: keyboard graph entity/relationship navigation, type/search filters, progressive 20-node detail; opaque vehicle/graph/findings pagination with revision checks | API-501 graph/findings |
+| F2.02 | Finding/part/graph/evidence identities remain consistent | App selection tests; GraphPanel exact/ambiguous/removed entity tests | Frontend verified / external blocked: opaque IDs retained; unknown and hierarchy-only parts remain nonspatial; graph requires explicit finding choice | Published IDs; ASSETS |
+| F2.03 | Selection/camera survive data updates | App missing-selection/opaque-ID tests; viewer camera/reorder tests | Frontend verified / external blocked: explicit removed finding never silently substitutes; actual camera survives data updates/toggles | ASSETS |
+| F2.04 | Keyboard equivalents and non-color cues expose spatial findings | App tab keyboard test; viewer keyboard tests; F2 browser report | Frontend verified: component lists, numeric denominators/status labels, graph relationship buttons, source dialog focus and Escape | None |
+| F2.05 | Display backend counts, denominator, provisional status, coverage, uncertainty; no local scoring/global part sums | FindingDetails null/zero/overlap/scope tests; viewer scoped aggregate tests | Frontend verified / external blocked: independent backend counts/shares/scales/cohort scopes, provisional/low-evidence/coverage/uncertainty; no sums or local scoring | Published aggregate contract |
+| F2.06 | Vehicle-wide, unmapped and non-geometric findings usable | App unknown/hierarchy part tests; grouped Findings list | Frontend verified / external blocked: vehicle-wide, unsupported and non-geometric findings inspectable without selecting unrelated spatial part | ASSETS |
+| F2.07 | Exact source references and authorized source-opening interactions | EvidenceList/SourceDialog tests; published source-access tests; browser exact-locator path | Frontend verified / external blocked: structured cell/PDF/web locators, source versions/scope/applicability, per-row failure/retry; protected originals use authenticated bounded fetch with cancellation/blob cleanup | API-501 evidence; authorized source links |
+| F2.08 | Validate supported assets/part mappings; explicit fallback; no relabeled vehicle | modelMapping validator tests; viewer image/network recovery tests; App saved-triple tests | Frontend verified / external blocked: saved vehicle/asset/catalog triple gates viewer; no guessed mesh names; valid parent graph, explicit list/photo reference fallback and image retries | ASSETS |
 
 ## F3 — Deep Dive, conflicts and alternatives
 
@@ -120,4 +120,4 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 ## Package gates and handoff evidence
 
-F1 gate: 79 tests across 9 files pass; `npm run typecheck`, `npm run build`, `git diff --check` pass. See [F1 verification](F1-VERIFICATION.md). Separate sub-agent review found setup/retry/access/session/opaque-ID issues; all fixed with regression tests. F2–F6 gates pending. Each package records commit/PR/base dependency, executed test counts, typecheck/build, applicable browser checks, separate reviewer findings and resolution, CI result, plus precise remaining external acceptance. Dependent work starts only after predecessor verification/PR gate; do not merge without user approval.
+F1 gate: 79 tests across 9 files pass; `npm run typecheck`, `npm run build`, `git diff --check` pass. See [F1 verification](F1-VERIFICATION.md). Separate sub-agent review found setup/retry/access/session/opaque-ID issues; all fixed with regression tests. F2 gate: 141 tests across 14 files, typecheck/build/diff-check pass; final native browser focus and graph/source path verified. See [F2 verification](F2-VERIFICATION.md). F3–F6 gates pending. Each package records commit/PR/base dependency, executed test counts, typecheck/build, applicable browser checks, separate reviewer findings and resolution, CI result, plus precise remaining external acceptance. Dependent work starts only after predecessor verification/PR gate; do not merge without user approval.

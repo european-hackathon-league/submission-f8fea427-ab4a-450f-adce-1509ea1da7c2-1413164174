@@ -33,3 +33,9 @@ A clearly defined end-to-end workflow showing how inputs are processed into prop
 A demonstrable audit trail that makes each requirement traceable from its underlying findings and sources through consolidation, scoring, prioritization, and human decision-making. It should record relevant changes to requirement content, scores, priorities, evidence, and status, including who or what initiated each change, when it occurred, and the documented rationale.
 
 Important: Teams are free to choose their technical approach, architecture, prioritization logic, and user experience. The deliverables describe the capabilities and outcomes that should be demonstrated, not a prescribed solution design. Deliverables may be presented as one integrated solution or as a combination of connected concepts, prototypes, models, and visualizations.
+
+
+
+
+We just received the question what common pain points of product managers are. One certainly is to balance customer requirements across different markets and regions, as preferences differ given for instance the climate, customer usage or culture.  Another is to access early customer feedback (for example regarding predecessor vehicles) and to extract future customer requirements. 
+One additional remark - the requirement process is not performed only once resulting in a requirement list, but in fact it's a process over approximately two years to prioritize the most relevant requirements.

@@ -6,7 +6,7 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CSSProperties } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
@@ -57,11 +57,18 @@ type UploadRow = {
   source_id?: string;
   reason?: string | null;
 };
-type ProposalDraft = { text: string; target: string; baseVersion: number };
+type ProposalDraft = {
+  text: string;
+  target: string;
+  baseVersion: number;
+  dirty: boolean;
+};
 
 export default function App({ api: suppliedApi }: { api?: Api }) {
   const [api, setApi] = useState(() => suppliedApi ?? createApi());
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicleError, setVehicleError] = useState("");
+  const [vehicleRetry, setVehicleRetry] = useState(0);
   const [vehicleId, setVehicleId] = useState("g60-i5-m60");
   const [deepDive, setDeepDive] = useState(false);
   const [mode, setMode] = useState<"autonomous" | "guided">("autonomous");
@@ -88,8 +95,34 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     download_url?: string;
   } | null>(null);
   const lock = useRef(false);
+  const startAttempt = useRef<{ input: string; key: string } | null>(null);
   const proposalDrafts = useRef(new Map<string, ProposalDraft>());
+  const scopeDrafts = useRef(new Map<string, string>());
+  const [dirtyDrafts, setDirtyDrafts] = useState(new Set<string>());
+  const [confirmNewRun, setConfirmNewRun] = useState(false);
+  const [savedConfigExpanded, setSavedConfigExpanded] = useState(false);
+  const [vehicleExpanded, setVehicleExpanded] = useState(false);
   const [ideaDraft, setIdeaDraft] = useState("");
+  const hasUnsavedWork = dirtyDrafts.size > 0 || !!ideaDraft.trim();
+  const rememberDirty = useCallback((key: string, dirty: boolean) => {
+    setDirtyDrafts((old) => {
+      if (old.has(key) === dirty) return old;
+      const next = new Set(old);
+      if (dirty) next.add(key);
+      else next.delete(key);
+      return next;
+    });
+  }, []);
+
+  useEffect(() => {
+    if (!hasUnsavedWork) return;
+    const warn = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = "";
+    };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [hasUnsavedWork]);
   const run = workspace?.snapshot;
   const vehicle = vehicles.find(
     (v) => v.vehicle_id === (run?.config.vehicle_id ?? vehicleId),
@@ -110,23 +143,50 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
       uploads.filter((u) => u.status === "ready").map((u) => u.source_id!),
     ),
   ];
+  const uploadingCount = uploads.filter((u) => u.status === "uploading").length;
+  const readyCount = uploads.filter((u) => u.status === "ready").length;
+  const hasUploadErrors = uploads.some(
+    (u) => u.status === "failed" || u.status === "rejected",
+  );
+  const startReadiness = runId
+    ? "Run created. Reconnect to load its workspace; your saved settings and files are unchanged."
+    : busy
+      ? "Starting your run. Your files and settings are being saved."
+      : vehicleError
+        ? "Vehicle options unavailable. Retry loading vehicles to continue."
+        : !vehicles.length
+          ? "Loading vehicle options…"
+          : !baselineAvailable
+            ? "No baseline asset for this vehicle. Choose a vehicle with an available baseline."
+            : uploadingCount
+              ? `Uploading ${uploadingCount} ${uploadingCount === 1 ? "file" : "files"}. Wait for uploads to finish.`
+              : readyCount
+                ? `${readyCount} ${readyCount === 1 ? "file" : "files"} ready. Only ready files will be included.`
+                : "Add at least one source file to start.";
   const can = (action: string) =>
     !busy && !!run?.available_actions.includes(action);
 
   useEffect(() => {
     let active = true;
+    setVehicleError("");
     api
       .request<Page<Vehicle>>("/vehicles")
       .then((result) => {
-        if (active) setVehicles(result.items);
+        if (active) {
+          setVehicles(result.items);
+          if (!result.items.length)
+            setVehicleError(
+              "No vehicles available. Retry or contact your workspace administrator.",
+            );
+        }
       })
       .catch((e) => {
-        if (active) setError(e.message);
+        if (active) setVehicleError(e.message);
       });
     return () => {
       active = false;
     };
-  }, [api]);
+  }, [api, vehicleRetry]);
 
   const refresh = useCallback(
     async (id: string) => {
@@ -314,7 +374,14 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
   }
 
   const reset = () => {
+    startAttempt.current = null;
     proposalDrafts.current.clear();
+    scopeDrafts.current.clear();
+    setDirtyDrafts(new Set());
+    setConfirmNewRun(false);
+    setSavedConfigExpanded(false);
+    setVehicleExpanded(false);
+    setTab("Findings");
     setIdeaDraft("");
     setWorkspace(null);
     setRunId(null);
@@ -348,158 +415,287 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
       <main id="workspace">
         <section className="run-setup" aria-label="Run setup">
           <div className="section-title">
-            <h1>{run ? "Saved configuration" : "New analysis run"}</h1>
+            <h1 tabIndex={-1}>
+              {run ? "Saved configuration" : "New analysis run"}
+            </h1>
             {run && (
-              <button onClick={reset} disabled={busy}>
+              <button onClick={() => setConfirmNewRun(true)} disabled={busy}>
                 <Plus size={16} />
                 New run
               </button>
             )}
           </div>
-          <div className="setup-fields">
-            <label className="vehicle-field">
-              Vehicle
-              <select
-                aria-label="Vehicle"
-                value={run?.config.vehicle_id ?? vehicleId}
-                disabled={!!run || busy}
-                onChange={(e) => setVehicleId(e.target.value)}
-              >
-                {vehicles.length ? (
-                  vehicles.map((v) => (
-                    <option key={v.vehicle_id} value={v.vehicle_id}>
-                      {v.title}
-                    </option>
-                  ))
-                ) : (
-                  <option value="g60-i5-m60">Loading vehicles...</option>
-                )}
-              </select>
-            </label>
-            <fieldset disabled={!!run || busy}>
-              <legend>Participation</legend>
-              <label>
-                <input
-                  type="radio"
-                  name="participation"
-                  checked={
-                    (run?.config.participation_mode ?? mode) === "autonomous"
-                  }
-                  onChange={() => setMode("autonomous")}
-                />
-                Autonomous
-              </label>
-              <label>
-                <input
-                  type="radio"
-                  name="participation"
-                  checked={
-                    (run?.config.participation_mode ?? mode) === "guided"
-                  }
-                  onChange={() => setMode("guided")}
-                />
-                Guided
-              </label>
-            </fieldset>
-            <label className="check-field">
-              <input
-                type="checkbox"
-                checked={run?.config.deep_dive.enabled ?? deepDive}
-                disabled={!!run || busy}
-                onChange={(e) => setDeepDive(e.target.checked)}
-              />
-              Deep Dive
-            </label>
-            {!run && (
-              <button
-                className="primary"
-                disabled={
-                  busy ||
-                  !baselineAvailable ||
-                  !readySourceIds.length ||
-                  uploads.some((u) => u.status === "uploading")
-                }
-                onClick={() =>
-                  void act(async () => {
-                    const result = await api.request<{ run_id: string }>(
-                      "/runs",
-                      {
-                        vehicle_id: vehicle!.vehicle_id,
-                        baseline_asset_id: vehicle!.baseline_asset_id,
-                        part_catalog_version: vehicle!.part_catalog_version,
-                        source_ids: readySourceIds,
-                        market_context: [],
-                        participation_mode: mode,
-                        deep_dive: { enabled: deepDive },
-                      },
-                      commandKey(),
-                    );
-                    setRunId(result.run_id);
-                    await refresh(result.run_id);
-                  })
-                }
-              >
-                {busy ? <LoaderCircle size={16} /> : <ArrowRight size={16} />}
-                Create run
-              </button>
-            )}
-          </div>
           {!run && (
-            <div className="upload-zone">
-              <label className="upload-control">
-                <UploadIcon size={18} />
-                <span>Upload files</span>
-                <input
-                  aria-label="Upload files"
-                  type="file"
-                  multiple
-                  disabled={busy}
-                  onChange={(e) => {
-                    void uploadFiles(Array.from(e.target.files ?? []));
-                    e.target.value = "";
-                  }}
-                />
-              </label>
-              <span className="muted">
-                Partial packages and multiple regional files accepted
-              </span>
+            <div className="setup-intro">
+              <p>
+                Choose a vehicle, add your source files, then start a run to
+                review customer findings and proposals.
+              </p>
+              {api.mode === "mock" && (
+                <p className="demo-notice">
+                  Demo mode: uploaded contents are not analyzed. Runs use
+                  synthetic findings and proposals.
+                </p>
+              )}
             </div>
           )}
-          <ul className="upload-list">
-            {uploads.map((row) => (
-              <li key={row.id}>
-                <span>{row.filename}</span>
-                <span className={`status status-${row.status}`}>
-                  {row.status}
-                </span>
-                {row.reason && (
-                  <span className="upload-error">{row.reason}</span>
+          {run && (
+            <div className="saved-config-summary">
+              <span>
+                {vehicle?.title} · {run.config.participation_mode}
+                {run.config.deep_dive.enabled ? " · Deep Dive" : ""}
+              </span>
+              <button
+                aria-expanded={savedConfigExpanded}
+                aria-controls="saved-config-fields"
+                onClick={() => setSavedConfigExpanded(!savedConfigExpanded)}
+              >
+                {savedConfigExpanded ? "Hide settings" : "Show settings"}
+              </button>
+            </div>
+          )}
+          <div
+            id="saved-config-fields"
+            className={
+              run
+                ? `saved-config-fields${savedConfigExpanded ? " is-expanded" : ""}`
+                : undefined
+            }
+          >
+            {!run && (
+              <h2 className="setup-step">1. Choose vehicle and settings</h2>
+            )}
+            <div className="setup-fields">
+              <label className="vehicle-field">
+                Vehicle
+                <select
+                  aria-label="Vehicle"
+                  value={run?.config.vehicle_id ?? vehicleId}
+                  disabled={!!runId || busy}
+                  onChange={(e) => setVehicleId(e.target.value)}
+                >
+                  {vehicles.length ? (
+                    vehicles.map((v) => (
+                      <option key={v.vehicle_id} value={v.vehicle_id}>
+                        {v.title}
+                      </option>
+                    ))
+                  ) : (
+                    <option value="g60-i5-m60">
+                      {vehicleError
+                        ? "Vehicle options unavailable"
+                        : "Loading vehicles..."}
+                    </option>
+                  )}
+                </select>
+              </label>
+              <fieldset
+                disabled={!!runId || busy}
+                aria-describedby={!run ? "participation-help" : undefined}
+              >
+                <legend>Participation</legend>
+                <label>
+                  <input
+                    type="radio"
+                    name="participation"
+                    checked={
+                      (run?.config.participation_mode ?? mode) === "autonomous"
+                    }
+                    onChange={() => setMode("autonomous")}
+                  />
+                  Autonomous
+                </label>
+                <label>
+                  <input
+                    type="radio"
+                    name="participation"
+                    checked={
+                      (run?.config.participation_mode ?? mode) === "guided"
+                    }
+                    onChange={() => setMode("guided")}
+                  />
+                  Guided
+                </label>
+              </fieldset>
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  aria-describedby={!run ? "deep-dive-help" : undefined}
+                  checked={run?.config.deep_dive.enabled ?? deepDive}
+                  disabled={!!runId || busy}
+                  onChange={(e) => setDeepDive(e.target.checked)}
+                />
+                Deep Dive
+              </label>
+            </div>
+            {!run && (
+              <>
+                {vehicleError && (
+                  <div className="vehicle-load-error">
+                    <p role="alert">{vehicleError}</p>
+                    <button
+                      onClick={() => setVehicleRetry((value) => value + 1)}
+                    >
+                      Retry loading vehicles
+                    </button>
+                  </div>
                 )}
-                {!run && (
+                <div className="setup-help">
+                  <p id="participation-help" className="muted">
+                    {mode === "autonomous"
+                      ? "Autonomous: completes proposals without intermediate choices."
+                      : "Guided: pauses at checkpoints for your input."}
+                  </p>
+                  <p id="deep-dive-help" className="muted">
+                    Deep Dive adds competitor research for identified customer
+                    needs.
+                  </p>
+                </div>
+                <h2 className="setup-step">2. Add source files</h2>
+                <p id="upload-help" className="muted">
+                  CSV, XLSX, XLS, PDF, TXT or DOCX. Add one or more files;
+                  partial packages are welcome.
+                </p>
+                <div className="upload-zone">
+                  <label className="upload-control">
+                    <UploadIcon size={18} />
+                    <span>Upload files</span>
+                    <input
+                      aria-label="Upload files"
+                      aria-describedby="upload-help"
+                      type="file"
+                      multiple
+                      disabled={busy || !!runId}
+                      onChange={(e) => {
+                        void uploadFiles(Array.from(e.target.files ?? []));
+                        e.target.value = "";
+                      }}
+                    />
+                  </label>
+                  <span className="muted">
+                    Customer feedback, studies and vehicle reference documents
+                  </span>
+                </div>
+              </>
+            )}
+            <ul className="upload-list">
+              {uploads.map((row) => (
+                <li key={row.id}>
+                  <span>{row.filename}</span>
+                  <span className={`status status-${row.status}`}>
+                    {row.status}
+                  </span>
+                  {row.reason && (
+                    <span className="upload-error">{row.reason}</span>
+                  )}
+                  {!run && (
+                    <button
+                      className="icon-button"
+                      aria-label={`Remove ${row.filename}`}
+                      title="Remove file"
+                      disabled={row.status === "uploading" || busy || !!runId}
+                      onClick={() =>
+                        setUploads((old) => old.filter((u) => u.id !== row.id))
+                      }
+                    >
+                      <X size={15} />
+                    </button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {!baselineAvailable && vehicles.length > 0 && run && (
+              <p className="notice">Baseline asset unavailable</p>
+            )}
+            {!run && (
+              <>
+                {hasUploadErrors && (
+                  <p className="upload-error">
+                    Remove failed or rejected files and choose them again to
+                    retry. They will not be included in the run.
+                  </p>
+                )}
+                <div className="start-run-action">
+                  <div>
+                    <h2 className="setup-step">3. Start your run</h2>
+                    <p id="start-run-readiness" role="status">
+                      {startReadiness}
+                    </p>
+                  </div>
+
                   <button
-                    className="icon-button"
-                    aria-label={`Remove ${row.filename}`}
-                    title="Remove file"
-                    disabled={row.status === "uploading" || busy}
+                    className="primary"
+                    aria-describedby="start-run-readiness"
+                    disabled={
+                      busy ||
+                      (!runId &&
+                        (!baselineAvailable ||
+                          !!vehicleError ||
+                          !readySourceIds.length ||
+                          uploadingCount > 0))
+                    }
                     onClick={() =>
-                      setUploads((old) => old.filter((u) => u.id !== row.id))
+                      void act(async () => {
+                        if (runId) {
+                          await refresh(runId);
+                          return;
+                        }
+                        const config = {
+                          vehicle_id: vehicle!.vehicle_id,
+                          baseline_asset_id: vehicle!.baseline_asset_id,
+                          part_catalog_version: vehicle!.part_catalog_version,
+                          source_ids: readySourceIds,
+                          market_context: [],
+                          participation_mode: mode,
+                          deep_dive: { enabled: deepDive },
+                        };
+                        const input = JSON.stringify(config);
+                        if (startAttempt.current?.input !== input) {
+                          startAttempt.current = { input, key: commandKey() };
+                        }
+                        const result = await api.request<{ run_id: string }>(
+                          "/runs",
+                          config,
+                          startAttempt.current.key,
+                        );
+                        setRunId(result.run_id);
+                        await refresh(result.run_id);
+                      })
                     }
                   >
-                    <X size={15} />
+                    {busy ? (
+                      <LoaderCircle size={16} />
+                    ) : (
+                      <ArrowRight size={16} />
+                    )}
+                    {busy
+                      ? runId
+                        ? "Connecting…"
+                        : "Starting run…"
+                      : runId
+                        ? "Reconnect to run"
+                        : "Start run"}
                   </button>
-                )}
-              </li>
-            ))}
-          </ul>
-          {!baselineAvailable && vehicles.length > 0 && (
-            <p className="notice">Baseline asset unavailable</p>
-          )}
+                </div>
+              </>
+            )}
+          </div>
           {run && (
             <div className="run-progress" role="status">
               <span className="status">{run.analysis_status}</span>
               <strong>{run.stage}</strong>
               <span>{run.run_id}</span>
               {busy && <LoaderCircle size={16} className="spin" />}
+              {run.analysis_status === "proposals_ready" && (
+                <button
+                  onClick={() => {
+                    setTab("Proposals");
+                    document.getElementById("tab-Proposals")?.focus();
+                  }}
+                >
+                  Review proposals <ArrowRight size={16} />
+                </button>
+              )}
             </div>
           )}
         </section>
@@ -531,10 +727,72 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
             </button>
           </div>
         )}
-        <div className="work-area">
-          <section className="vehicle-column" aria-label="Vehicle workspace">
+        {run && (
+          <div
+            className="reimagine-toolbar"
+            role="group"
+            aria-label="Reimagine target"
+          >
+            <div id="reimagine-context" className="reimagine-context">
+              <span className="muted">Selected variant</span>
+              <strong>{variant?.title ?? "No variant available"}</strong>
+              <span>Saved proposal version {version}</span>
+              {hasUnsavedWork && (
+                <p className="muted">
+                  Uses saved proposals; unsaved edits are excluded.
+                </p>
+              )}
+            </div>
+            <button
+              className="primary"
+              aria-describedby="reimagine-context"
+              disabled={!can("reimagine") || !variant}
+              onClick={() =>
+                void act(async () => {
+                  const job = await api.request<{
+                    render_request_id: string;
+                  }>(
+                    `/runs/${runId}/renders`,
+                    {
+                      proposal_set_version: version,
+                      variant_ids: [variant!.variant_id],
+                      baseline_asset_id: run.config.baseline_asset_id,
+                    },
+                    commandKey(),
+                  );
+                  setRenderResult(
+                    await api.request<RenderResult>(
+                      `/runs/${runId}/renders/${encodeURIComponent(job.render_request_id)}`,
+                    ),
+                  );
+                  await refresh(runId!);
+                })
+              }
+            >
+              <WandSparkles size={16} />
+              Reimagine
+            </button>
+          </div>
+        )}
+        <div
+          className={`work-area${tab === "Proposals" && workspace ? " is-reviewing" : ""}`}
+        >
+          <section
+            className={`vehicle-column${run ? " has-run" : ""}${vehicleExpanded ? " is-expanded" : ""}`}
+            aria-label="Vehicle workspace"
+          >
             <div className="section-title">
               <h2>Baseline vehicle</h2>
+              {run && (
+                <button
+                  className="mobile-vehicle-toggle"
+                  aria-expanded={vehicleExpanded}
+                  aria-controls="vehicle-content"
+                  onClick={() => setVehicleExpanded(!vehicleExpanded)}
+                >
+                  {vehicleExpanded ? "Hide vehicle" : "Show vehicle"}
+                </button>
+              )}
               <label className="check-field">
                 <input
                   type="checkbox"
@@ -544,120 +802,96 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                 Feedback tags
               </label>
             </div>
-            {baselineAvailable ? (
-              <Suspense
-                fallback={
-                  <div className="empty-state">Loading baseline vehicle...</div>
-                }
-              >
-                <VehicleViewer
-                  className="bmw-asset-viewer--compact"
-                  selectedComponent={selectedComponent}
-                  onSelectComponent={selectPart}
-                  view={view}
-                  onViewChange={setView}
-                  heatmap={heatmap}
-                  findings={(run?.part_aggregates ?? []).map((a) => ({
-                    id: a.part_id,
-                    counts: a.counts,
-                  }))}
-                />
-              </Suspense>
-            ) : (
-              <div className="empty-state">
-                <h3>{vehicle?.title ?? "Vehicle catalog"}</h3>
-                <p>
-                  {vehicles.length
-                    ? "No verified baseline asset for this model."
-                    : "Loading asset availability..."}
-                </p>
-              </div>
-            )}
+            <div id="vehicle-content" className="vehicle-content">
+              {baselineAvailable ? (
+                <Suspense
+                  fallback={
+                    <div className="empty-state">
+                      Loading baseline vehicle...
+                    </div>
+                  }
+                >
+                  <VehicleViewer
+                    className="bmw-asset-viewer--compact"
+                    selectedComponent={selectedComponent}
+                    onSelectComponent={selectPart}
+                    view={view}
+                    onViewChange={setView}
+                    heatmap={heatmap}
+                    findings={(run?.part_aggregates ?? []).map((a) => ({
+                      id: a.part_id,
+                      counts: a.counts,
+                    }))}
+                  />
+                </Suspense>
+              ) : (
+                <div className="empty-state">
+                  <h3>{vehicle?.title ?? "Vehicle catalog"}</h3>
+                  <p>
+                    {vehicles.length
+                      ? "No verified baseline asset for this model."
+                      : "Loading asset availability..."}
+                  </p>
+                </div>
+              )}
+              {run && (
+                <div className="render-section">
+                  <div className="section-title">
+                    <h2>Visualization</h2>
+                  </div>
+                  {renderResult ? (
+                    <>
+                      <h3>
+                        Render proposal version{" "}
+                        {renderResult.proposal_set_version}
+                      </h3>
+                      <span className="status">{renderResult.status}</span>
+                      {renderResult.proposal_set_version !== version && (
+                        <p className="notice">
+                          Older render. Current proposal version {version};
+                          baseline remains selected.
+                        </p>
+                      )}
+                      <p className="muted">Not validated or approved</p>
+                      {renderResult.outcomes.map((o) => (
+                        <p key={o.change_id}>
+                          <strong>
+                            {o.change_id}: {o.status}
+                          </strong>
+                          <br />
+                          {o.reason}
+                        </p>
+                      ))}
+                      {renderResult.proposal_set_version === version &&
+                        renderResult.variant_ids.includes(
+                          variant?.variant_id ?? "",
+                        ) &&
+                        renderResult.assets.map((asset) =>
+                          safeUrl(asset.url) ? (
+                            <a
+                              key={asset.asset_id}
+                              href={asset.url}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              Open variant asset {asset.asset_id}
+                            </a>
+                          ) : null,
+                        )}
+                    </>
+                  ) : (
+                    <p className="muted">
+                      No render requested for this proposal set.
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
             {run?.warnings.map((w) => (
               <p className="coverage-note" key={w}>
                 {w}
               </p>
             ))}
-            {run && (
-              <div className="render-section">
-                <div className="section-title">
-                  <h2>Visualization</h2>
-                  <button
-                    className="primary"
-                    disabled={!can("reimagine") || !variant}
-                    onClick={() =>
-                      void act(async () => {
-                        const job = await api.request<{
-                          render_request_id: string;
-                        }>(
-                          `/runs/${runId}/renders`,
-                          {
-                            proposal_set_version: version,
-                            variant_ids: [variant!.variant_id],
-                            baseline_asset_id: run.config.baseline_asset_id,
-                          },
-                          commandKey(),
-                        );
-                        setRenderResult(
-                          await api.request<RenderResult>(
-                            `/runs/${runId}/renders/${encodeURIComponent(job.render_request_id)}`,
-                          ),
-                        );
-                        await refresh(runId!);
-                      })
-                    }
-                  >
-                    <WandSparkles size={16} />
-                    Reimagine
-                  </button>
-                </div>
-                {renderResult ? (
-                  <>
-                    <h3>
-                      Render proposal version{" "}
-                      {renderResult.proposal_set_version}
-                    </h3>
-                    <span className="status">{renderResult.status}</span>
-                    {renderResult.proposal_set_version !== version && (
-                      <p className="notice">
-                        Older render. Current proposal version {version};
-                        baseline remains selected.
-                      </p>
-                    )}
-                    <p className="muted">Not validated or approved</p>
-                    {renderResult.outcomes.map((o) => (
-                      <p key={o.change_id}>
-                        <strong>
-                          {o.change_id}: {o.status}
-                        </strong>
-                        <br />
-                        {o.reason}
-                      </p>
-                    ))}
-                    {renderResult.proposal_set_version === version &&
-                      renderResult.variant_ids.includes(
-                        variant?.variant_id ?? "",
-                      ) &&
-                      renderResult.assets.map((asset) =>
-                        safeUrl(asset.url) ? (
-                          <a
-                            key={asset.asset_id}
-                            href={asset.url}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Open variant asset {asset.asset_id}
-                          </a>
-                        ) : null,
-                      )}
-                  </>
-                ) : (
-                  <p className="muted">
-                    No render requested for this proposal set.
-                  </p>
-                )}
-              </div>
-            )}
           </section>
           <section className="analysis-column" aria-label="Analysis panels">
             <div
@@ -709,7 +943,10 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                 <div className="empty-state">
                   <Network size={30} />
                   <h2>Vehicle evidence workspace</h2>
-                  <p>No analysis run yet.</p>
+                  <p>
+                    Findings and proposals will appear here after you start a
+                    run. Add source files in the setup above to begin.
+                  </p>
                 </div>
               ) : (
                 <>
@@ -928,6 +1165,19 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                             <ScopeEditor
                               key={variant.variant_id}
                               scope={variant.cohort_scope}
+                              initialDraft={scopeDrafts.current.get(
+                                variant.variant_id,
+                              )}
+                              rememberDraft={(draft, dirty) => {
+                                scopeDrafts.current.set(
+                                  variant.variant_id,
+                                  draft,
+                                );
+                                rememberDirty(
+                                  `scope:${variant.variant_id}`,
+                                  dirty,
+                                );
+                              }}
                               disabled={!can("edit")}
                               onSave={(cohort_scope) =>
                                 submitInstruction({
@@ -944,33 +1194,55 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
                               initialDraft={proposalDrafts.current.get(
                                 variant.variant_id + ":" + change.change_id,
                               )}
-                              rememberDraft={(draft) =>
+                              rememberDraft={(draft) => {
                                 proposalDrafts.current.set(
                                   variant.variant_id + ":" + change.change_id,
                                   draft,
-                                )
-                              }
+                                );
+                                rememberDirty(
+                                  variant.variant_id + ":" + change.change_id,
+                                  draft.dirty,
+                                );
+                              }}
                               key={variant.variant_id + ":" + change.change_id}
                               change={change}
                               number={index + 1}
                               version={version}
                               disabled={!can("edit")}
-                              onEvidence={() => {
-                                const f = workspace.findings.find(
-                                  (row) => row.finding_id === change.finding_id,
-                                );
-                                if (f) selectFinding(f);
-                                setTab("Evidence");
-                              }}
-                              onSave={(operation, fields, baseVersion) =>
-                                submitInstruction({
+                              evidence={
+                                <ProposalEvidence
+                                  api={api}
+                                  runId={runId!}
+                                  change={change}
+                                  finding={workspace.findings.find(
+                                    (f) => f.finding_id === change.finding_id,
+                                  )}
+                                  onOpen={setSource}
+                                />
+                              }
+                              onSave={async (
+                                operation,
+                                fields,
+                                baseVersion,
+                              ) => {
+                                const saved = await submitInstruction({
                                   operation,
                                   change_id: change.change_id,
                                   variant_id: variant.variant_id,
                                   base_proposal_set_version: baseVersion,
                                   fields,
-                                })
-                              }
+                                });
+                                if (
+                                  saved !== null &&
+                                  operation === "remove_change"
+                                ) {
+                                  const key =
+                                    variant.variant_id + ":" + change.change_id;
+                                  proposalDrafts.current.delete(key);
+                                  rememberDirty(key, false);
+                                }
+                                return saved;
+                              }}
                             />
                           ))}
                           <AddProposal
@@ -1074,6 +1346,18 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
           </section>
         </div>
       </main>
+      {confirmNewRun && (
+        <ConfirmDialog
+          title="Start a new run?"
+          description={`${hasUnsavedWork ? "You have unsaved edits that will be discarded. " : ""}${api.mode === "mock" ? "Starting a new run clears this synthetic run and its results." : "Starting a new run closes this workspace."} Export anything you need before continuing.`}
+          confirmLabel="Start new run"
+          onCancel={() => setConfirmNewRun(false)}
+          onConfirm={() => {
+            reset();
+            return true;
+          }}
+        />
+      )}
       {source && (
         <SourceDialog evidence={source} onClose={() => setSource(null)} />
       )}
@@ -1128,11 +1412,14 @@ function EvidenceList({
 }) {
   const [rows, setRows] = useState<Evidence[]>([]);
   const [error, setError] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [retry, setRetry] = useState(0);
   const idKey = ids.join("|");
   useEffect(() => {
     let active = true;
     setRows([]);
     setError("");
+    setLoading(ids.length > 0);
     Promise.all(
       ids.map((id) =>
         api.request<Evidence>(
@@ -1145,15 +1432,33 @@ function EvidenceList({
       })
       .catch((e) => {
         if (active) setError(e.message);
+      })
+      .finally(() => {
+        if (active) setLoading(false);
       });
     return () => {
       active = false;
     };
-  }, [api, runId, idKey]);
+  }, [api, runId, idKey, retry]);
   return (
     <section className="evidence-section">
       <h3>{title}</h3>
-      {error && <p role="alert">{error}</p>}
+      {loading && (
+        <p role="status" className="muted">
+          Loading observations…
+        </p>
+      )}
+      {error && (
+        <div>
+          <p role="alert">{error}</p>
+          <button
+            aria-label={`Retry ${title}`}
+            onClick={() => setRetry((value) => value + 1)}
+          >
+            Retry evidence
+          </button>
+        </div>
+      )}
       {!ids.length && <p className="muted">No observations supplied.</p>}
       {rows.map((e) => (
         <article key={e.evidence_id} className="evidence-card">
@@ -1173,6 +1478,75 @@ function EvidenceList({
         </article>
       ))}
     </section>
+  );
+}
+
+function ProposalEvidence({
+  api,
+  runId,
+  change,
+  finding,
+  onOpen,
+}: {
+  api: Api;
+  runId: string;
+  change: Change;
+  finding?: Finding;
+  onOpen: (e: Evidence) => void;
+}) {
+  if (change.origin === "pm" && !change.evidence_ids.length)
+    return <p className="muted">No evidence linked to this PM idea.</p>;
+  const supporting = finding?.supporting_evidence_ids ?? [];
+  const opposing = finding?.opposing_evidence_ids ?? [];
+  const otherLinked = change.evidence_ids.filter(
+    (id) => !supporting.includes(id) && !opposing.includes(id),
+  );
+  return (
+    <>
+      {finding ? (
+        <>
+          <h4>{finding.title}</h4>
+          <p>{finding.customer_need}</p>
+          <p>
+            <strong>
+              {finding.counts.negative_records} of{" "}
+              {finding.counts.total_records} negative feedback records
+            </strong>
+            {finding.provisional ? " / provisional" : ""}
+            {finding.counts.low_evidence ? " / low evidence" : ""}
+          </p>
+          <p className="muted">
+            {finding.cohort_ids.join(", ")} · {finding.coverage}
+          </p>
+          <p className="muted">{finding.applicability}</p>
+          <EvidenceList
+            api={api}
+            runId={runId}
+            ids={supporting}
+            title="Supporting observations"
+            onOpen={onOpen}
+          />
+          <EvidenceList
+            api={api}
+            runId={runId}
+            ids={opposing}
+            title="Opposing observations"
+            onOpen={onOpen}
+          />
+        </>
+      ) : (
+        <p className="muted">No customer finding linked to this proposal.</p>
+      )}
+      {otherLinked.length > 0 && (
+        <EvidenceList
+          api={api}
+          runId={runId}
+          ids={otherLinked}
+          title="Linked proposal evidence"
+          onOpen={onOpen}
+        />
+      )}
+    </>
   );
 }
 
@@ -1249,7 +1623,7 @@ function ProposalEditor({
   version,
   disabled,
   onSave,
-  onEvidence,
+  evidence,
   initialDraft,
   rememberDraft,
 }: {
@@ -1262,7 +1636,7 @@ function ProposalEditor({
     fields: Instruction["fields"],
     baseVersion: number,
   ) => Promise<number | null>;
-  onEvidence: () => void;
+  evidence: ReactNode;
   initialDraft?: ProposalDraft;
   rememberDraft: (draft: ProposalDraft) => void;
 }) {
@@ -1271,9 +1645,16 @@ function ProposalEditor({
   const [baseVersion, setBaseVersion] = useState(
     initialDraft?.baseVersion ?? version,
   );
+  const [confirmRemoval, setConfirmRemoval] = useState(false);
+  const [showEvidence, setShowEvidence] = useState(true);
   useEffect(() => {
-    rememberDraft({ text, target, baseVersion });
-  }, [text, target, baseVersion, rememberDraft]);
+    rememberDraft({
+      text,
+      target,
+      baseVersion,
+      dirty: text !== change.after || target !== change.target,
+    });
+  }, [text, target, baseVersion, change.after, change.target, rememberDraft]);
   const stale = version !== baseVersion;
   async function save(
     operation: Instruction["operation"],
@@ -1281,6 +1662,7 @@ function ProposalEditor({
   ) {
     const saved = await onSave(operation, fields, baseVersion);
     if (saved !== null) setBaseVersion(saved);
+    return saved !== null;
   }
   return (
     <article className="proposal-item">
@@ -1289,73 +1671,102 @@ function ProposalEditor({
         {change.origin === "pm" ? "PM idea" : "AI proposal"}{" "}
         <small>{change.decision_state}</small>
       </h3>
-      <p>
-        <strong>Before:</strong> {change.before}
-      </p>
-      <p>{change.rationale}</p>
-      <label className="stacked-label">
-        Proposal text
-        <textarea
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          disabled={disabled}
-        />
-      </label>
-      <label className="stacked-label">
-        Target
-        <textarea
-          value={target}
-          onChange={(e) => setTarget(e.target.value)}
-          disabled={disabled}
-        />
-      </label>
-      <p className="muted">Target maturity: {change.target_maturity}</p>
-      {change.assumptions.map((a) => (
-        <p className="muted" key={a}>
-          {a}
-        </p>
-      ))}
-      {stale && (
-        <div className="notice">
-          <strong>
-            Draft based on version {baseVersion}; current version {version}.
-          </strong>
-          <p>Current proposal: {change.after}</p>
-          <button onClick={() => setBaseVersion(version)}>
-            <RefreshCw size={15} />
-            Use current version with my draft
-          </button>
+      <div
+        className={`proposal-review${showEvidence ? "" : " is-evidence-hidden"}`}
+      >
+        <div className="proposal-editor">
+          <p>
+            <strong>Before:</strong> {change.before}
+          </p>
+          <p>{change.rationale}</p>
+          <label className="stacked-label">
+            Proposal text
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              disabled={disabled}
+            />
+          </label>
+          <label className="stacked-label">
+            Target
+            <textarea
+              value={target}
+              onChange={(e) => setTarget(e.target.value)}
+              disabled={disabled}
+            />
+          </label>
+          <p className="muted">Target maturity: {change.target_maturity}</p>
+          {change.assumptions.map((a) => (
+            <p className="muted" key={a}>
+              {a}
+            </p>
+          ))}
+          {stale && (
+            <div className="notice">
+              <strong>
+                Draft based on version {baseVersion}; current version {version}.
+              </strong>
+              <p>Current proposal: {change.after}</p>
+              <button onClick={() => setBaseVersion(version)}>
+                <RefreshCw size={15} />
+                Use current version with my draft
+              </button>
+            </div>
+          )}
+          <div className="action-row">
+            <button
+              disabled={disabled || stale || !text.trim()}
+              onClick={() => void save("edit_change", { after: text })}
+            >
+              <Save size={15} />
+              Save edit
+            </button>
+            <button
+              disabled={disabled || stale || !target.trim()}
+              onClick={() => void save("edit_target", { target })}
+            >
+              <Save size={15} />
+              Save target
+            </button>
+            <button
+              aria-expanded={showEvidence}
+              aria-controls={`proposal-evidence-${change.change_id}`}
+              onClick={() => setShowEvidence(!showEvidence)}
+            >
+              <BookOpen size={15} />
+              {showEvidence ? "Hide evidence" : "View evidence"}
+            </button>
+            <button
+              className="icon-button"
+              aria-label={`Remove change ${number}`}
+              title="Remove change"
+              disabled={disabled || stale}
+              onClick={() => setConfirmRemoval(true)}
+            >
+              <Trash2 size={16} />
+            </button>
+          </div>
         </div>
-      )}
-      <div className="action-row">
-        <button
-          disabled={disabled || stale || !text.trim()}
-          onClick={() => void save("edit_change", { after: text })}
+        <section
+          id={`proposal-evidence-${change.change_id}`}
+          className="proposal-evidence"
+          aria-label={`Evidence for proposal ${number}`}
+          hidden={!showEvidence}
         >
-          <Save size={15} />
-          Save edit
-        </button>
-        <button
-          disabled={disabled || stale || !target.trim()}
-          onClick={() => void save("edit_target", { target })}
-        >
-          <Save size={15} />
-          Save target
-        </button>
-        <button onClick={onEvidence}>
-          <BookOpen size={15} />
-          View evidence
-        </button>
-        <button
-          className="icon-button"
-          aria-label={`Remove change ${number}`}
-          title="Remove change"
-          disabled={disabled || stale}
-          onClick={() => void save("remove_change", {})}
-        >
-          <Trash2 size={16} />
-        </button>
+          <h3>Evidence</h3>
+          {evidence}
+        </section>
       </div>
+      {confirmRemoval && (
+        <ConfirmDialog
+          title="Remove proposal?"
+          description="This removes this proposal from the selected variant, including its unsaved edits. Removal cannot be undone here. Customer evidence stays unchanged."
+          confirmLabel="Remove proposal"
+          disabled={disabled || stale}
+          onCancel={() => setConfirmRemoval(false)}
+          onConfirm={() => save("remove_change", {})}
+        />
+      )}
     </article>
   );
 }
@@ -1397,14 +1808,22 @@ function AddProposal({
 
 function ScopeEditor({
   scope,
+  initialDraft,
+  rememberDraft,
   disabled,
   onSave,
 }: {
   scope: string[];
+  initialDraft?: string;
+  rememberDraft: (draft: string, dirty: boolean) => void;
   disabled: boolean;
   onSave: (scope: string[]) => Promise<number | null>;
 }) {
-  const [draft, setDraft] = useState(scope.join(", "));
+  const [draft, setDraft] = useState(initialDraft ?? scope.join(", "));
+  const currentScope = scope.join(", ");
+  useEffect(() => {
+    rememberDraft(draft, draft !== currentScope);
+  }, [draft, currentScope, rememberDraft]);
   return (
     <div className="scope-editor">
       <label className="stacked-label">
@@ -1417,14 +1836,13 @@ function ScopeEditor({
       </label>
       <button
         disabled={disabled || !draft.trim()}
-        onClick={() =>
-          void onSave(
-            draft
-              .split(",")
-              .map((s) => s.trim())
-              .filter(Boolean),
-          )
-        }
+        onClick={async () => {
+          const next = draft
+            .split(",")
+            .map((s) => s.trim())
+            .filter(Boolean);
+          if ((await onSave(next)) !== null) setDraft(next.join(", "));
+        }}
       >
         <Save size={15} />
         Save grouping
@@ -1434,6 +1852,81 @@ function ScopeEditor({
         together.
       </p>
     </div>
+  );
+}
+
+function ConfirmDialog({
+  title,
+  description,
+  confirmLabel,
+  disabled = false,
+  onCancel,
+  onConfirm,
+}: {
+  title: string;
+  description: string;
+  confirmLabel: string;
+  disabled?: boolean;
+  onCancel: () => void;
+  onConfirm: () => boolean | Promise<boolean>;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  const [pending, setPending] = useState(false);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    if (ref.current?.showModal) ref.current.showModal();
+    else ref.current?.setAttribute("open", "");
+    ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => {
+      if (opener?.isConnected) opener.focus();
+      else document.querySelector<HTMLHeadingElement>("main h1")?.focus();
+    };
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      aria-label={title}
+      onCancel={(e) => {
+        e.preventDefault();
+        if (!pending) onCancel();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          if (!pending) onCancel();
+        }
+      }}
+    >
+      <h2>{title}</h2>
+      <p>{description}</p>
+      {failed && (
+        <p role="alert">
+          Removal failed. Proposal and draft kept. Close this dialog to review
+          the error, then retry.
+        </p>
+      )}
+      <div className="action-row">
+        <button disabled={pending} onClick={onCancel}>
+          Keep working
+        </button>
+        <button
+          className="primary"
+          disabled={disabled || pending}
+          onClick={async () => {
+            setPending(true);
+            setFailed(false);
+            try {
+              if (!(await onConfirm())) setFailed(true);
+            } finally {
+              setPending(false);
+            }
+          }}
+        >
+          {pending ? "Working…" : confirmLabel}
+        </button>
+      </div>
+    </dialog>
   );
 }
 

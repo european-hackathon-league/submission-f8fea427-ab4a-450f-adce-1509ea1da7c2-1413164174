@@ -1,11 +1,11 @@
 import type { RunConfig } from "./api/contracts";
 export type PendingRun = { key: string; config: RunConfig };
-export type Session = { pendingRun?: PendingRun | null; runId: string | null; tab: string; selectedFindingId: string; selectedComponent: string; view: string; variantId: string; ideaDraft: string; proposalDrafts: Array<[string, { text: string; target: string; baseVersion: number }]> };
+export type Session = { pendingRun?: PendingRun | null; runId: string | null; tab: string; selectedFindingId: string | null; selectedComponent: string; view: string; variantId: string; ideaDraft: string; proposalDrafts: Array<[string, { text: string; target: string; baseVersion: number }]> };
 const key = (namespace: string) => `vehicle-workspace:${namespace}`;
 export function readSession(namespace: string): Session | null {
   try {
     const value = JSON.parse(sessionStorage.getItem(key(namespace)) ?? "null");
-    if (!value || (value.runId !== null && typeof value.runId !== "string") || !["tab", "selectedFindingId", "selectedComponent", "view", "variantId", "ideaDraft"].every(k => typeof value[k] === "string") || !Array.isArray(value.proposalDrafts)) return null;
+    if (!value || (value.runId !== null && typeof value.runId !== "string") || !["tab", "selectedComponent", "view", "variantId", "ideaDraft"].every(k => typeof value[k] === "string") || (value.selectedFindingId !== null && typeof value.selectedFindingId !== "string") || !Array.isArray(value.proposalDrafts)) return null;
     if (!value.proposalDrafts.every((row: unknown) => Array.isArray(row) && row.length === 2 && typeof row[0] === "string" && row[1] && typeof row[1].text === "string" && typeof row[1].target === "string" && Number.isSafeInteger(row[1].baseVersion) && row[1].baseVersion >= 1)) return null;
     if (value.pendingRun != null) {
       const { key, config } = value.pendingRun;

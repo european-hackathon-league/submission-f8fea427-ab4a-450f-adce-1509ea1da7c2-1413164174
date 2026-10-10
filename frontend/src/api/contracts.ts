@@ -44,7 +44,11 @@ export interface Snapshot {
   wire?: Wire.Snapshot;
   available_actions: string[];
   warnings: string[];
-  part_aggregates: Array<{ part_id: ComponentId; counts: FeedbackCount }>;
+  part_aggregates: Array<{
+    part_id: ComponentId;
+    counts: FeedbackCount;
+    wire?: Wire.PartAggregate;
+  }>;
 }
 export interface Finding {
   finding_id: string;
@@ -218,6 +222,9 @@ export interface Api {
     signal: AbortSignal,
   ): Promise<Response>;
   sourceUrl?(sourceId: string): string;
+  vehicles?(): Promise<Vehicle[]>;
+  canReadSource?(url: string): boolean;
+  readSource?(url: string, signal: AbortSignal): Promise<Blob>;
   dispose?(): void;
   request<T>(path: string, body?: unknown, key?: string): Promise<T>;
   upload(file: File): Promise<Upload>;

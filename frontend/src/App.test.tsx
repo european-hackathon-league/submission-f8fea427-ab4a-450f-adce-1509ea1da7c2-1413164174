@@ -43,14 +43,14 @@ describe("frontend plan workspace", () => {
   it("recovers vehicle loading locally without losing uploaded files", async () => {
     const user = userEvent.setup();
     const api = createMockApi();
-    const request = api.request;
+    const vehicles = api.vehicles!;
     let fail = true;
-    api.request = (path, body, key) => {
-      if (path === "/vehicles" && fail) {
+    api.vehicles = () => {
+      if (fail) {
         fail = false;
         return Promise.reject(new Error("Vehicle service offline"));
       }
-      return request(path, body, key);
+      return vehicles();
     };
     render(<App api={api} />);
     await screen.findByText("Vehicle service offline");
@@ -311,12 +311,13 @@ describe("frontend plan workspace", () => {
     const evidence = screen.getByRole("region", {
       name: "Evidence for proposal 1",
     });
-    await within(evidence).findByText("Evidence temporarily unavailable");
+    await within(evidence).findByText(/dashboard-E1: Evidence temporarily unavailable/);
+    expect(within(evidence).getByRole("button", { name: "Open source dashboard-E2" })).toBeInTheDocument();
     await user.clear(screen.getByLabelText("Proposal text"));
     await user.type(screen.getByLabelText("Proposal text"), "Keep draft");
     await user.click(
       within(evidence).getByRole("button", {
-        name: "Retry Supporting observations",
+        name: "Retry source dashboard-E1",
       }),
     );
     expect(
@@ -499,7 +500,7 @@ describe("frontend plan workspace", () => {
     expect(screen.getByText("partial")).toBeInTheDocument();
     expect(screen.getByText(/Owner sample unavailable/)).toBeInTheDocument();
     expect(
-      screen.getByText(/172 of 400 negative feedback records/),
+      screen.getAllByText(/172 of 400 negative feedback records/)[0],
     ).toBeInTheDocument();
   });
 
@@ -683,7 +684,7 @@ it("starts an independent second synthetic run after New run", async () => {
 
 it("creates server-supported configurations even when local visual asset is unavailable", async () => {
   const base = createMockApi();
-  const api = { ...base, request: async <T,>(path: string, body?: unknown, key?: string): Promise<T> => {
+  const api = { ...base, vehicles: undefined, request: async <T,>(path: string, body?: unknown, key?: string): Promise<T> => {
     if (path === "/vehicles") return {items:[{vehicle_id:"server-vehicle",title:"Server vehicle",baseline_asset_id:"server-asset",part_catalog_version:"server-catalog",capabilities:[],wire:{vehicle_id:"server-vehicle",baseline_asset_ids:["server-asset"],part_catalog_versions:["server-catalog"],capabilities:[]}}],next_cursor:null} as T;
     if (path === "/runs") return { run_id: "server-run",snapshot_url:"/api/v1/runs/server-run",events_url:"/api/v1/runs/server-run/events" } as T;
     return base.request<T>(path, body, key);
@@ -731,4 +732,123 @@ it("retries an uncertain accepted run with original frozen command and key", asy
   await screen.findByText("waiting_for_pm");
   expect(commands).toHaveLength(2);
   expect(commands[1]).toEqual(commands[0]);
+});
+
+
+it("keeps unknown semantic parts accessible without selecting an unrelated spatial part", async () => {
+  const base = createMockApi();
+  const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id);
+    w.findings.push({ ...w.findings[0], finding_id: "unknown-part", title: "Non-geometric subscription", part_ids: ["subscription" as never] });
+    return w;
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf"));
+  await screen.findByText("ready"); await user.click(screen.getByRole("button", { name: "Start run" }));
+  await screen.findByText("proposals_ready");
+  expect(screen.getByRole("heading", { name: "Unmapped or non-geometric findings" })).toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: /Non-geometric subscription/ }));
+  expect(screen.getByRole("heading", { name: "Non-geometric subscription" })).toBeInTheDocument();
+  expect(screen.getAllByText(/No spatial part selected/)[0]).toBeInTheDocument();
+});
+
+it("does not replace an explicit finding selection when refreshed findings remove it", async () => {
+  const base = createMockApi(); let removed = false;
+  const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id);
+    if (removed) w.findings = w.findings.filter(f => f.finding_id !== "finding-dashboard");
+    return w;
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf"));
+  await screen.findByText("ready"); await user.click(screen.getByRole("button", { name: "Start run" }));
+  await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ }));
+  removed = true; await user.click(screen.getByRole("button", { name: "Reimagine" }));
+  expect(await screen.findByText(/Selected finding is unavailable in this snapshot/)).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Vehicle-wide and unmapped" })).not.toBeInTheDocument();
+});
+
+it("moves focus with analysis tab keyboard navigation", async () => {
+  const user = await createRun(); screen.getByRole("tab", { name: "Findings" }).focus();
+  await user.keyboard("{ArrowRight}");
+  expect(screen.getByRole("tab", { name: "Graph" })).toHaveFocus();
+  expect(screen.getByRole("tab", { name: "Graph" })).toHaveAttribute("aria-selected", "true");
+  await user.keyboard("{End}"); expect(screen.getByRole("tab", { name: "History" })).toHaveFocus();
+});
+
+
+it("uses saved run asset and catalog identity before exposing local spatial mappings", async () => {
+  const base = createMockApi(); const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id); w.snapshot.config = { ...w.snapshot.config, baseline_asset_id: "other-version", part_catalog_version: "other-parts" }; return w;
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  expect(screen.queryByRole("region", { name: "BMW i5 M60 vehicle viewer" })).not.toBeInTheDocument();
+  expect(screen.getByText("No verified baseline asset for this model.")).toBeInTheDocument();
+});
+
+it("keeps catalog hierarchy-only IDs out of spatial part selection", async () => {
+  const base = createMockApi(); const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id); w.findings[0].part_ids = ["cabin" as never]; return w;
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  const group = screen.getByRole("region", { name: "Unmapped or non-geometric findings" });
+  await user.click(within(group).getByRole("button", { name: /Comfort controls/ }));
+  expect(screen.getAllByText(/No spatial part selected/).length).toBeGreaterThan(0);
+});
+
+
+it("treats finding IDs as opaque even when resembling old UI sentinel IDs", async () => {
+  const base = createMockApi(); const api = { ...base, workspace: async (id: string) => { const w = await base.workspace(id); w.findings[0].finding_id = "unreported-real-finding"; return w; } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ }));
+  expect(screen.getByRole("heading", { name: "Comfort controls" })).toBeInTheDocument();
+});
+
+
+it("preserves selected finding when several findings map to one component", async () => {
+  const base = createMockApi(); const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id); w.findings.push({ ...w.findings[1], finding_id: "body-other", title: "Chosen body finding" }); return w;
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("button", { name: /Chosen body finding/ }));
+  await user.click(screen.getByRole("button", { name: /^Body.*Cohorts/ }));
+  expect(screen.getByRole("heading", { name: "Chosen body finding" })).toBeInTheDocument();
+});
+
+
+it("moves keyboard focus into evidence after choosing a finding", async () => {
+  const user = await createRun(); const choice = screen.getByRole("button", { name: /Comfort controls.*172 of 400/ });
+  choice.focus(); await user.keyboard("{Enter}");
+  expect(screen.getByRole("tabpanel", { name: "Evidence" })).toHaveFocus();
+});
+
+
+it("clears obsolete spatial selection when current finding mapping changes on refresh", async () => {
+  const base = createMockApi(); let unmapped = false;
+  const api = { ...base, workspace: async (id: string) => { const w = await base.workspace(id); if (unmapped) w.findings[1].part_ids = []; return w; } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("button", { name: /Trunk gesture reliability.*88 of 400/ }));
+  expect(screen.getByRole("button", { name: /^Body.*Cohorts/ })).toHaveAttribute("aria-pressed", "true");
+  unmapped = true; await user.click(screen.getByRole("button", { name: "Reimagine" }));
+  await waitFor(() => expect(screen.getByRole("button", { name: /^Body.*Cohorts/ })).toHaveAttribute("aria-pressed", "false"));
+  expect(screen.getByRole("heading", { name: "Trunk gesture reliability" })).toBeInTheDocument();
+});
+
+
+it("opens mapped evidence from a keyboard component tag", async () => {
+  const user = await createRun(); await screen.findByRole("button", { name: /^Body.*Cohorts/ });
+  await user.click(screen.getByRole("button", { name: /^Body.*Cohorts/ }));
+  expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Trunk gesture reliability" })).toBeInTheDocument();
 });

@@ -1,27 +1,119 @@
 {
-  "catalog_version": "g60-parts-v1",
   "vehicle_id": "g60-i5-m60",
   "baseline_asset_id": "i5-m60-exterior-v1",
   "baseline_asset": {
     "type": "sketchfab",
     "model_id": "207fd872d28b4cafa7fefe061ae98e26",
     "preview_url": "/vehicles/i5-m60-preview.jpg",
-    "capabilities": ["navigation", "part_selection", "annotations"],
-    "limitations": ["Hosted community model; network required", "Exterior mesh anchors unverified", "Geometry generation unsupported"]
+    "capabilities": [
+      "navigation",
+      "list_annotation"
+    ],
+    "limitations": [
+      "Hosted community model; network required",
+      "No verified exterior mesh or anchor mappings; use component list",
+      "Geometry generation unsupported"
+    ]
   },
   "interior_reference": {
     "asset_id": "g60-520i-cabin-photo-v1",
     "url": "/vehicles/g60-interior.jpg",
     "vehicle_id": "g60-520i",
     "type": "reference_photo",
-    "limitations": ["Separate G60 520i reference, not a verified i5 M60 cabin", "Annotations only"]
+    "limitations": [
+      "Separate G60 520i reference, not a verified i5 M60 cabin",
+      "Annotations only"
+    ]
   },
   "parts": [
-    {"part_id": "body", "parent_part_id": "vehicle", "mesh_names": ["body", "body_panels", "exterior_body"], "anchor": null, "capabilities": ["list_annotation"]},
-    {"part_id": "lighting", "parent_part_id": "body", "mesh_names": ["lighting", "headlamps", "rear_lamps"], "anchor": null, "capabilities": ["list_annotation"]},
-    {"part_id": "charging", "parent_part_id": "body", "mesh_names": ["charging", "charge_port", "charging_port"], "anchor": null, "capabilities": ["list_annotation"]},
-    {"part_id": "steering", "parent_part_id": "cabin", "mesh_names": ["steering", "steering_wheel", "cockpit_steering_wheel"], "reference_photo_anchor": [0.34, 0.55], "capabilities": ["photo_annotation"]},
-    {"part_id": "dashboard", "parent_part_id": "cabin", "mesh_names": ["dashboard", "instrument_panel", "cockpit_dashboard"], "reference_photo_anchor": [0.6, 0.45], "capabilities": ["photo_annotation"]},
-    {"part_id": "seats", "parent_part_id": "cabin", "mesh_names": ["seats", "seat_front_left", "seat_front_right"], "reference_photo_anchor": [0.82, 0.88], "capabilities": ["photo_annotation"]}
-  ]
+    {
+      "part_id": "vehicle",
+      "parent_part_id": null,
+      "mesh_refs": [],
+      "anchor_ref": null,
+      "capabilities": [
+        "list_annotation"
+      ]
+    },
+    {
+      "part_id": "cabin",
+      "parent_part_id": "vehicle",
+      "mesh_refs": [],
+      "anchor_ref": null,
+      "capabilities": [
+        "list_annotation"
+      ]
+    },
+    {
+      "part_id": "body",
+      "parent_part_id": "vehicle",
+      "capabilities": [
+        "list_annotation"
+      ],
+      "mesh_refs": [],
+      "anchor_ref": null
+    },
+    {
+      "part_id": "lighting",
+      "parent_part_id": "body",
+      "capabilities": [
+        "list_annotation"
+      ],
+      "mesh_refs": [],
+      "anchor_ref": null
+    },
+    {
+      "part_id": "charging",
+      "parent_part_id": "body",
+      "capabilities": [
+        "list_annotation"
+      ],
+      "mesh_refs": [],
+      "anchor_ref": null
+    },
+    {
+      "part_id": "steering",
+      "parent_part_id": "cabin",
+      "reference_photo_anchor": [
+        0.34,
+        0.55
+      ],
+      "capabilities": [
+        "list_annotation",
+        "photo_annotation"
+      ],
+      "mesh_refs": [],
+      "anchor_ref": null
+    },
+    {
+      "part_id": "dashboard",
+      "parent_part_id": "cabin",
+      "reference_photo_anchor": [
+        0.6,
+        0.45
+      ],
+      "capabilities": [
+        "list_annotation",
+        "photo_annotation"
+      ],
+      "mesh_refs": [],
+      "anchor_ref": null
+    },
+    {
+      "part_id": "seats",
+      "parent_part_id": "cabin",
+      "reference_photo_anchor": [
+        0.82,
+        0.88
+      ],
+      "capabilities": [
+        "list_annotation",
+        "photo_annotation"
+      ],
+      "mesh_refs": [],
+      "anchor_ref": null
+    }
+  ],
+  "contract_version": "1",
+  "part_catalog_version": "g60-parts-v1"
 }

@@ -1,0 +1,2850 @@
+{
+  "deep_dive_partial": {
+    "description": "deep_dive_partial",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": true
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "deep_dive_success": {
+    "description": "deep_dive_success",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": true
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "duplicate_uploads": {
+    "description": "duplicate_uploads",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": false
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "guided_conflict": {
+    "description": "guided_conflict",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "waiting_for_pm",
+        "available_actions": [
+          "continue_checkpoint"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": false
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "guided",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "pm_edit_stale": {
+    "description": "pm_edit_stale",
+    "payloads": {
+      "Error": {
+        "code": "stale_version",
+        "current_version": 2,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": false
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "reconnect": {
+    "description": "reconnect",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": false
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "render_late": {
+    "description": "render_late",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": true,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": false
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "render_partial": {
+    "description": "render_partial",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "unsupported",
+            "reason": "Synthetic geometry unsupported"
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "partial",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": false
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "standard_autonomous": {
+    "description": "standard_autonomous",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": false
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  },
+  "versioned_export": {
+    "description": "versioned_export",
+    "payloads": {
+      "Error": {
+        "code": "example_error",
+        "current_version": null,
+        "field_errors": [],
+        "message": "Synthetic error example",
+        "retryable": false
+      },
+      "Event": {
+        "contract_version": "1",
+        "event_id": "event_demo_1",
+        "occurred_at": "2026-10-10T00:00:00Z",
+        "proposal_set_version": 1,
+        "resource": {
+          "id": "run_demo",
+          "revision": 1,
+          "type": "proposals"
+        },
+        "run_id": "run_demo",
+        "sequence": 1,
+        "type": "proposals.ready"
+      },
+      "EvidenceList": {
+        "items": [
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_demo",
+            "excerpt": "Synthetic: the seat is uncomfortable on long journeys.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A2",
+                "G2"
+              ],
+              "row": 2,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
+      },
+      "FindingsPage": {
+        "counts": {
+          "negative_records": 1,
+          "negative_share": 1.0,
+          "record_ids": [
+            "record_demo"
+          ],
+          "total_records": 1
+        },
+        "items": [
+          {
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "counts": {
+              "negative_records": 1,
+              "negative_share": 1.0,
+              "record_ids": [
+                "record_demo"
+              ],
+              "total_records": 1
+            },
+            "coverage": [
+              "Synthetic fixture; no population inference"
+            ],
+            "customer_need": "Remain comfortable on long journeys",
+            "finding_id": "finding_demo",
+            "opposing_evidence_ids": [],
+            "part_ids": [
+              "part_seat"
+            ],
+            "provisional": false,
+            "revision": 1,
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "title": "Synthetic seat comfort"
+          }
+        ],
+        "next_cursor": null,
+        "part_aggregates": [],
+        "revision": 1
+      },
+      "Proposals": {
+        "changes": [
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_demo",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "ai",
+            "outcome": "Improve long-journey seat comfort",
+            "part_ids": [
+              "part_seat"
+            ],
+            "requirement_id": "requirement_demo",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [
+              "evidence_demo"
+            ],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "Baseline and target require validation"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
+          }
+        ],
+        "config_version": 1,
+        "gaps": [
+          "Synthetic example"
+        ],
+        "generation_id": "generation_demo",
+        "proposal_set_version": 1,
+        "research_ids": [],
+        "run_id": "run_demo",
+        "scoring_policy_version": "default_35_25_20_20_v1",
+        "source_version_ids": [
+          "source_version_demo"
+        ],
+        "unresolved_conflict_ids": [],
+        "variants": [
+          {
+            "assumptions": [],
+            "change_ids": [
+              "change_demo"
+            ],
+            "cohort_ids": [
+              "cohort_us"
+            ],
+            "related_variant_ids": [],
+            "requirement_ids": [
+              "requirement_demo"
+            ],
+            "title": "Synthetic alternative",
+            "variant_id": "variant_demo"
+          }
+        ]
+      },
+      "RenderManifest": {
+        "baseline_asset_id": "asset_demo_v1",
+        "changes": [
+          {
+            "change_id": "change_demo",
+            "evidence_ids": [
+              "evidence_demo"
+            ],
+            "part_ids": [
+              "part_seat"
+            ],
+            "preserve_constraints": [
+              "Preserve all other parts"
+            ],
+            "proposed_outcome": "Improve long-journey seat comfort",
+            "visual_instruction": "Annotate synthetic concept"
+          }
+        ],
+        "contract_version": "1",
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "run_id": "run_demo",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "RenderResult": {
+        "assets": [],
+        "baseline_asset_id": "asset_demo_v1",
+        "failure_reason": null,
+        "job_id": null,
+        "outcomes": [
+          {
+            "asset_ids": [],
+            "change_id": "change_demo",
+            "outcome": "annotated",
+            "reason": null
+          }
+        ],
+        "part_catalog_version": "catalog_demo_v1",
+        "proposal_set_version": 1,
+        "render_request_id": "render_demo",
+        "stale": false,
+        "status": "succeeded",
+        "variant_ids": [
+          "variant_demo"
+        ]
+      },
+      "Snapshot": {
+        "analysis_status": "proposals_ready",
+        "available_actions": [
+          "edit",
+          "reimagine",
+          "export"
+        ],
+        "config": {
+          "baseline_asset_id": "asset_demo_v1",
+          "deep_dive": {
+            "enabled": false
+          },
+          "market_context": [
+            "US"
+          ],
+          "part_catalog_version": "catalog_demo_v1",
+          "participation_mode": "autonomous",
+          "source_ids": [
+            "source_demo"
+          ],
+          "vehicle_id": "vehicle_demo"
+        },
+        "contract_version": "1",
+        "current_proposal_set_version": 1,
+        "last_event_sequence": 1,
+        "resource_links": {
+          "proposals": "/api/v1/runs/run_demo/proposals"
+        },
+        "revision": 1,
+        "run_id": "run_demo",
+        "stage": "proposal",
+        "warnings": [
+          "Synthetic data"
+        ]
+      }
+    },
+    "synthetic": true
+  }
+}

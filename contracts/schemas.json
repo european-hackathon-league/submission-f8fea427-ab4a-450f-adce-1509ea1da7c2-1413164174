@@ -1,0 +1,1598 @@
+{
+  "Error": {
+    "additionalProperties": false,
+    "properties": {
+      "code": {
+        "title": "Code",
+        "type": "string"
+      },
+      "current_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Current Version"
+      },
+      "field_errors": {
+        "items": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "type": "object"
+        },
+        "title": "Field Errors",
+        "type": "array"
+      },
+      "message": {
+        "title": "Message",
+        "type": "string"
+      },
+      "retryable": {
+        "default": false,
+        "title": "Retryable",
+        "type": "boolean"
+      }
+    },
+    "required": [
+      "code",
+      "message"
+    ],
+    "title": "Error",
+    "type": "object"
+  },
+  "Event": {
+    "$defs": {
+      "Resource": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "revision"
+        ],
+        "title": "Resource",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "contract_version": {
+        "const": "1",
+        "default": "1",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "event_id": {
+        "title": "Event Id",
+        "type": "string"
+      },
+      "occurred_at": {
+        "format": "date-time",
+        "title": "Occurred At",
+        "type": "string"
+      },
+      "proposal_set_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Proposal Set Version"
+      },
+      "resource": {
+        "$ref": "#/$defs/Resource"
+      },
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "sequence": {
+        "minimum": 1,
+        "title": "Sequence",
+        "type": "integer"
+      },
+      "type": {
+        "enum": [
+          "analysis.updated",
+          "findings.updated",
+          "graph.updated",
+          "part_counts.updated",
+          "research.updated",
+          "conflicts.updated",
+          "checkpoint.created",
+          "proposals.ready",
+          "render.updated",
+          "export.updated",
+          "audit.appended"
+        ],
+        "title": "Type",
+        "type": "string"
+      }
+    },
+    "required": [
+      "event_id",
+      "sequence",
+      "run_id",
+      "type",
+      "occurred_at",
+      "resource"
+    ],
+    "title": "Event",
+    "type": "object"
+  },
+  "EvidenceList": {
+    "$defs": {
+      "CellLocator": {
+        "additionalProperties": false,
+        "properties": {
+          "cells": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cells",
+            "type": "array"
+          },
+          "row": {
+            "minimum": 1,
+            "title": "Row",
+            "type": "integer"
+          },
+          "sheet": {
+            "title": "Sheet",
+            "type": "string"
+          },
+          "type": {
+            "const": "cell",
+            "default": "cell",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "sheet",
+          "row",
+          "cells"
+        ],
+        "title": "CellLocator",
+        "type": "object"
+      },
+      "Evidence": {
+        "additionalProperties": false,
+        "properties": {
+          "applicability": {
+            "default": "unknown",
+            "enum": [
+              "applicable",
+              "mismatch",
+              "unknown"
+            ],
+            "title": "Applicability",
+            "type": "string"
+          },
+          "evidence_id": {
+            "title": "Evidence Id",
+            "type": "string"
+          },
+          "excerpt": {
+            "title": "Excerpt",
+            "type": "string"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "locator": {
+            "discriminator": {
+              "mapping": {
+                "cell": "#/$defs/CellLocator",
+                "pdf": "#/$defs/PDFLocator",
+                "web": "#/$defs/WebLocator"
+              },
+              "propertyName": "type"
+            },
+            "oneOf": [
+              {
+                "$ref": "#/$defs/CellLocator"
+              },
+              {
+                "$ref": "#/$defs/PDFLocator"
+              },
+              {
+                "$ref": "#/$defs/WebLocator"
+              }
+            ],
+            "title": "Locator"
+          },
+          "scope": {
+            "$ref": "#/$defs/Scope"
+          },
+          "source_kind": {
+            "enum": [
+              "feedback",
+              "study",
+              "sales",
+              "equipment",
+              "strategy",
+              "external"
+            ],
+            "title": "Source Kind",
+            "type": "string"
+          },
+          "source_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Source Url"
+          },
+          "source_version_id": {
+            "title": "Source Version Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "evidence_id",
+          "source_version_id",
+          "source_kind",
+          "locator",
+          "scope",
+          "excerpt"
+        ],
+        "title": "Evidence",
+        "type": "object"
+      },
+      "PDFLocator": {
+        "additionalProperties": false,
+        "properties": {
+          "bbox": {
+            "anyOf": [
+              {
+                "maxItems": 4,
+                "minItems": 4,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Bbox"
+          },
+          "page": {
+            "minimum": 1,
+            "title": "Page",
+            "type": "integer"
+          },
+          "section": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Section"
+          },
+          "type": {
+            "const": "pdf",
+            "default": "pdf",
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "title": "PDFLocator",
+        "type": "object"
+      },
+      "Scope": {
+        "additionalProperties": false,
+        "properties": {
+          "cohort_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cohort Ids",
+            "type": "array"
+          },
+          "equipment": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Equipment",
+            "type": "array"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "software": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Software"
+          },
+          "vehicle_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Vehicle Ids",
+            "type": "array"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Year"
+          }
+        },
+        "title": "Scope",
+        "type": "object"
+      },
+      "WebLocator": {
+        "additionalProperties": false,
+        "properties": {
+          "passage_end": {
+            "minimum": 0,
+            "title": "Passage End",
+            "type": "integer"
+          },
+          "passage_start": {
+            "minimum": 0,
+            "title": "Passage Start",
+            "type": "integer"
+          },
+          "type": {
+            "const": "web",
+            "default": "web",
+            "title": "Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "url",
+          "passage_start",
+          "passage_end"
+        ],
+        "title": "WebLocator",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/$defs/Evidence"
+        },
+        "title": "Items",
+        "type": "array"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Next Cursor"
+      },
+      "revision": {
+        "default": 1,
+        "title": "Revision",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "items"
+    ],
+    "title": "Page[Evidence]",
+    "type": "object"
+  },
+  "FindingsPage": {
+    "$defs": {
+      "Counts": {
+        "additionalProperties": false,
+        "properties": {
+          "negative_records": {
+            "minimum": 0,
+            "title": "Negative Records",
+            "type": "integer"
+          },
+          "negative_share": {
+            "anyOf": [
+              {
+                "maximum": 1,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Negative Share"
+          },
+          "record_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Record Ids",
+            "type": "array"
+          },
+          "total_records": {
+            "minimum": 0,
+            "title": "Total Records",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total_records",
+          "negative_records",
+          "record_ids"
+        ],
+        "title": "Counts",
+        "type": "object"
+      },
+      "Finding": {
+        "additionalProperties": false,
+        "properties": {
+          "cohort_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cohort Ids",
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/$defs/Counts"
+          },
+          "coverage": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Coverage",
+            "type": "array"
+          },
+          "customer_need": {
+            "title": "Customer Need",
+            "type": "string"
+          },
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "opposing_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Opposing Evidence Ids",
+            "type": "array"
+          },
+          "part_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Part Ids",
+            "type": "array"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "supporting_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supporting Evidence Ids",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "finding_id",
+          "revision",
+          "title",
+          "customer_need",
+          "part_ids",
+          "cohort_ids",
+          "supporting_evidence_ids",
+          "opposing_evidence_ids",
+          "counts",
+          "coverage",
+          "provisional"
+        ],
+        "title": "Finding",
+        "type": "object"
+      },
+      "PartAggregate": {
+        "additionalProperties": false,
+        "properties": {
+          "cohort_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cohort Ids",
+            "type": "array"
+          },
+          "counts": {
+            "$ref": "#/$defs/Counts"
+          },
+          "intensity_scale_id": {
+            "title": "Intensity Scale Id",
+            "type": "string"
+          },
+          "intensity_value": {
+            "maximum": 1,
+            "minimum": 0,
+            "title": "Intensity Value",
+            "type": "number"
+          },
+          "low_evidence": {
+            "title": "Low Evidence",
+            "type": "boolean"
+          },
+          "part_id": {
+            "title": "Part Id",
+            "type": "string"
+          },
+          "provisional": {
+            "title": "Provisional",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "part_id",
+          "cohort_ids",
+          "counts",
+          "intensity_value",
+          "intensity_scale_id",
+          "low_evidence",
+          "provisional"
+        ],
+        "title": "PartAggregate",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "counts": {
+        "$ref": "#/$defs/Counts"
+      },
+      "items": {
+        "items": {
+          "$ref": "#/$defs/Finding"
+        },
+        "title": "Items",
+        "type": "array"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Next Cursor"
+      },
+      "part_aggregates": {
+        "items": {
+          "$ref": "#/$defs/PartAggregate"
+        },
+        "title": "Part Aggregates",
+        "type": "array"
+      },
+      "revision": {
+        "default": 1,
+        "title": "Revision",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "items",
+      "counts",
+      "part_aggregates"
+    ],
+    "title": "FindingsPage",
+    "type": "object"
+  },
+  "Proposals": {
+    "$defs": {
+      "Change": {
+        "additionalProperties": false,
+        "properties": {
+          "after": {
+            "title": "After",
+            "type": "string"
+          },
+          "before": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Before"
+          },
+          "change_id": {
+            "title": "Change Id",
+            "type": "string"
+          },
+          "conditions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conditions",
+            "type": "array"
+          },
+          "decision_state": {
+            "default": "proposed",
+            "enum": [
+              "proposed",
+              "approved",
+              "rejected",
+              "deferred",
+              "selected"
+            ],
+            "title": "Decision State",
+            "type": "string"
+          },
+          "evidence_strength": {
+            "enum": [
+              "low",
+              "medium",
+              "high"
+            ],
+            "title": "Evidence Strength",
+            "type": "string"
+          },
+          "factors": {
+            "$ref": "#/$defs/Factors"
+          },
+          "finding_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Finding Ids",
+            "type": "array"
+          },
+          "horizon": {
+            "title": "Horizon",
+            "type": "integer"
+          },
+          "metric": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Metric"
+          },
+          "opposing_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Opposing Evidence Ids",
+            "type": "array"
+          },
+          "origin": {
+            "enum": [
+              "ai",
+              "pm"
+            ],
+            "title": "Origin",
+            "type": "string"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "part_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Part Ids",
+            "type": "array"
+          },
+          "requirement_id": {
+            "title": "Requirement Id",
+            "type": "string"
+          },
+          "scope": {
+            "$ref": "#/$defs/Scope"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "scoring_policy_version": {
+            "title": "Scoring Policy Version",
+            "type": "string"
+          },
+          "supporting_evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Supporting Evidence Ids",
+            "type": "array"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target"
+          },
+          "target_basis": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Basis"
+          },
+          "target_maturity": {
+            "enum": [
+              "proposed",
+              "needs_validation",
+              "validated",
+              "pm_accepted"
+            ],
+            "title": "Target Maturity",
+            "type": "string"
+          },
+          "uncertainty": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Uncertainty",
+            "type": "array"
+          },
+          "unit": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Unit"
+          },
+          "validation_method": {
+            "title": "Validation Method",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "change_id",
+          "requirement_id",
+          "version",
+          "origin",
+          "outcome",
+          "part_ids",
+          "scope",
+          "horizon",
+          "before",
+          "after",
+          "finding_ids",
+          "supporting_evidence_ids",
+          "opposing_evidence_ids",
+          "metric",
+          "unit",
+          "target",
+          "target_basis",
+          "conditions",
+          "validation_method",
+          "target_maturity",
+          "factors",
+          "score",
+          "scoring_policy_version",
+          "evidence_strength",
+          "uncertainty"
+        ],
+        "title": "Change",
+        "type": "object"
+      },
+      "Factors": {
+        "additionalProperties": false,
+        "properties": {
+          "breadth": {
+            "anyOf": [
+              {
+                "maximum": 5,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Breadth"
+          },
+          "future_relevance": {
+            "anyOf": [
+              {
+                "maximum": 5,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Future Relevance"
+          },
+          "gap": {
+            "anyOf": [
+              {
+                "maximum": 5,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Gap"
+          },
+          "impact": {
+            "anyOf": [
+              {
+                "maximum": 5,
+                "minimum": 0,
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Impact"
+          },
+          "rationales": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Rationales",
+            "type": "object"
+          }
+        },
+        "required": [
+          "rationales"
+        ],
+        "title": "Factors",
+        "type": "object"
+      },
+      "Scope": {
+        "additionalProperties": false,
+        "properties": {
+          "cohort_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cohort Ids",
+            "type": "array"
+          },
+          "equipment": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Equipment",
+            "type": "array"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "software": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Software"
+          },
+          "vehicle_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Vehicle Ids",
+            "type": "array"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Year"
+          }
+        },
+        "title": "Scope",
+        "type": "object"
+      },
+      "Variant": {
+        "additionalProperties": false,
+        "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
+          "change_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Change Ids",
+            "type": "array"
+          },
+          "cohort_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cohort Ids",
+            "type": "array"
+          },
+          "related_variant_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Related Variant Ids",
+            "type": "array"
+          },
+          "requirement_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Requirement Ids",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "variant_id": {
+            "title": "Variant Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "variant_id",
+          "title",
+          "cohort_ids",
+          "assumptions",
+          "requirement_ids",
+          "change_ids",
+          "related_variant_ids"
+        ],
+        "title": "Variant",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "changes": {
+        "items": {
+          "$ref": "#/$defs/Change"
+        },
+        "title": "Changes",
+        "type": "array"
+      },
+      "config_version": {
+        "title": "Config Version",
+        "type": "integer"
+      },
+      "gaps": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Gaps",
+        "type": "array"
+      },
+      "generation_id": {
+        "title": "Generation Id",
+        "type": "string"
+      },
+      "proposal_set_version": {
+        "title": "Proposal Set Version",
+        "type": "integer"
+      },
+      "research_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Research Ids",
+        "type": "array"
+      },
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "scoring_policy_version": {
+        "title": "Scoring Policy Version",
+        "type": "string"
+      },
+      "source_version_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Source Version Ids",
+        "type": "array"
+      },
+      "unresolved_conflict_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Unresolved Conflict Ids",
+        "type": "array"
+      },
+      "variants": {
+        "items": {
+          "$ref": "#/$defs/Variant"
+        },
+        "title": "Variants",
+        "type": "array"
+      }
+    },
+    "required": [
+      "proposal_set_version",
+      "run_id",
+      "generation_id",
+      "source_version_ids",
+      "research_ids",
+      "config_version",
+      "scoring_policy_version",
+      "variants",
+      "changes",
+      "unresolved_conflict_ids",
+      "gaps"
+    ],
+    "title": "Proposals",
+    "type": "object"
+  },
+  "RenderManifest": {
+    "$defs": {
+      "ManifestChange": {
+        "additionalProperties": false,
+        "properties": {
+          "change_id": {
+            "title": "Change Id",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "part_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Part Ids",
+            "type": "array"
+          },
+          "preserve_constraints": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preserve Constraints",
+            "type": "array"
+          },
+          "proposed_outcome": {
+            "title": "Proposed Outcome",
+            "type": "string"
+          },
+          "visual_instruction": {
+            "title": "Visual Instruction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "change_id",
+          "part_ids",
+          "proposed_outcome",
+          "visual_instruction",
+          "preserve_constraints",
+          "evidence_ids"
+        ],
+        "title": "ManifestChange",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "baseline_asset_id": {
+        "title": "Baseline Asset Id",
+        "type": "string"
+      },
+      "changes": {
+        "items": {
+          "$ref": "#/$defs/ManifestChange"
+        },
+        "title": "Changes",
+        "type": "array"
+      },
+      "contract_version": {
+        "const": "1",
+        "default": "1",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "part_catalog_version": {
+        "title": "Part Catalog Version",
+        "type": "string"
+      },
+      "proposal_set_version": {
+        "minimum": 1,
+        "title": "Proposal Set Version",
+        "type": "integer"
+      },
+      "render_request_id": {
+        "title": "Render Request Id",
+        "type": "string"
+      },
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "variant_ids": {
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "title": "Variant Ids",
+        "type": "array"
+      }
+    },
+    "required": [
+      "proposal_set_version",
+      "variant_ids",
+      "baseline_asset_id",
+      "render_request_id",
+      "run_id",
+      "part_catalog_version",
+      "changes"
+    ],
+    "title": "RenderManifest",
+    "type": "object"
+  },
+  "RenderResult": {
+    "$defs": {
+      "Asset": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "url",
+          "media_type"
+        ],
+        "title": "Asset",
+        "type": "object"
+      },
+      "RenderOutcome": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "change_id": {
+            "title": "Change Id",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "rendered",
+              "annotated",
+              "unsupported",
+              "failed"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "change_id",
+          "outcome",
+          "asset_ids"
+        ],
+        "title": "RenderOutcome",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "assets": {
+        "items": {
+          "$ref": "#/$defs/Asset"
+        },
+        "title": "Assets",
+        "type": "array"
+      },
+      "baseline_asset_id": {
+        "title": "Baseline Asset Id",
+        "type": "string"
+      },
+      "failure_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Reason"
+      },
+      "job_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Job Id"
+      },
+      "outcomes": {
+        "items": {
+          "$ref": "#/$defs/RenderOutcome"
+        },
+        "title": "Outcomes",
+        "type": "array"
+      },
+      "part_catalog_version": {
+        "title": "Part Catalog Version",
+        "type": "string"
+      },
+      "proposal_set_version": {
+        "title": "Proposal Set Version",
+        "type": "integer"
+      },
+      "render_request_id": {
+        "title": "Render Request Id",
+        "type": "string"
+      },
+      "stale": {
+        "default": false,
+        "title": "Stale",
+        "type": "boolean"
+      },
+      "status": {
+        "enum": [
+          "queued",
+          "rendering",
+          "succeeded",
+          "partial",
+          "failed"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "variant_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Variant Ids",
+        "type": "array"
+      }
+    },
+    "required": [
+      "render_request_id",
+      "proposal_set_version",
+      "variant_ids",
+      "baseline_asset_id",
+      "part_catalog_version",
+      "status",
+      "assets",
+      "outcomes"
+    ],
+    "title": "RenderResult",
+    "type": "object"
+  },
+  "Snapshot": {
+    "$defs": {
+      "DeepDive": {
+        "additionalProperties": false,
+        "properties": {
+          "enabled": {
+            "default": false,
+            "title": "Enabled",
+            "type": "boolean"
+          }
+        },
+        "title": "DeepDive",
+        "type": "object"
+      },
+      "RunConfig": {
+        "additionalProperties": false,
+        "properties": {
+          "baseline_asset_id": {
+            "title": "Baseline Asset Id",
+            "type": "string"
+          },
+          "deep_dive": {
+            "$ref": "#/$defs/DeepDive"
+          },
+          "market_context": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Market Context",
+            "type": "array"
+          },
+          "part_catalog_version": {
+            "title": "Part Catalog Version",
+            "type": "string"
+          },
+          "participation_mode": {
+            "default": "autonomous",
+            "enum": [
+              "autonomous",
+              "guided"
+            ],
+            "title": "Participation Mode",
+            "type": "string"
+          },
+          "source_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 100,
+            "minItems": 1,
+            "title": "Source Ids",
+            "type": "array"
+          },
+          "vehicle_id": {
+            "title": "Vehicle Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "vehicle_id",
+          "baseline_asset_id",
+          "part_catalog_version",
+          "source_ids"
+        ],
+        "title": "RunConfig",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "analysis_status": {
+        "enum": [
+          "queued",
+          "processing",
+          "waiting_for_pm",
+          "proposals_ready",
+          "failed"
+        ],
+        "title": "Analysis Status",
+        "type": "string"
+      },
+      "available_actions": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Available Actions",
+        "type": "array"
+      },
+      "config": {
+        "$ref": "#/$defs/RunConfig"
+      },
+      "contract_version": {
+        "const": "1",
+        "default": "1",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "current_proposal_set_version": {
+        "anyOf": [
+          {
+            "type": "integer"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "title": "Current Proposal Set Version"
+      },
+      "last_event_sequence": {
+        "title": "Last Event Sequence",
+        "type": "integer"
+      },
+      "resource_links": {
+        "additionalProperties": {
+          "type": "string"
+        },
+        "title": "Resource Links",
+        "type": "object"
+      },
+      "revision": {
+        "title": "Revision",
+        "type": "integer"
+      },
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "stage": {
+        "title": "Stage",
+        "type": "string"
+      },
+      "warnings": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Warnings",
+        "type": "array"
+      }
+    },
+    "required": [
+      "run_id",
+      "config",
+      "analysis_status",
+      "stage",
+      "revision",
+      "last_event_sequence",
+      "current_proposal_set_version",
+      "available_actions",
+      "warnings",
+      "resource_links"
+    ],
+    "title": "Snapshot",
+    "type": "object"
+  }
+}

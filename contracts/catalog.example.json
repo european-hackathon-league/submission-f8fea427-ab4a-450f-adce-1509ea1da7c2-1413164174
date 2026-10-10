@@ -1,0 +1,35 @@
+{
+  "baseline_asset_id": "asset_demo_v1",
+  "contract_version": "1",
+  "part_catalog_version": "catalog_demo_v1",
+  "parts": [
+    {
+      "capabilities": [
+        "annotation"
+      ],
+      "parent_part_id": "part_interior",
+      "part_id": "part_seat"
+    },
+    {
+      "capabilities": [
+        "annotation"
+      ],
+      "parent_part_id": null,
+      "part_id": "part_interior"
+    },
+    {
+      "capabilities": [
+        "annotation"
+      ],
+      "parent_part_id": null,
+      "part_id": "part_digital"
+    },
+    {
+      "capabilities": [],
+      "parent_part_id": null,
+      "part_id": "part_unmapped"
+    }
+  ],
+  "synthetic": true,
+  "vehicle_id": "vehicle_demo"
+}

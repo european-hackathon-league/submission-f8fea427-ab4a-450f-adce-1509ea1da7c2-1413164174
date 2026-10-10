@@ -36,7 +36,7 @@ export default function EvidenceList({ api, runId, ids, title, onOpen }: {
         {(!row || row.loading) && <p role="status">Loading source {id}…</p>}
         {row?.error && <div><p role="alert">{id}: {row.error}</p><button disabled={row.loading} onClick={() => void load(id, generation.current)}>Retry source {id}</button></div>}
         {item && <>
-          <strong>{item.source_kind === "uploaded" ? "Customer evidence" : "External evidence"}{item.wire ? ` / ${item.wire.source_kind}` : ""}</strong>
+          <strong>{item.wire?.source_kind === "feedback" ? "Customer evidence" : item.source_kind === "external" ? "External evidence" : "Uploaded evidence"}{item.wire ? ` / ${item.wire.source_kind}` : ""}</strong>
           <blockquote>{item.excerpt}</blockquote>
           <p className="muted">{item.scope} / {item.locator.label}</p>
           <p className="muted">Source version: {item.source_version_id}. Applicability: {item.wire?.applicability ?? "unknown"}.</p>

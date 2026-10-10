@@ -4,6 +4,7 @@ import {afterEach,expect,it,vi} from "vitest";
 import EvidenceList from "./EvidenceList";
 import SourceDialog from "./SourceDialog";
 import {useState} from "react";
+import * as normalize from "../api/normalize";
 import {evidence} from "../api/fixtures";
 import type {Api,Evidence} from "../api/contracts";
 afterEach(cleanup);
@@ -40,4 +41,17 @@ it("restores source opener focus when pointer click does not focus button",async
  function Sources(){const [item,setItem]=useState<Evidence|null>(null);return <><EvidenceList api={api} runId="r" ids={[evidence[0].evidence_id]} title="Sources" onOpen={setItem}/>{item&&<SourceDialog api={api} evidence={item} onClose={()=>setItem(null)}/>}</>;}
  render(<Sources/>);const opener=await screen.findByRole("button",{name:`Open source ${evidence[0].evidence_id}`});
  expect(opener).not.toHaveFocus();fireEvent.click(opener);fireEvent.click(screen.getByRole("button",{name:"Close source"}));expect(opener).toHaveFocus();
+});
+
+it.each([
+ ["feedback","Customer evidence / feedback"],
+ ["study","Uploaded evidence / study"],
+ ["sales","Uploaded evidence / sales"],
+ ["equipment","Uploaded evidence / equipment"],
+ ["strategy","Uploaded evidence / strategy"],
+ ["external","External evidence / external"],
+] as const)("distinguishes uploaded %s records from customer feedback",async(source_kind,label)=>{
+ const item=normalize.evidence({...evidence[0].wire!,source_kind});
+ render(<EvidenceList api={{request:async()=>item} as unknown as Api} runId="r" ids={[item.evidence_id]} title="Sources" onOpen={()=>{}}/>);
+ expect(await screen.findByText(label)).toBeInTheDocument();
 });

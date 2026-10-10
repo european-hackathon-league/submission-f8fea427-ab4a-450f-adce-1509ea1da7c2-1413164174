@@ -865,6 +865,7 @@ def establish_baselines(args: list[str]) -> str:
                             "evidence": supplied,
                             "assessment": assessed.model_dump(mode="json"),
                             "validated_claims": claims,
+                            "target_scope": config,
                             "planning_horizon": policy["planning_horizon"],
                             "reference_year": policy["reference_year"],
                         },

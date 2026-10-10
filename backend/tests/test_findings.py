@@ -192,3 +192,66 @@ def test_existing_stage_returns_persisted_status_and_stale_generation_stops(
     assert stage(["synthetic-run", "synthetic-generation"]) == "partial"
     monkeypatch.setattr(module, "_current_generation", lambda *args: False)
     assert stage(["synthetic-run", "synthetic-generation"]) == "superseded"
+
+
+def test_baseline_review_sees_operator_target_separately_from_source_scope(monkeypatch):
+    row = observation("one", "respondent", cohorts=["GB"])
+    row["scope"] = w.Scope(markets=["GB"], cohort_ids=["GB"]).model_dump()
+    findings = aggregate([row], [], "synthetic-run")
+    config = {"vehicle_id": "vehicle_demo", "market_context": ["DE"]}
+    evidence = [
+        {
+            "evidence_id": "one",
+            "source_kind": "feedback",
+            "excerpt": row["quote"],
+            "scope": row["scope"],
+        }
+    ]
+    stages = {"findings": findings}
+    calls = []
+    monkeypatch.setenv("OPENAI_API_KEY", "synthetic-controlled-test")
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(
+        module,
+        "_inputs",
+        lambda *args: (
+            {"reference_year": 2026, "planning_horizon": 2030},
+            evidence,
+            config,
+        ),
+    )
+    monkeypatch.setattr(
+        module, "get_stage", lambda run, generation, key: stages.get(key)
+    )
+    monkeypatch.setattr(
+        module,
+        "put_stage",
+        lambda run, generation, key, payload, **kw: stages.update({key: payload}),
+    )
+
+    def call(schema, instructions, data, policy):
+        calls.append(schema)
+        assert data["target_scope"] == config
+        assert data["finding"]["cohort_ids"] == ["GB"]
+        if schema is module.NeedAssessment:
+            return module.NeedAssessment(
+                finding_id=findings["findings"][0]["finding_id"],
+                need_kind="usability",
+                baseline_claims=[],
+                preserve_strengths=[],
+                inference="Feedback may suggest a need for seat comfort.",
+                basis_evidence_ids=["one"],
+                uncertainty=["GB feedback does not establish DE applicability"],
+                future_assumptions=[],
+            ), {}
+        return module.Review(accepted=True, objections=[]), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    assert (
+        module.establish_baselines(["synthetic-run", "synthetic-generation"])
+        == "partial"
+    )
+    assert calls == [module.NeedAssessment, module.Review]
+    baseline = next(iter(stages["baselines"]["items"].values()))
+    assert baseline["state"] == "unknown"
+    assert "GB feedback does not establish DE applicability" in baseline["uncertainty"]

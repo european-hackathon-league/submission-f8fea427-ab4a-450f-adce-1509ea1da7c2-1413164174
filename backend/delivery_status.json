@@ -126,6 +126,16 @@
     "static_checks": "Ruff lint/format passed; generated contracts refreshed; strict mypy passed all 38 source files",
     "remaining": "Full cumulative suite, all scenario endpoints, crash/replay, private corpus and configured live integrations deferred to testing phase"
   },
+  "main_integration": {
+    "branch": "main",
+    "tested_code_commit": "e9d6d4235dbb086a54c9ad433902921a466bc1b5",
+    "sources": ["origin/backend", "be/backend-completion"],
+    "frontend_changes": false,
+    "tests": "Full backend suite: 192 passed in 71.16s on Python 3.14.8 with PostgreSQL and local Temporal; AI/research/renderer external behavior uses deterministic fakes",
+    "checks": ["Ruff lint passed", "Ruff formatting passed for 85 files", "Strict mypy passed for 38 source files", "Generated contracts check passed", "Alembic upgrade/repeated upgrade/check passed with no schema drift", "git diff --check passed"],
+    "fixed": ["Placeholder-era API and privacy tests now exercise implemented proposal reads", "Mock parser fixtures use distinct input bytes to avoid cross-test content-cache contamination"],
+    "remaining_gates": ["Live structured inference/search and real renderer integration", "Production identity/storage/Temporal/telemetry and backup/restore configuration", "Full private-corpus semantic quality evaluation", "Joint frontend acceptance; frontend branches were excluded"]
+  },
   "live_integrations": {
     "ai_connectivity": {
       "status": "verified",

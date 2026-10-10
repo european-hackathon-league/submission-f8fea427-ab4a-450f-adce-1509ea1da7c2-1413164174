@@ -1,6 +1,10 @@
-# Illustrative vehicle viewer
+# Vehicle viewer modules
 
-The default scene is original, procedural geometry created in this repository. It represents a premium sedan design study and does not reproduce or claim to be an exact BMW model. Feedback values come from the local synthetic fixtures.
+Pitch routes use `BmwAssetViewer.tsx`: see [current provenance and limits](README-bmw.md). It embeds the authentic i5 M60 exterior and provides a separately labeled G60 cabin reference photo.
+
+## Legacy illustration study (not routed)
+
+The legacy `VehicleViewer.tsx` scene is original, procedural geometry created in this repository. It represents a premium sedan design study and does not reproduce or claim to be an exact BMW model. Feedback values come from the local synthetic fixtures.
 
 To replace the illustration, pass `modelUrl` with a local GLB asset. Model node names map through `modelMapping.ts`: `body_panels`/`exterior_body`, `cockpit_steering_wheel`, `cockpit_dashboard`, `seat_front_left`/`seat_front_right`, `charge_port`/`charging_port`, and `headlamps`/`rear_lamps`. Unmapped meshes remain at their asset material. Keep GLB textures and environment assets local; viewer itself downloads no textures or HDR environment. If loading fails, procedural illustration stays available.
 

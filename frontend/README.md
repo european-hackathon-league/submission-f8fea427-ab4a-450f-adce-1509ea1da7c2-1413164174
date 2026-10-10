@@ -1,22 +1,9 @@
-# FWD vehicle insights
+# Frontend
 
-BMW-inspired pitch prototype for evidence-led vehicle planning. Uses synthetic feedback and prepared research; it does not establish real BMW issue rates or causal findings.
+Local pitch prototype. Run `npm ci`, `npm run dev`; checks are `npm test` and `npm run build`.
 
-```sh
-npm ci
-npm run dev
-npm test
-npm run build
-```
+Five destinations use synthetic feedback and prepared research. Requirement decisions and versions persist in this browser only. File upload retains names in the current session; no content is parsed. No backend, live research, identity, or production approval is connected.
 
-Vite prints the local preview URL. Runtime dependencies are pinned in the lockfile. Main demo runs without remote imagery, models, fonts or research APIs.
+The pitch route lazy-loads `src/viewer/BmwAssetViewer.tsx`: hosted 2023 i5 M60 3D (network required) with bundled exterior image fallback, plus a separate static G60 520i cabin photo. No GLB is self-hosted, and mesh-to-component coloring is unverified. See [`../doc/frontend/3D-SPEC.md`](../doc/frontend/3D-SPEC.md) and [`../doc/frontend/MODEL-COVERAGE.md`](../doc/frontend/MODEL-COVERAGE.md).
 
-## Parallel build and handoff
-
-Concise [epics](../doc/frontend/EPICS.md), [UI spec](../doc/frontend/UI-SPEC.md), and [3D spec](../doc/frontend/3D-SPEC.md) define ownership and acceptance. Viewer lives in `src/viewer`; application in `src/App.tsx`; shared types and synthetic fixtures in `src/domain`.
-
-Backend team should supply context-scoped source records, comparison denominators and comparability status, job progress/results, authenticated decisions and version history. UI fixtures are demonstration content, never a substitute for uploaded-file analysis.
-
-## Vehicle assets
-
-Bundled vehicle is original illustrative geometry, not an exact BMW model. Viewer can receive an optional GLB URL and stable semantic node mapping; consult `src/viewer/README.md` for asset replacement. Heat color describes feedback share, not verified damage. Missing samples remain gray. No-WebGL view preserves component selection.
+`src/viewer/VehicleViewer.tsx` is a legacy procedural study scene, not the current pitch model. Do not present it as an authentic BMW vehicle asset.

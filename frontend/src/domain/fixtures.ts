@@ -15,9 +15,17 @@ const quotes:Record<ComponentId,string[]>={
  body:['The door handles are easier to use than before.','The trunk gesture only works sometimes for me.','Loading bags is easier with the updated access settings.'],
  lighting:['The lights adjust well on dark roads.','I am unsure which mode I have selected.','The control is easier to find in the new layout.'],
 };
+const evidenceStances:Record<ComponentId,Array<'supports-friction'|'counter-signal'>>={
+ steering:['counter-signal','supports-friction','supports-friction'],
+ dashboard:['supports-friction','supports-friction','counter-signal'],
+ seats:['counter-signal','supports-friction','counter-signal'],
+ charging:['supports-friction','supports-friction','supports-friction'],
+ body:['counter-signal','supports-friction','counter-signal'],
+ lighting:['counter-signal','supports-friction','counter-signal'],
+};
 export const findings:Finding[]=rows.map(([id,name,category,before,after,summary,research])=>({
  id,name,category,summary,previous:{negative:before*4,total:400},current:{negative:after*4,total:400},trend:[before,before-5,before-12,Math.round((before+after)/2),after+4,after],
- evidence:quotes[id].map((quote,i)=>({id:`${id}-E${i+1}`,quote,source:`Synthetic customer study · record ${i+1}`,period:i===2?'2025':'2026',market:'Europe'})),
+ evidence:quotes[id].map((quote,i)=>({id:`${id}-E${i+1}`,quote,stance:evidenceStances[id][i],source:`Synthetic customer study · record ${i+1}`,period:i===2?'2025':'2026',market:'Europe'})),
  marketSamples:{Europe:{negative:after*4,total:400},China:{negative:Math.min(after+13,90)*2,total:200},'United States':{negative:Math.max(after-7,4)*2,total:200}},research,
  hypotheses:['Differences in feature discoverability may influence the feedback.','Equipment, software versions and sample composition may differ.','Matched usability studies are needed before claiming a causal explanation.']
 }));

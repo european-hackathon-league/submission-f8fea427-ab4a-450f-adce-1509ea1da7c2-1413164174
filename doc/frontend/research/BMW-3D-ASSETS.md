@@ -2,6 +2,8 @@
 
 Checked **10 October 2026**. Scope: F70, G60, G68, G70 and the 23 derivatives in the supplied option lists. G68 has no supplied trim list. Evidence: public model records, downloadable-search export metadata, thumbnails and an interactive i7 M70 exterior preview. **No authenticated mesh archives downloaded; no complete cabin or component topology verified.**
 
+Follow-up: [exact G60 i5 M60 cabin research](G60-INTERIOR-ASSETS.md) identifies a detailed paid ARKVIZ candidate with inspected cockpit/rear-cabin renders. Commercial web/conversion rights remain unresolved. The supplied BlendSwap catalog has no exact G60/i5 match.
+
 ## Result
 
 **Two families have promising free exterior assets. No complete, high-quality, open asset set covers all four families or all 23 trims.** These are artist representations of actual BMW designs, not manufacturer CAD or certified digital twins. Exterior previews are credible starting points, but their current materials and presentation need work for the pitch.

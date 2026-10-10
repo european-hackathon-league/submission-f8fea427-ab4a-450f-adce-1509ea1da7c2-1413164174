@@ -10,7 +10,7 @@ The viewer embeds Sketchfab's public viewer through its [documented JavaScript A
 
 ## Cabin reference
 
-The source i5 M60 model has no verified cabin geometry. The interior view therefore uses a separate authentic [BMW 520i G60 cabin photograph](https://commons.wikimedia.org/wiki/File:BMW_520i_G60_Oxide_Grey_Metallic_03.jpg), photographed by Ethan Llamas and licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The UI names it as a G60 520i cabin reference, credits the photographer and license, and identifies the crop and feedback markers as a synthetic overlay. It must not be described as an i5 M60 interior or an interactive 3D cabin.
+The source i5 M60 model has no verified cabin geometry. The interior view therefore uses a separate authentic [BMW 520i G60 cabin photograph](https://commons.wikimedia.org/wiki/File:BMW_520i_G60_Oxide_Grey_Metallic_03.jpg), photographed by Ethan Llamas and licensed [CC BY-SA 4.0](https://creativecommons.org/licenses/by-sa/4.0/). The UI names it as a G60 520i cabin reference, credits the photographer and license, and identifies the fitted photo and feedback markers as a synthetic overlay. It must not be described as an i5 M60 interior or an interactive 3D cabin.
 
 `/vehicles/g60-interior.jpg` is the locally served photo copy. Preserve the Wikimedia attribution and license links if the image is moved or replaced.
 

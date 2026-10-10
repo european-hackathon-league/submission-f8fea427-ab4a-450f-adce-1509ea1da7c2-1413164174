@@ -1,16 +1,19 @@
-# 3D viewer specification
+# Vehicle viewer scope and next steps
 
-## Deliverable
-React Three Fiber viewer, original illustrative premium sedan exterior and cockpit interior. Geometry must read as a car: sculpted hood, roof/glass, wheels, lighting, grille; cockpit includes dashboard, wheel and seats. No claim of exact BMW geometry. Label “Illustrative vehicle”; model provenance stays explicit.
+## Current route
 
-## Shared interface
-Export default `VehicleViewer` from `frontend/src/viewer/VehicleViewer.tsx`; props defined in shared contracts. Stable IDs: steering, dashboard, seats, charging, body, lighting. External `view`, `period`, `selectedComponent`, and `heatmap` drive display; changes use callbacks. Keep styling scoped to viewer. UI agent treats viewer as opaque.
+`frontend/src/App.tsx` lazy-loads `BmwAssetViewer` (`frontend/src/viewer/BmwAssetViewer.tsx`) through the shared `VehicleViewerProps` contract. It shows a creator-uploaded **2023 BMW i5 M60** hosted on Sketchfab (model UID `207fd872d28b4cafa7fefe061ae98e26`; listing license CC BY 4.0). Hosted 3D requires network. A bundled exterior image remains as a fallback. No GLB was downloaded or self-hosted.
 
-## Interaction and overlays
-Exterior/interior buttons, constrained orbit and zoom, reset camera, named clickable hotspots with accessible HTML equivalents. Exterior focuses body/lighting/charging; interior focuses steering/dashboard/seats. Selected part gets distinct blue outline/anchor independent of heat color. Negative-share scale: ≥50 red #e45454; ≥25 amber #e8b75a; lower teal #57b6a0; unknown gray #8a909b. Label and counts accompany color. Use shared metric helpers. Heat overlays follow period. Camera preset transitions respect reduced motion. No continuous idle motion by default.
+Interior mode is a static **BMW 520i G60 cabin photograph**, licensed CC BY-SA 4.0 and credited in the view. It is not an i5 M60 cabin and is not 3D. Synthetic component markers overlay the photo.
 
-## Model replacement and resilience
-Optional `modelUrl` loads GLB through error boundary; scope materials per instance. Stable node-name mapping identifies supported parts; unmapped mesh remains neutral. Original procedural car remains bundled default and fallback on model failure. WebGL failure provides annotated static fallback and component buttons. No remote HDR/environment assets; generate lights/reflections locally. Lazy-load viewer; cap DPR at 1.5–2; use demand rendering when idle; dispose owned resources.
+The viewer accepts selected component, view, period, findings, and heatmap state. Severity is negative-feedback share, not a defect score. Color is shown in the HTML component list and cabin-photo markers; **component-mesh heat recoloring is not verified**. Treat scene selection/hotspots as illustrative unless mapping to named geometry is tested. Attribution stays visible. Asset is creator-uploaded, not official BMW material; BMW does not endorse this prototype.
 
-## Acceptance
-Exterior/interior and rapid switches work; clickable selection updates parent; red heat changes by period and can be disabled; reset frames correctly; asset failure and no-WebGL remain usable. Focus/keyboard equivalence and small-width framing required. Document asset mapping/provenance and replacement steps in viewer README. Unit-test heat/mapping behaviors; integrator performs visual/browser verification.
+`frontend/src/viewer/VehicleViewer.tsx` contains a procedural study scene but is not the current pitch route. Do not describe it as a BMW model or current exterior/interior asset.
+
+## Integration gates
+
+Before using a different derivative, confirm source/license and exact model identity; secure both exterior and interior assets; validate proportions, cabin, and component mapping; test attribution, failure fallback, and responsive framing. Unknown mesh names remain neutral. Do not imply an accurate component heatmap before separate semantic meshes are verified.
+
+Keep the network-independent photo and HTML component list usable if hosted content or WebGL fails. Preserve keyboard alternatives, focus states, reduced-motion behavior, reset/zoom/orbit controls, and text/sample equivalents. Self-hosted GLB is a later option only after an authorized download and asset review.
+
+See [MODEL-COVERAGE.md](MODEL-COVERAGE.md) for family coverage and [cabin research](research/G60-INTERIOR-ASSETS.md) for the exact i5 M60 replacement candidate. ARKVIZ has the strongest inspected cabin previews, but its standard license does not clear commercial browser delivery or conversion. Use the [Blender brief](BLENDER-ASSET-BRIEF.md) if acquisition fails. Current browser/test results and remaining gates are in [VERIFICATION.md](VERIFICATION.md).

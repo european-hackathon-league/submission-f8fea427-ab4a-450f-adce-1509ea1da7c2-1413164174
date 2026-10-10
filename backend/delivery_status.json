@@ -12,19 +12,20 @@
         "BE-03",
         "BE-04"
       ],
-      "status": "draft",
+      "status": "merged",
       "branch": "be/S1-foundation",
       "pr_url": "https://github.com/indkhan/vehicle-requirements-ai/pull/2",
-      "tested_commit": "c65b3735fd04968c0a4e4954de0da804159a4272",
+      "tested_commit": "c9d6a06e8f382c55d7f51e2bf9fc688868048a99",
       "tests": [
-        "Final fresh-image local verification: cumulative suite 50 passed in 71.43s; Ruff lint/format (36 files), strict mypy (19 source files), Alembic upgrade/repeat/no-drift, generated contracts and git diff checks passed; final CI pending",
+        "Final GitHub Actions run 38078058760 at c9d6a06: cumulative suite 50 passed in 35.33s; lint, formatting, type checks, migrations, contracts, API/worker startup and parser imports passed",
+        "Final fresh-image local verification: cumulative suite 50 passed in 71.43s; Ruff lint/format (36 files), strict mypy (19 source files), Alembic upgrade/repeat/no-drift, generated contracts and git diff checks passed",
         "GitHub Actions run 38077115078 at c65b373: Linux cumulative suite 49 passed in 31.25s",
         "GitHub Actions at c65b373: Ruff lint/format, strict mypy (19 files), migration repeat/no-drift, generated contracts, API/worker startup and parser binary imports passed",
         "Local cumulative suite at c65b373: 47 passed, 2 timing failures in 333.50s under host contention; unchanged focused reproductions passed 2 in 7.21s, deadline rejection/dispatch recovery behavior confirmed",
         "Runtime pip-audit: no known vulnerabilities found",
         "Focused privacy + connected Temporal trace: 6 passed in 10.64s"
       ],
-      "merge_sha": null,
+      "merge_sha": "2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46",
       "blocker": null
     },
     {
@@ -34,7 +35,7 @@
         "BE-06",
         "BE-07"
       ],
-      "status": "not_started",
+      "status": "in_progress",
       "branch": "be/S2-ingestion",
       "pr_url": null,
       "tested_commit": null,

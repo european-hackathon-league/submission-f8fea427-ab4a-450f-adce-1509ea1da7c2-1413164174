@@ -4,7 +4,7 @@ Checked 2026-10-10. Scope: 2024+ BMW 1 Series F70, including 116, 120, 123 xDriv
 
 ## Finding
 
-No candidate currently meets bar for production or trim-specific requirement evidence. One public Sketchfab record is downloadable under CC BY 4.0 and identifies itself as a 2025 F70, but it is tagged `ai-generated` and `hunyuan3d`; neither the model record nor its metadata verifies shape accuracy, full interior, or a specific production trim. Treat it as a provisional generic F70 visual only, pending visual inspection and geometry review.
+No candidate currently meets the requested accuracy bar. One public Sketchfab record is downloadable under CC BY 4.0 and identifies itself as a 2025 F70, but it is tagged `ai-generated` and `hunyuan3d`. Primary visual review found distorted exterior details; no full interior or exact production trim was verified. Reject it for the accurate-car pitch.
 
 ## Candidate: provisional only
 

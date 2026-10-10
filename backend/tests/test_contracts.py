@@ -33,6 +33,15 @@ def test_committed_contract_has_no_drift():
         assert json.loads((root / name).read_text()) == value
 
 
+def test_public_limit_and_internal_errors_have_typed_openapi_responses():
+    paths = artifacts()["openapi.json"]["paths"]
+    for path in ("/api/v1/uploads", "/api/v1/runs"):
+        for status in ("413", "500"):
+            assert paths[path]["post"]["responses"][status]["content"][
+                "application/json"
+            ]["schema"] == {"$ref": "#/components/schemas/Error"}
+
+
 def test_scenarios_exercise_their_named_contract_behaviors():
     fixtures = artifacts()["scenarios.json"]
     success = fixtures["deep_dive_success"]["payloads"]
@@ -65,3 +74,4 @@ def test_scenarios_exercise_their_named_contract_behaviors():
         stale["Instruction"]["base_proposal_set_version"]
         < stale["Error"]["current_version"]
     )
+    assert fixtures["reconnect"]["payloads"]["Error"]["code"] == "replay_expired"

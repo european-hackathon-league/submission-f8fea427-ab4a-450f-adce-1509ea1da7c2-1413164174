@@ -130,7 +130,9 @@ def health() -> dict[str, str]:
 router = APIRouter(
     prefix="/api/v1",
     dependencies=[Depends(actor)],
-    responses={code: {"model": w.Error} for code in (401, 403, 404, 409, 422, 501)},
+    responses={
+        code: {"model": w.Error} for code in (401, 403, 404, 409, 413, 422, 500, 501)
+    },
 )
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
 Auth = Annotated[Actor, Depends(actor)]

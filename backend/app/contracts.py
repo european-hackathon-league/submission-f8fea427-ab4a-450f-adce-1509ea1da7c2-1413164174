@@ -426,7 +426,7 @@ def scenario(name: str) -> dict[str, Any]:
             items=[event], revision=snapshot.revision
         )
         payloads["Error"] = w.Error(
-            code="cursor_expired",
+            code="replay_expired",
             message="Replay cursor expired; fetch snapshot",
             retryable=False,
         )

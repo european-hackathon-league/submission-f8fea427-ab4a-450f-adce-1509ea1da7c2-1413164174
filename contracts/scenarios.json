@@ -1723,7 +1723,7 @@
     "description": "reconnect",
     "payloads": {
       "Error": {
-        "code": "cursor_expired",
+        "code": "replay_expired",
         "current_version": null,
         "field_errors": [],
         "message": "Replay cursor expired; fetch snapshot",

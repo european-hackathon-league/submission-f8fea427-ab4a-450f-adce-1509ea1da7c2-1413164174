@@ -4,10 +4,13 @@ import math
 import re
 from io import BytesIO
 from typing import Any, Literal
+from xml.etree.ElementTree import iterparse
+from zipfile import ZipFile
 
 import openpyxl
 from openpyxl import load_workbook
-from openpyxl.utils import get_column_letter
+from openpyxl.utils import coordinate_to_tuple, get_column_letter, range_boundaries
+from pydantic import JsonValue
 
 from app.ingest_types import (
     ContextMetric,
@@ -18,7 +21,7 @@ from app.ingest_types import (
 )
 from app.wire import CellLocator, Scope
 
-REVISION = "excel-v3"
+REVISION = "excel-v4"
 HEADERS = {
     "id": "id",
     "source": "source",
@@ -63,6 +66,83 @@ COUNTRIES = {
     "south korea": "KR",
 }
 EU_MARKETS = {"DE", "FR", "IT", "ES", "NL", "AT", "BE", "PL", "SE"}
+
+
+class ExcelResourceLimit(Exception):
+    pass
+
+
+def validate_dimensions(
+    data: bytes, max_rows: int, max_columns: int, max_cells: int
+) -> None:
+    """Inspect declared and actual coordinates before openpyxl allocates padded rows."""
+    if min(max_rows, max_columns, max_cells) < 1:
+        raise ValueError("Excel limits must be positive")
+    total_cells = 0
+    with ZipFile(BytesIO(data)) as archive:
+        for name in archive.namelist():
+            if not name.startswith("xl/worksheets/") or not name.endswith(".xml"):
+                continue
+            last_row = column = actual_rows = actual_columns = populated_cells = 0
+            with archive.open(name) as xml:
+                for event, element in iterparse(xml, events=("start", "end")):
+                    tag = element.tag.rsplit("}", 1)[-1]
+                    if event == "start":
+                        if tag == "dimension":
+                            _, _, declared_columns, declared_rows = range_boundaries(
+                                element.attrib["ref"]
+                            )
+                            if (
+                                declared_rows is not None
+                                and declared_columns is not None
+                                and (
+                                    declared_rows > max_rows
+                                    or declared_columns > max_columns
+                                    or declared_rows * declared_columns > max_cells
+                                )
+                            ):
+                                raise ExcelResourceLimit
+                        elif tag == "row":
+                            last_row = int(element.attrib.get("r", last_row + 1))
+                            column = 0
+                            actual_rows = max(actual_rows, last_row)
+                        elif tag == "c":
+                            row, column = (
+                                coordinate_to_tuple(element.attrib["r"])
+                                if "r" in element.attrib
+                                else (last_row, column + 1)
+                            )
+                            actual_rows = max(actual_rows, row)
+                            actual_columns = max(actual_columns, column)
+                            populated_cells += 1
+                        if (
+                            actual_rows > max_rows
+                            or actual_columns > max_columns
+                            or max(actual_rows * actual_columns, populated_cells)
+                            + total_cells
+                            > max_cells
+                        ):
+                            raise ExcelResourceLimit
+                    else:
+                        element.clear()
+            total_cells += max(actual_rows * actual_columns, populated_cells)
+
+
+def bounded_values(sheet: Any) -> list[list[Any]]:
+    # Dimensions have been independently validated and recalculated from actual XML.
+    return [
+        list(row)
+        for row in sheet.iter_rows(
+            min_row=1, max_row=sheet.max_row, max_col=sheet.max_column, values_only=True
+        )
+    ]
+
+
+def actual_dimensions(sheet: Any) -> None:
+    sheet.reset_dimensions()
+    # openpyxl's force calculation cannot handle an entirely empty sheet.
+    if any(sheet.iter_rows()):
+        sheet.calculate_dimension(force=True)
 
 
 def text(value: Any) -> str:
@@ -196,12 +276,21 @@ def parse_excel(
     dataset_namespace: str,
     reference_year: int = 2026,
     header_aliases: dict[str, str] | None = None,
+    max_rows: int = 10000,
+    max_columns: int = 64,
+    max_cells: int = 1000000,
 ) -> ParseResult:
     result = ParseResult(
         kind="unknown",
         parser_revision=REVISION,
         parser_versions={"openpyxl": openpyxl.__version__},
     )
+    try:
+        validate_dimensions(data, max_rows, max_columns, max_cells)
+    except ExcelResourceLimit:
+        result.status = "failed"
+        issue(result, "parser_resource_limit")
+        return result
     book = load_workbook(
         BytesIO(data), read_only=True, data_only=True, keep_links=False
     )
@@ -209,6 +298,9 @@ def parse_excel(
         BytesIO(data), read_only=True, data_only=False, keep_links=False
     )
     try:
+        for workbook in (book, raw_book):
+            for sheet in workbook:
+                actual_dimensions(sheet)
         if "Feedback_Explorer" in book.sheetnames:
             result.kind = "feedback"
             aliases = HEADERS | {
@@ -278,7 +370,7 @@ def context_metric(
     source_kind: Literal["study", "sales"] = "study",
 ) -> ContextMetric:
     cells = [f"{get_column_letter(column)}{row}" for row, column in references]
-    raw_cells = {}
+    raw_cells: dict[str, JsonValue] = {}
     for address, (row, column) in zip(cells, references, strict=True):
         raw = rows[row - 1][column - 1]
         raw_cells[address] = (
@@ -312,8 +404,8 @@ def context_metric(
 
 
 def study(sheet: Any, raw_sheet: Any, result: ParseResult) -> None:
-    rows = [list(row) for row in sheet.values]
-    raw_rows = [list(row) for row in raw_sheet.values]
+    rows = bounded_values(sheet)
+    raw_rows = bounded_values(raw_sheet)
     year_match = re.search(r"\b(20\d{2})\b", sheet.title.replace("_", " "))
     year = int(year_match[1]) if year_match else None
     if year is None:
@@ -549,8 +641,8 @@ def is_sales_sheet(sheet: Any) -> bool:
 
 
 def sales(sheet: Any, raw_sheet: Any, reference_year: int, result: ParseResult) -> None:
-    rows = [list(row) for row in sheet.values]
-    raw_rows = [list(row) for row in raw_sheet.values]
+    rows = bounded_values(sheet)
+    raw_rows = bounded_values(raw_sheet)
     vehicles = re.findall(r"\b[A-Z]\d{2}\b", sheet.title.replace("_", " "))
     years: dict[int, int] = {}
     for column, header in enumerate(rows[0][2:], 2):

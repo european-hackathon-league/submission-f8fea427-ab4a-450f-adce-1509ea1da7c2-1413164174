@@ -1,4 +1,5 @@
 from io import BytesIO
+from zipfile import ZIP_DEFLATED, ZipFile
 
 from openpyxl import Workbook
 
@@ -48,3 +49,17 @@ def feedback_row(
         "comfort",
         None,
     ]
+
+
+def worksheet_xml(data, transform):
+    output = BytesIO()
+    with (
+        ZipFile(BytesIO(data)) as original,
+        ZipFile(output, "w", ZIP_DEFLATED) as changed,
+    ):
+        for item in original.infolist():
+            content = original.read(item.filename)
+            if item.filename == "xl/worksheets/sheet1.xml":
+                content = transform(content.decode()).encode()
+            changed.writestr(item.filename, content)
+    return output.getvalue()

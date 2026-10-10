@@ -23,6 +23,7 @@ export type HarnessRequest = {
 };
 type Options = {
   scenario?: string;
+  failAssetOnce?: boolean;
   loadTransport?: (scenario: string) => Promise<Transport> | Transport;
 };
 type Event = {
@@ -93,6 +94,7 @@ export function createContractHarness(options: Options = {}) {
     code?: string;
     disconnect?: boolean;
   }[] = [];
+  let assetFailurePending = options.failAssetOnce ?? false;
   let expire = false,
     duplicate = false,
     disposed = false;
@@ -173,6 +175,20 @@ export function createContractHarness(options: Options = {}) {
       `http://${req.headers.host ?? "localhost"}`,
     );
     if (!url.pathname.startsWith("/api/v1/")) {
+      if (
+        assetFailurePending &&
+        req.method === "GET" &&
+        url.pathname === "/vehicles/frontend-render-annotation.svg"
+      ) {
+        assetFailurePending = false;
+        res.writeHead(503, {
+          "Content-Type": "text/plain",
+          "Cache-Control": "no-store",
+          "X-Frontend-Contract-Harness": "synthetic",
+        });
+        res.end("Explicit synthetic one-shot asset failure. Retry this asset.");
+        return;
+      }
       if (next) {
         next();
         return;

@@ -64,3 +64,20 @@ it("injects explicit HTTP failures without replacing valid fixture state", async
   ).toBe(200);
   expect(h.validationErrors).toEqual([]);
 });
+it("fails only the known annotation asset once, then serves its normal static bytes", async () => {
+  const h = await startContractHarness({ failAssetOnce: true });
+  cleanups.push(h.close);
+  const origin = new URL(h.baseUrl).origin;
+  expect((await fetch(`${origin}/vehicles/unknown.svg`)).status).toBe(404);
+  const first = await fetch(
+    `${origin}/vehicles/frontend-render-annotation.svg`,
+  );
+  expect(first.status).toBe(503);
+  expect(first.headers.get("cache-control")).toBe("no-store");
+  const retry = await fetch(
+    `${origin}/vehicles/frontend-render-annotation.svg`,
+  );
+  expect(retry.status).toBe(200);
+  expect(retry.headers.get("content-type")).toBe("image/svg+xml");
+  expect(await retry.text()).toContain("Static annotation reference");
+});

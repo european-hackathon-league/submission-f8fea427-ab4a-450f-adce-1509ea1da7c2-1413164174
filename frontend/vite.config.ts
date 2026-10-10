@@ -1,7 +1,7 @@
 import { defineConfig } from "vitest/config";
 import { loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
-function contractHarness(): Plugin {
+function contractHarness(failAssetOnce: boolean): Plugin {
   let dispose: (() => Promise<void>) | undefined;
   return {
     name: "frontend-synthetic-contract-harness",
@@ -14,6 +14,7 @@ function contractHarness(): Plugin {
         "/testing/contractHarness.ts",
       );
       const harness = createContractHarness({
+        failAssetOnce,
         loadTransport: async (scenario: string) => {
           const module = await server.ssrLoadModule("/src/api/mock.ts");
           return module.createMockTransport(scenario);
@@ -35,7 +36,7 @@ export default defineConfig(({ mode, command }) => {
     plugins: [
       react(),
       ...(command === "serve" && env.FRONTEND_CONTRACT_HARNESS === "1"
-        ? [contractHarness()]
+        ? [contractHarness(env.FRONTEND_HARNESS_FAIL_ASSET_ONCE === "1")]
         : []),
     ],
     test: { environment: "jsdom", setupFiles: ["./src/test-setup.ts"] },

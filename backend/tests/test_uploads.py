@@ -95,3 +95,44 @@ def test_misleading_or_corrupt_inputs_are_rejected(client):
         source["status"] == "rejected" and source["reason"]
         for source in response.json()["sources"]
     )
+
+
+def test_corrupt_xml_is_a_source_rejection_and_failed_storage_writes_roll_back(
+    client, monkeypatch
+):
+    from zipfile import ZipFile
+
+    original = ZipFile(BytesIO(workbook()))
+    buffer = BytesIO()
+    with ZipFile(buffer, "w") as corrupt:
+        for name in original.namelist():
+            corrupt.writestr(
+                name, b"<broken" if name == "xl/workbook.xml" else original.read(name)
+            )
+    response = client.post(
+        "/api/v1/uploads",
+        files={"files": ("corrupt.xlsx", buffer.getvalue())},
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert response.status_code == 200
+    assert response.json()["sources"][0]["status"] == "rejected"
+    from app.db import Command
+    from app.storage import LocalStorage
+
+    key = str(uuid4())
+
+    def fail(self, object_key, data):
+        raise OSError("Synthetic storage failure")
+
+    monkeypatch.setattr(LocalStorage, "put", fail)
+    response = client.post(
+        "/api/v1/uploads",
+        files={"files": ("valid.xlsx", workbook())},
+        headers={"Idempotency-Key": key},
+    )
+    assert response.status_code == 500
+    with Session() as session:
+        assert (
+            session.scalar(select(Command).where(Command.idempotency_key == key))
+            is None
+        )

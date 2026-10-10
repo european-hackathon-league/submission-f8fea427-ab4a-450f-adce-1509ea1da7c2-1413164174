@@ -55,7 +55,7 @@ def inspect_upload(
                 return kind, "page_limit"
             if not any((page.extract_text() or "").strip() for page in pdf.pages):
                 return kind, "image_only_pdf"
-    except BadZipFile, PdfReadError, KeyError, ValueError, OSError:
+    except BadZipFile, PdfReadError, KeyError, ValueError, OSError, SyntaxError:
         return kind, "corrupt_file"
     return kind, None
 

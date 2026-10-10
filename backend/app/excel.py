@@ -21,7 +21,7 @@ from app.ingest_types import (
 )
 from app.wire import CellLocator, Scope
 
-REVISION = "excel-v5"
+REVISION = "excel-v6"
 HEADERS = {
     "id": "id",
     "source": "source",
@@ -64,8 +64,23 @@ COUNTRIES = {
     "japan": "JP",
     "jp": "JP",
     "south korea": "KR",
+    "kr": "KR",
+    "australia": "AU",
+    "au": "AU",
+    "canada": "CA",
+    "ca": "CA",
+    "denmark": "DK",
+    "dk": "DK",
+    "finland": "FI",
+    "fi": "FI",
+    "latvia": "LV",
+    "lv": "LV",
+    "norway": "NO",
+    "no": "NO",
+    "south africa": "ZA",
+    "za": "ZA",
 }
-EU_MARKETS = {"DE", "FR", "IT", "ES", "NL", "AT", "BE", "PL", "SE"}
+EU_MARKETS = {"DE", "FR", "IT", "ES", "NL", "AT", "BE", "PL", "SE", "DK", "FI", "LV"}
 
 
 class ExcelResourceLimit(Exception):

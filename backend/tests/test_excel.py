@@ -1,6 +1,22 @@
+import pytest
 from fixtures.excel import FEEDBACK_HEADERS, feedback_row, workbook
 
 from app.excel import parse_excel
+
+
+@pytest.mark.parametrize("country", ["AU", "CA", "DK", "FI", "KR", "LV", "NO", "ZA"])
+def test_supplied_country_codes_keep_their_market_and_eu_membership(country):
+    row = feedback_row()
+    row[4] = country
+    result = parse_excel(
+        workbook({"Feedback_Explorer": [FEEDBACK_HEADERS, row]}),
+        dataset_namespace="synthetic",
+    )
+    assert result.status == "ready"
+    assert result.records[0].scope.markets == [country]
+    assert ("EU" in result.records[0].scope.cohort_ids) == (
+        country in {"DK", "FI", "LV"}
+    )
 
 
 def test_feedback_annotations_preserve_exact_cells_original_values_and_cohort_sets():

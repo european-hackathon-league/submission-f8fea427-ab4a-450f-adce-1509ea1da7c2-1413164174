@@ -1,11 +1,9 @@
-# Pitch scope lock
+# Frontend integration scope
 
-Controlling brief: [user-supplied frontend plan](PITCH-PLAN.md), retained verbatim. The GitHub `first_plan.md` at `80e328e` is the broader product plan; it is not identical to this frontend brief.
+Controlling specification: [`frontend_plan.md`](../../frontend_plan.md), together with [`plan.md`](../../plan.md). The user explicitly selected the car, graph and Deep Dive workspace in that plan. `PITCH-PLAN.md` is an archived earlier brief, not the controlling specification.
 
-Keep five destinations, period and market comparisons, counts/percentage points/relative change, evidence, prepared Deep Research, editable Reimagine concepts, requirement review/history, sample upload flow and exports. The explicitly requested actual i5 M60 exterior remains the first vehicle case.
+Branch `frontend` consolidates the completed pitch UI and vehicle viewer from `codex/pitch-ui`, `codex/pitch-workspace-ui` and `codex/pitch-vehicle-3d`, based on main at `80e328e`. Integrated fixes take precedence over older worktree versions. The rejected procedural sedan remains excluded.
 
-Exclude backend implementation, live AI/research, authentication, extra vehicle-family screens, asset marketplace UI and the rejected procedural sedan study. Preserve research as handoff documentation. Never infer a detailed M60 cabin from the separate 520i reference photograph.
+This is a consolidation checkpoint, not completion of the newer scope rebuild. The current prototype still has older navigation and comparison features. Removing those extras and implementing the graph, versioned backend adapter, Deep Dive and Reimagine contracts remain pending. Interrupted work is preserved in the `frontend-plan-only`, `frontend-plan-3d` and `pitch-visual-redesign` worktrees; it is not included in the runnable checkpoint.
 
-Before this refinement, complete integrated state was saved at `aae4732`, available in the managed `pitch-before-plan-polish` worktree. Future work can continue there and be reviewed before merging. The existing UI and 3D worktrees continue separate implementation tracks.
-
-Visual direction: BMW-inspired vehicle-first composition; white and soft gray management surfaces, graphite text, restrained blue actions, dark neutral vehicle stage, rectangular 44px controls, thin dividers and generous spacing. Use system sans-serif fallback; no BMW-owned font or logo is copied. Expose credible data context without making implementation details dominate the manager's task.
+The i5 M60 exterior uses a hosted creator model. The interior is a separately credited G60 520i reference photograph, not a verified 3D M60 cabin. All metrics and research are synthetic. Backend branches and source data are outside this consolidation.

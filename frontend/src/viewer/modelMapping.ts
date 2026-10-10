@@ -21,6 +21,13 @@ export interface SceneCatalog {
 }
 const nonempty = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const stringList = (value: unknown): value is string[] => Array.isArray(value) && value.every(nonempty);
+const assetReference = (value: unknown): value is string => {
+  if (!nonempty(value) || value !== value.trim() || /[\\\u0000-\u0020]/.test(value) || value.startsWith("//")) return false;
+  try {
+    const url = new URL(value, "https://local-scene.invalid");
+    return ["http:", "https:"].includes(url.protocol) && !url.username && !url.password && (value.startsWith("/") || /^https?:\/\//i.test(value));
+  } catch { return false; }
+};
 const viewerComponents: ComponentId[] = ["body", "lighting", "charging", "steering", "dashboard", "seats"];
 
 export function validateSceneCatalog(value: unknown): SceneCatalog {
@@ -29,9 +36,9 @@ export function validateSceneCatalog(value: unknown): SceneCatalog {
     throw new Error("Invalid scene catalog identity/version.");
   const baseline = scene.baseline_asset;
   const interior = scene.interior_reference;
-  if (!baseline || baseline.type !== "sketchfab" || !nonempty(baseline.model_id) || !nonempty(baseline.preview_url) || !stringList(baseline.capabilities) || !stringList(baseline.limitations) || baseline.capabilities.some(capability => !["navigation", "list_annotation"].includes(capability)))
+  if (!baseline || baseline.type !== "sketchfab" || !nonempty(baseline.model_id) || !assetReference(baseline.preview_url) || !stringList(baseline.capabilities) || !stringList(baseline.limitations) || baseline.capabilities.some(capability => !["navigation", "list_annotation"].includes(capability)))
     throw new Error("Invalid baseline asset/capabilities.");
-  if (!interior || interior.type !== "reference_photo" || ![interior.asset_id, interior.vehicle_id, interior.url].every(nonempty) || !stringList(interior.limitations))
+  if (!interior || interior.type !== "reference_photo" || ![interior.asset_id, interior.vehicle_id].every(nonempty) || !assetReference(interior.url) || interior.asset_id === scene.baseline_asset_id || !stringList(interior.limitations))
     throw new Error("Invalid interior reference asset.");
   const parts = new Map<string, CatalogPart>();
   const meshes = new Set<string>();

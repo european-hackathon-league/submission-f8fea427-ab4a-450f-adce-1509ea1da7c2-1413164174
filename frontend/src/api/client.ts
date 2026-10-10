@@ -144,6 +144,81 @@ async function readGraph(send: Send, path: string): Promise<Wire.Graph> {
   result!.next_cursor = null;
   return result!;
 }
+function researchItems(items: Wire.Research[]) {
+  const strings = (value: unknown): value is string[] =>
+    Array.isArray(value) && value.every((item) => typeof item === "string");
+  const object = (value: unknown): value is Record<string, unknown> =>
+    value !== null && typeof value === "object" && !Array.isArray(value);
+  const scope = (value: unknown): boolean =>
+    object(value) &&
+    ["vehicle_ids", "markets", "cohort_ids", "equipment"].every(
+      (key) => value[key] === undefined || strings(value[key]),
+    ) &&
+    (value.year === undefined ||
+      value.year === null ||
+      Number.isInteger(value.year)) &&
+    (value.software === undefined ||
+      value.software === null ||
+      typeof value.software === "string");
+  if (!Array.isArray(items))
+    throw new ApiError("invalid_response", "Research items must be an array.");
+  for (const item of items) {
+    if (
+      !object(item) ||
+      typeof item.research_id !== "string" ||
+      typeof item.finding_id !== "string" ||
+      ![
+        "queued",
+        "searching",
+        "checking",
+        "ready",
+        "partial",
+        "unavailable",
+      ].includes(item.status) ||
+      !scope(item.competitor_scope) ||
+      !Array.isArray(item.claims) ||
+      !strings(item.counterevidence_ids) ||
+      !strings(item.candidate_approaches) ||
+      !strings(item.gaps) ||
+      !(
+        item.recommendation === null || typeof item.recommendation === "string"
+      ) ||
+      item.claims.some(
+        (claim) =>
+          !object(claim) ||
+          typeof claim.claim_id !== "string" ||
+          !["fact", "opinion", "inference"].includes(claim.type as string) ||
+          typeof claim.text !== "string" ||
+          !strings(claim.evidence_ids) ||
+          !strings(claim.limitations),
+      )
+    ) {
+      throw new ApiError(
+        "invalid_response",
+        "Research response does not match the published contract.",
+      );
+    }
+  }
+  return items.map(normalize.research);
+}
+async function researchResource(send: Send, path: string) {
+  try {
+    const page = await readPages<Wire.Research>(send, path);
+    return {
+      items: researchItems(page.items),
+      error: undefined as string | undefined,
+    };
+  } catch (error) {
+    if (
+      error instanceof ApiError &&
+      (["network_error", "request_timeout"].includes(error.code) ||
+        (error.status !== null && error.status >= 500))
+    ) {
+      return { items: [], error: error.message };
+    }
+    throw error;
+  }
+}
 function requestBody(path: string, body: unknown): unknown {
   if (body === undefined) return undefined;
   if (path.endsWith("/instructions"))
@@ -190,7 +265,7 @@ function project(path: string, body: unknown, value: unknown): unknown {
   if (p.endsWith("/graph")) return normalize.graph(value as Wire.Graph);
   if (p.endsWith("/research")) {
     const page = value as Wire.Page_Research_;
-    return { ...page, items: page.items.map(normalize.research) };
+    return { ...page, items: researchItems(page.items) };
   }
   if (p.endsWith("/conflicts"))
     return {
@@ -250,7 +325,7 @@ function boundary(
           const [f, g, r, c, p, h] = await Promise.all([
             readPages<Wire.Finding>(send, `${root}/findings`),
             readGraph(send, `${root}/graph`),
-            readPages<Wire.Research>(send, `${root}/research`),
+            researchResource(send, `${root}/research`),
             send<Wire.Conflicts>(`${root}/conflicts`),
             before.current_proposal_set_version === null
               ? Promise.resolve(null)
@@ -291,7 +366,8 @@ function boundary(
             findings: f.items.map(normalize.finding),
             counts: f.first.counts as Wire.Counts,
             graph: normalize.graph(g),
-            research: r.items.map(normalize.research),
+            research: r.items,
+            ...(r.error ? { resourceErrors: { research: r.error } } : {}),
             conflicts: c,
             checkpoint: normalize.checkpoint(c),
             proposals: p
@@ -423,6 +499,14 @@ export function createRealApi(
           throw new ApiError(
             "request_timeout",
             "Request timed out. Retry the same command; its result may already exist.",
+            null,
+            null,
+            true,
+          );
+        if (error instanceof TypeError)
+          throw new ApiError(
+            "network_error",
+            error.message || "Network request failed.",
             null,
             null,
             true,

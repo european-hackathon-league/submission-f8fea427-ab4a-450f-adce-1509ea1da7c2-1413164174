@@ -136,3 +136,28 @@ def test_corrupt_xml_is_a_source_rejection_and_failed_storage_writes_roll_back(
             session.scalar(select(Command).where(Command.idempotency_key == key))
             is None
         )
+
+
+def test_trailing_worksheet_corruption_rejects_only_the_damaged_companion(client):
+    from zipfile import ZipFile
+
+    data = workbook()
+    buffer = BytesIO()
+    with ZipFile(BytesIO(data)) as original, ZipFile(buffer, "w") as damaged:
+        for name in original.namelist():
+            content = original.read(name)
+            if name == "xl/worksheets/sheet1.xml":
+                content = content.replace(b"</worksheet>", b"<broken")
+            damaged.writestr(name, content)
+    response = client.post(
+        "/api/v1/uploads",
+        files=[
+            ("files", ("damaged.xlsx", buffer.getvalue())),
+            ("files", ("valid.xlsx", data)),
+        ],
+        headers={"Idempotency-Key": str(uuid4())},
+    )
+    assert response.status_code == 200
+    assert [
+        (item["status"], item["reason"]) for item in response.json()["sources"]
+    ] == [("rejected", "corrupt_file"), ("ready", None)]

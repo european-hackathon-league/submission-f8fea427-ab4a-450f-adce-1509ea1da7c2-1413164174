@@ -36,6 +36,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 32 * 1024 * 1024
     max_archive_bytes: int = 256 * 1024 * 1024
     max_pdf_pages: int = 500
+    max_pdf_stream_bytes: int = 8 * 1024 * 1024
     event_retention: int = 10000
     catalog_path: Path = (
         Path(__file__).resolve().parents[2] / "contracts/catalog.example.json"

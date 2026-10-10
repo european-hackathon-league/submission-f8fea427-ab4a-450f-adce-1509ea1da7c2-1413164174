@@ -100,3 +100,22 @@ def test_s3_adapter_uses_private_encrypted_immutable_write_and_exact_read(monkey
         objects.put("workspace/version", b"original")
         assert objects.read("workspace/version") == b"original"
         stub.assert_no_pending_responses()
+
+
+def test_compressed_pdf_stream_cannot_bypass_expansion_limit():
+    from pypdf.generic import DecodedStreamObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=100, height=100)
+    stream = DecodedStreamObject()
+    stream.set_data(b" " * (1024 * 1024))
+    page[NameObject("/Contents")] = writer._add_object(stream.flate_encode())
+    buffer = BytesIO()
+    writer.write(buffer)
+    assert len(buffer.getvalue()) < 10000
+    result = inspect_upload(
+        "compressed.pdf",
+        buffer.getvalue(),
+        Settings(_env_file=None, max_pdf_stream_bytes=1024),
+    )
+    assert result == ("pdf", "parser_resource_limit")

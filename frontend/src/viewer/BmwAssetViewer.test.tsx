@@ -33,9 +33,10 @@ describe('BmwAssetViewer', () => {
 
   it('uses a licensed real G60 cabin photograph instead of claiming an unverified 3D interior', () => {
     const onSelectComponent=vi.fn();
-    render(<BmwAssetViewer selectedComponent="dashboard" onSelectComponent={onSelectComponent} view="interior" onViewChange={vi.fn()} heatmap period="2026" findings={findings}/>);
+    const {container}=render(<BmwAssetViewer selectedComponent="dashboard" onSelectComponent={onSelectComponent} view="interior" onViewChange={vi.fn()} heatmap period="2026" findings={findings}/>);
 
     expect(screen.getByRole('img',{name:/BMW 5 Series G60 cabin reference photo/i})).toHaveAttribute('src','/vehicles/g60-interior.jpg');
+    expect(container.querySelector('.bmw-asset-viewer__photo-canvas')).toContainElement(container.querySelector('.bmw-asset-viewer__photo-markers'));
     expect(screen.getByText(/Detailed 3D cabin not verified/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:/Dashboard feedback marker/}));
     expect(onSelectComponent).toHaveBeenCalledWith('dashboard');
@@ -133,7 +134,12 @@ describe('BmwAssetViewer', () => {
     fireEvent.click(screen.getByRole('button',{name:'Zoom in'}));
     expect(api.setCameraLookAt).toHaveBeenCalledWith([1.6,1.6,3.2],[0,0,0],0);
     fireEvent.click(screen.getByRole('button',{name:'Orbit model left'}));
-    expect(api.setCameraLookAt).toHaveBeenLastCalledWith(expect.any(Array),[0,0,0],0);
+    const [orbitPosition,orbitTarget]=api.setCameraLookAt.mock.lastCall!;
+    expect(orbitTarget).toEqual([0,0,0]);
+    // Sketchfab's native autospin is around Z; keep the camera's Z component fixed.
+    expect(orbitPosition[0]).toBeCloseTo(2*Math.cos(-Math.PI/12)-2*Math.sin(-Math.PI/12));
+    expect(orbitPosition[1]).toBeCloseTo(2*Math.sin(-Math.PI/12)+2*Math.cos(-Math.PI/12));
+    expect(orbitPosition[2]).toBeCloseTo(4);
     fireEvent.click(screen.getByRole('button',{name:'Reset view'}));
     expect(api.setCameraLookAt).toHaveBeenLastCalledWith([2,2,4],[0,0,0],0);
   });

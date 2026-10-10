@@ -64,8 +64,10 @@
 .bmw-asset-viewer__camera-controls button:disabled { color: #73787d; opacity: .68; cursor: not-allowed; }
 .bmw-asset-viewer__stage-caption { position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 12px; padding: 11px 15px; background: linear-gradient(transparent,rgba(12,15,18,.76)); color: #fff; font-size: 11px; font-weight: 650; letter-spacing: .02em; text-shadow: 0 1px 2px #000; }
 
-.bmw-asset-viewer__photo-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #e7e8e7; }
-.bmw-asset-viewer__interior-photo { display: block; width: 100%; height: 100%; object-fit: cover; object-position: center 52%; }
+.bmw-asset-viewer__photo-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #e7e8e7; container-type: size; }
+.bmw-asset-viewer__photo-canvas { position: relative; flex: 0 0 auto; width: 100%; height: 100%; aspect-ratio: 1280 / 853; }
+@supports (width: 1cqh) { .bmw-asset-viewer__photo-canvas { width: min(100%, 150.06cqh); height: auto; } }
+.bmw-asset-viewer__interior-photo { position: absolute; inset: 0; display: block; width: 100%; height: 100%; object-fit: contain; object-position: center; }
 .bmw-asset-viewer__photo-badge { position: absolute; left: 15px; top: 15px; z-index: 3; padding: 7px 9px; background: rgba(255,255,255,.92); color: #25292e; font-size: 11px; font-weight: 700; }
 .bmw-asset-viewer__photo-markers { position: absolute; inset: 0; z-index: 2; pointer-events: none; }
 .bmw-asset-viewer__photo-marker { position: absolute; transform: translate(-50%,-50%); display: grid; justify-items: center; gap: 4px; padding: 3px; border: 0; background: transparent; color: #fff; cursor: pointer; pointer-events: auto; text-shadow: 0 1px 3px #000; }

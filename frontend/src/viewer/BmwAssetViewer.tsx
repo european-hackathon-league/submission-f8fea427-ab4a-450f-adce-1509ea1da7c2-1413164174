@@ -171,7 +171,7 @@ function useSketchfabViewer(
       if(error)return;
       const [x,y,z]=camera.position.map((coordinate,index)=>coordinate-camera.target[index]);
       const angle=direction*Math.PI/12;
-      const position=[camera.target[0]+x*Math.cos(angle)-z*Math.sin(angle),camera.target[1]+y,camera.target[2]+x*Math.sin(angle)+z*Math.cos(angle)];
+      const position=[camera.target[0]+x*Math.cos(angle)-y*Math.sin(angle),camera.target[1]+x*Math.sin(angle)+y*Math.cos(angle),camera.target[2]+z];
       api.setCameraLookAt(position,camera.target,reducedMotion()?0:.22);
     });
     return true;
@@ -253,15 +253,17 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
           </div>
           <div className="bmw-asset-viewer__stage-caption"><span>Exterior · interactive 3D</span><span>{sceneReady?'Sketchfab model connected':apiFailed?'Preview image':'Connecting'}</span></div>
         </>:<div className="bmw-asset-viewer__photo-wrap">
-          <img className="bmw-asset-viewer__interior-photo" src="/vehicles/g60-interior.jpg" alt="BMW 5 Series G60 cabin reference photo, photographed by Ethan Llamas"/>
-          <div className="bmw-asset-viewer__photo-badge">G60 520i cabin reference · photograph</div>
-          {heatmap&&<div className="bmw-asset-viewer__photo-markers" aria-label="Feedback overlay on cabin photograph">
-            {([{id:'steering',x:'34%',y:'55%'},{id:'dashboard',x:'60%',y:'45%'},{id:'seats',x:'82%',y:'88%'}] as const).map(({id,x,y})=>{
-              const active=selectedComponent===id;
-              const severity=severityFor(findings,id,period);
-              return <button key={id} type="button" className={`bmw-asset-viewer__photo-marker ${active?'is-selected':''}`} style={{left:x,top:y,'--heat':severity} as React.CSSProperties} aria-label={`${labels[id]} feedback marker · ${metricSummary(findings,id,period)}`} aria-pressed={active} onClick={()=>onSelectComponent(id)}><span/><small>{labels[id]}</small></button>;
-            })}
-          </div>}
+          <div className="bmw-asset-viewer__photo-canvas">
+            <img className="bmw-asset-viewer__interior-photo" src="/vehicles/g60-interior.jpg" alt="BMW 5 Series G60 cabin reference photo, photographed by Ethan Llamas"/>
+            <div className="bmw-asset-viewer__photo-badge">G60 520i cabin reference · photograph</div>
+            {heatmap&&<div className="bmw-asset-viewer__photo-markers" aria-label="Feedback overlay on cabin photograph">
+              {([{id:'steering',x:'34%',y:'55%'},{id:'dashboard',x:'60%',y:'45%'},{id:'seats',x:'82%',y:'88%'}] as const).map(({id,x,y})=>{
+                const active=selectedComponent===id;
+                const severity=severityFor(findings,id,period);
+                return <button key={id} type="button" className={`bmw-asset-viewer__photo-marker ${active?'is-selected':''}`} style={{left:x,top:y,'--heat':severity} as React.CSSProperties} aria-label={`${labels[id]} feedback marker · ${metricSummary(findings,id,period)}`} aria-pressed={active} onClick={()=>onSelectComponent(id)}><span/><small>{labels[id]}</small></button>;
+              })}
+            </div>}
+          </div>
           <div className="bmw-asset-viewer__stage-caption"><span>Interior · static photo reference</span><span>Not a 3D cabin view</span></div>
         </div>}
       </div>

@@ -1,2 +1,10 @@
 .env
+**/.env
+**/.venv/
+**/__pycache__/
+**/.pytest_cache/
+**/.ruff_cache/
+**/.mypy_cache/
+backend/.local/
+backend/private-results/
 doc\googledrive

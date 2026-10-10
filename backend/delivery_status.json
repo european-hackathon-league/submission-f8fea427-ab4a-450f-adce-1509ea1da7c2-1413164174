@@ -1,0 +1,118 @@
+{
+  "builder": {
+    "provider_instance_id": "codex",
+    "model_id": "gpt-6.1-sol"
+  },
+  "stories": [
+    {
+      "story": "S1",
+      "work_packages": [
+        "BE-01",
+        "BE-02",
+        "BE-03",
+        "BE-04"
+      ],
+      "status": "draft",
+      "branch": "be/S1-foundation",
+      "pr_url": "https://github.com/indkhan/vehicle-requirements-ai/pull/2",
+      "tested_commit": "c65b3735fd04968c0a4e4954de0da804159a4272",
+      "tests": [
+        "Final fresh-image local verification: cumulative suite 50 passed in 71.43s; Ruff lint/format (36 files), strict mypy (19 source files), Alembic upgrade/repeat/no-drift, generated contracts and git diff checks passed; final CI pending",
+        "GitHub Actions run 38077115078 at c65b373: Linux cumulative suite 49 passed in 31.25s",
+        "GitHub Actions at c65b373: Ruff lint/format, strict mypy (19 files), migration repeat/no-drift, generated contracts, API/worker startup and parser binary imports passed",
+        "Local cumulative suite at c65b373: 47 passed, 2 timing failures in 333.50s under host contention; unchanged focused reproductions passed 2 in 7.21s, deadline rejection/dispatch recovery behavior confirmed",
+        "Runtime pip-audit: no known vulnerabilities found",
+        "Focused privacy + connected Temporal trace: 6 passed in 10.64s"
+      ],
+      "merge_sha": null,
+      "blocker": null
+    },
+    {
+      "story": "S2",
+      "work_packages": [
+        "BE-05",
+        "BE-06",
+        "BE-07"
+      ],
+      "status": "not_started",
+      "branch": "be/S2-ingestion",
+      "pr_url": null,
+      "tested_commit": null,
+      "tests": [],
+      "merge_sha": null,
+      "blocker": null
+    },
+    {
+      "story": "S3",
+      "work_packages": [
+        "BE-08",
+        "BE-09"
+      ],
+      "status": "not_started",
+      "branch": "be/S3-findings",
+      "pr_url": null,
+      "tested_commit": null,
+      "tests": [],
+      "merge_sha": null,
+      "blocker": null
+    },
+    {
+      "story": "S4",
+      "work_packages": [
+        "BE-10",
+        "BE-11",
+        "BE-12"
+      ],
+      "status": "not_started",
+      "branch": "be/S4-proposals",
+      "pr_url": null,
+      "tested_commit": null,
+      "tests": [],
+      "merge_sha": null,
+      "blocker": null
+    },
+    {
+      "story": "S5",
+      "work_packages": [
+        "BE-13",
+        "BE-14",
+        "BE-15"
+      ],
+      "status": "not_started",
+      "branch": "be/S5-control",
+      "pr_url": null,
+      "tested_commit": null,
+      "tests": [],
+      "merge_sha": null,
+      "blocker": null
+    },
+    {
+      "story": "S6",
+      "work_packages": [
+        "BE-16"
+      ],
+      "status": "not_started",
+      "branch": "be/S6-handoff",
+      "pr_url": null,
+      "tested_commit": null,
+      "tests": [],
+      "merge_sha": null,
+      "blocker": null
+    }
+  ],
+  "live_integrations": {
+    "ai_connectivity": {
+      "status": "verified",
+      "model": "gpt-6.1-sol",
+      "input_tokens": 21,
+      "output_tokens": 5
+    },
+    "ai_structured_extraction": "not_verified",
+    "search": "not_verified",
+    "oidc": "unconfigured",
+    "s3": "unconfigured",
+    "hosted_temporal": "unconfigured",
+    "renderer": "unconfigured",
+    "otlp": "unconfigured"
+  }
+}

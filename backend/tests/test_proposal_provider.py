@@ -43,3 +43,52 @@ def test_positive_strength_can_support_a_preservation_requirement(client):
     result.changes[0].supporting_evidence_ids = ["unrelated"]
     with pytest.raises(ValueError, match="outside supported finding evidence"):
         validated_draft(result, [finding], [], run_id, generation)
+
+
+@pytest.mark.parametrize("repaired", [False, True])
+def test_proposal_validation_repair_is_bounded_and_reuses_returned_drafts(
+    client, monkeypatch, repaired
+):
+    from types import SimpleNamespace
+
+    from app import proposals
+    from app.config import Settings
+
+    run_id, generation = ready_run(client)
+    finding = w.Finding.model_validate(
+        aggregate([observation("evidence", "record")], [], run_id)["findings"][0]
+    )
+    calls = []
+
+    def parse(**options):
+        calls.append(options)
+        change = sample().changes[0].model_dump()
+        change.update(
+            finding_ids=[finding.finding_id],
+            supporting_evidence_ids=["evidence"],
+            scope=w.Scope(markets=["unsupported"]).model_dump(),
+        )
+        if repaired and len(calls) == 2:
+            change["scope"] = w.Scope().model_dump()
+        return SimpleNamespace(
+            output_parsed=Draft.model_validate({"changes": [change], "gaps": []}),
+            model="synthetic",
+            usage=None,
+        )
+
+    monkeypatch.setattr(
+        proposals, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(
+        proposals,
+        "OpenAI",
+        lambda **options: SimpleNamespace(responses=SimpleNamespace(parse=parse)),
+    )
+    for _ in range(2):
+        if repaired:
+            assert proposals.draft_changes(run_id, generation, [finding], []).changes
+        else:
+            with pytest.raises(ValueError, match="scope is not established"):
+                proposals.draft_changes(run_id, generation, [finding], [])
+    assert len(calls) == 2
+    assert "scope is not established" in str(calls[1]["input"])

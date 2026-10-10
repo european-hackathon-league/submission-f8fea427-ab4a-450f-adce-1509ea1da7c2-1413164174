@@ -463,6 +463,62 @@ export function createRealApi(
       return null;
     }
   };
+  const assetAddress = (value: string): URL | null => {
+    try {
+      const address = new URL(value, apiUrl.origin);
+      const prefix = `${apiUrl.pathname.replace(/\/$/, "")}/runs/`;
+      if (
+        address.origin !== apiUrl.origin ||
+        address.username ||
+        address.password ||
+        address.search ||
+        address.hash ||
+        !address.pathname.startsWith(prefix)
+      )
+        return null;
+      const suffix = address.pathname.slice(prefix.length);
+      return /^[^/]+\/(?:renders\/[^/]+\/assets\/[^/]+|exports\/[^/]+\/download)$/.test(
+        suffix,
+      )
+        ? address
+        : null;
+    } catch {
+      return null;
+    }
+  };
+  async function readProtectedFile(
+    address: URL,
+    signal: AbortSignal,
+    kind: "source" | "asset",
+  ): Promise<Blob> {
+    signal.throwIfAborted();
+    const timeoutController = new AbortController();
+    const timeout = setTimeout(() => timeoutController.abort(), 30_000);
+    try {
+      const response = await fetch(address.href, {
+        credentials: "include",
+        headers: await headers(),
+        signal: AbortSignal.any([signal, timeoutController.signal]),
+        redirect: "error",
+      });
+      await checkResponse(response);
+      return await response.blob();
+    } catch (error) {
+      if (timeoutController.signal.aborted && !signal.aborted)
+        throw new ApiError(
+          `${kind}_timeout`,
+          kind === "source"
+            ? "Source download timed out. Retry opening the source."
+            : "Authorized file download timed out. Retry opening the file.",
+          null,
+          null,
+          true,
+        );
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
   const send: Send = async <T>(
     path: string,
     body?: unknown,
@@ -547,6 +603,16 @@ export function createRealApi(
     sourceUrl: (sourceId) =>
       `${base}/sources/${encodeURIComponent(sourceId)}/content`,
     canReadSource: (url) => sourceAddress(url) !== null,
+    canReadAsset: (url) => assetAddress(url) !== null,
+    async readAsset(url, signal) {
+      const address = assetAddress(url);
+      if (!address)
+        throw new ApiError(
+          "unsupported_asset_url",
+          "This link is not a protected application asset or export URL.",
+        );
+      return readProtectedFile(address, signal, "asset");
+    },
     async readSource(url, signal) {
       const address = sourceAddress(url);
       if (!address)
@@ -554,30 +620,7 @@ export function createRealApi(
           "unsupported_source_url",
           "This link is not an application source-content URL.",
         );
-      const timeoutController = new AbortController();
-      const timeout = setTimeout(() => timeoutController.abort(), 30_000);
-      try {
-        const response = await fetch(address.href, {
-          credentials: "include",
-          headers: await headers(),
-          signal: AbortSignal.any([signal, timeoutController.signal]),
-          redirect: "error",
-        });
-        await checkResponse(response);
-        return await response.blob();
-      } catch (error) {
-        if (timeoutController.signal.aborted && !signal.aborted)
-          throw new ApiError(
-            "source_timeout",
-            "Source download timed out. Retry opening the source.",
-            null,
-            null,
-            true,
-          );
-        throw error;
-      } finally {
-        clearTimeout(timeout);
-      }
+      return readProtectedFile(address, signal, "source");
     },
     async events(runId, sequence, lastEventId, signal) {
       const establishment = new AbortController();

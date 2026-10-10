@@ -423,3 +423,63 @@ it.each([false, true])(
     }
   },
 );
+it("retrieves protected API-returned export bytes after exact manifest verification and retries without resubmitting", async () => {
+  const returned = "/api/v1/runs/run_demo/exports/export%2Fopaque/download";
+  const request = vi.fn(async (path: string, body?: unknown) =>
+    path.includes("/proposals")
+      ? proposal()
+      : body
+        ? {
+            command_id: "c",
+            resource_id: "export/opaque",
+            resource_url: "unused",
+          }
+        : { ...jobResult(), download_url: returned },
+  );
+  const p = props(request);
+  p.api.mode = "real";
+  p.api.canReadAsset = (link) => link === returned;
+  const bytes = new Blob(["authoritative immutable JSON"]);
+  const read = vi
+    .fn()
+    .mockRejectedValueOnce(
+      new ApiError("forbidden", "Download access denied", null, 403),
+    )
+    .mockResolvedValueOnce(bytes);
+  p.api.readAsset = read;
+  const create = vi
+    .spyOn(URL, "createObjectURL")
+    .mockReturnValue("blob:exact-export");
+  const revoke = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => {});
+  const view = render(<HistoryPanel {...p} />);
+  try {
+    await screen.findByText("Immutable proposal version 1");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Request exact-version export" }),
+    );
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Download access denied",
+    );
+    expect(
+      screen.queryByRole("link", { name: "Download authorized export" }),
+    ).not.toBeInTheDocument();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry authorized export download" }),
+    );
+    const link = await screen.findByRole("link", {
+      name: "Download authorized export",
+    });
+    expect(link).toHaveAttribute("href", "blob:exact-export");
+    expect(create).toHaveBeenCalledWith(bytes);
+    expect(read).toHaveBeenLastCalledWith(returned, expect.any(AbortSignal));
+    expect(
+      request.mock.calls.filter((call) => call[1] !== undefined),
+    ).toHaveLength(1);
+    view.unmount();
+    expect(revoke).toHaveBeenCalledWith("blob:exact-export");
+  } finally {
+    view.unmount();
+    create.mockRestore();
+    revoke.mockRestore();
+  }
+});

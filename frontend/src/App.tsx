@@ -329,6 +329,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   }
 
   function selectPart(id: ComponentId) {
+    setTab("Evidence");
     setSelectedComponent(id);
     const matches = workspace?.findings.filter(f => f.part_ids.includes(id)) ?? [];
     const existing = matches.find(f => f.finding_id === selectedFindingId);

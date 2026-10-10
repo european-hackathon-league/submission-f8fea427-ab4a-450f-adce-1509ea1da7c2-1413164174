@@ -5,7 +5,7 @@ Base: verified `codex/frontend-f1`, PR https://github.com/indkhan/vehicle-requir
 ## Executed gate
 
 - `npm ci`: isolated worktree installation passed.
-- `npm test`: **141 tests across 14 files, all pass**.
+- `npm test`: **142 tests across 14 files, all pass**.
 - `npm run typecheck`, `npm run build`, `git diff --check`: pass.
 - Separate agents reviewed API/App/components and viewer/catalog against F2 and failure paths. Fixed with regressions: saved-run asset/catalog mismatch, hierarchy-only component IDs, ambiguous cohort aggregates, opaque finding IDs, first-match selection, changed finding mappings, source-kind labels, native modal focus and finding-navigation focus.
 
@@ -16,3 +16,5 @@ Browser: in-app WebKit at `127.0.0.1:5182`, 1440×1000 desktop. Created syntheti
 ## External acceptance
 
 Live findings/graph/evidence and protected original-source acceptance remain blocked by published backend 501 handlers and unavailable localhost backend. Protected download behavior above uses frontend tests, not a live original file. Geometry, exact-trim cabin, verified mesh references and unsupported vehicle assets remain external. No guessed mesh aliases remain; list/photo annotations explicitly disclose their limits. F3–F6 gates remain pending.
+
+Follow-up acceptance check: component tags now open their mapped Evidence panel directly; multiple matches retain explicit selection/choice behavior. Regression included in 142-test gate.

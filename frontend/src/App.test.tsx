@@ -438,3 +438,11 @@ it("clears obsolete spatial selection when current finding mapping changes on re
   await waitFor(() => expect(screen.getByRole("button", { name: /^Body.*Cohorts/ })).toHaveAttribute("aria-pressed", "false"));
   expect(screen.getByRole("heading", { name: "Trunk gesture reliability" })).toBeInTheDocument();
 });
+
+
+it("opens mapped evidence from a keyboard component tag", async () => {
+  const user = await createRun(); await screen.findByRole("button", { name: /^Body.*Cohorts/ });
+  await user.click(screen.getByRole("button", { name: /^Body.*Cohorts/ }));
+  expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Trunk gesture reliability" })).toBeInTheDocument();
+});

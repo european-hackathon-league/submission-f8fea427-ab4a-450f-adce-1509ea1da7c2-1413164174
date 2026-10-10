@@ -1,0 +1,41 @@
+{
+  "baseline_asset_id": "asset_demo_v1",
+  "contract_version": "1",
+  "part_catalog_version": "catalog_demo_v1",
+  "parts": [
+    {
+      "anchor_ref": "synthetic_anchor",
+      "capabilities": [
+        "annotation"
+      ],
+      "mesh_refs": [],
+      "parent_part_id": "part_interior",
+      "part_id": "part_seat"
+    },
+    {
+      "anchor_ref": "synthetic_anchor",
+      "capabilities": [
+        "annotation"
+      ],
+      "mesh_refs": [],
+      "parent_part_id": null,
+      "part_id": "part_interior"
+    },
+    {
+      "anchor_ref": "synthetic_anchor",
+      "capabilities": [
+        "annotation"
+      ],
+      "mesh_refs": [],
+      "parent_part_id": null,
+      "part_id": "part_digital"
+    },
+    {
+      "capabilities": [],
+      "parent_part_id": null,
+      "part_id": "part_unmapped"
+    }
+  ],
+  "synthetic": true,
+  "vehicle_id": "vehicle_demo"
+}

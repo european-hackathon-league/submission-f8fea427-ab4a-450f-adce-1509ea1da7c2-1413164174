@@ -32,6 +32,8 @@ export function createMockTransport(scenario: string): {
   const blobUrls = new Set<string>();
   let pending = false;
   let staleInjected = false;
+  let checkpointStaleInjected = false;
+  let researchFailed = false;
   const touch = () => {
     if (snapshot) {
       snapshot.revision++;
@@ -179,7 +181,7 @@ export function createMockTransport(scenario: string): {
               checkpoint_id: "checkpoint-comfort",
               version: 1,
               conflict_ids: ["conflict-comfort"],
-              allowed_actions: ["continue", "regroup_cohorts"],
+              allowed_actions: ["continue", "regroup_variants"],
               wait_state: "waiting",
             }
           : null;
@@ -213,33 +215,58 @@ export function createMockTransport(scenario: string): {
       if (resource === "") {
         if (pending) {
           pending = false;
-          snapshot.analysis_status = checkpoint
-            ? "waiting_for_pm"
-            : "proposals_ready";
-          snapshot.stage = checkpoint
-            ? "Guided checkpoint"
-            : "Proposals complete";
+          snapshot.analysis_status =
+            checkpoint?.wait_state === "waiting"
+              ? "waiting_for_pm"
+              : "proposals_ready";
+          snapshot.stage =
+            checkpoint?.wait_state === "waiting"
+              ? "Guided checkpoint"
+              : "Proposals complete";
           snapshot.current_proposal_set_version =
             proposals.proposal_set_version;
-          snapshot.available_actions = checkpoint
-            ? ["continue_checkpoint"]
-            : ["edit", "reimagine", "export"];
+          snapshot.available_actions =
+            checkpoint?.wait_state === "waiting"
+              ? ["continue_checkpoint"]
+              : ["edit", "reimagine", "export"];
           touch();
         }
         result = snapshot;
       } else if (resource === "/findings") result = wireFixtures.findings;
       else if (resource === "/graph") result = wireFixtures.graph;
-      else if (resource === "/research")
+      else if (resource === "/research") {
+        if (
+          scenario === "research_failure" &&
+          snapshot.config.deep_dive?.enabled &&
+          !researchFailed
+        ) {
+          researchFailed = true;
+          throw new ApiError(
+            "research_unavailable",
+            "Synthetic research service interruption. Retry research while findings remain available.",
+            null,
+            503,
+            true,
+          );
+        }
+        const states: Record<string, Wire.Research["status"]> = {
+          research_queued: "queued",
+          research_searching: "searching",
+          research_checking: "checking",
+          research_unavailable: "unavailable",
+          deep_dive_success: "ready",
+          deep_dive_partial: "partial",
+        };
         result = page(
           snapshot.config.deep_dive?.enabled
-            ? wireFixtures.research.map((r) =>
-                scenario === "deep_dive_success"
-                  ? { ...r, status: "ready", gaps: [] }
-                  : r,
-              )
+            ? wireFixtures.research.map((r) => ({
+                ...r,
+                status: states[scenario] ?? r.status,
+                ...(states[scenario] === "ready" ? { gaps: [] } : {}),
+              }))
             : [],
         );
-      else if (resource === "/conflicts")
+      } else if (resource === "/conflicts")
         result = {
           conflicts,
           checkpoints: checkpoint ? [checkpoint] : [],
@@ -391,21 +418,112 @@ export function createMockTransport(scenario: string): {
         body
       ) {
         const command = body as Wire.Continuation;
-        if (!checkpoint || command.checkpoint_version !== checkpoint.version)
+        if (
+          scenario === "guided_checkpoint_stale" &&
+          checkpoint &&
+          !checkpointStaleInjected
+        ) {
+          checkpointStaleInjected = true;
+          checkpoint.version++;
+          touch();
+        }
+        if (
+          !checkpoint ||
+          checkpoint.wait_state !== "waiting" ||
+          command.checkpoint_version !== checkpoint.version
+        )
           throw new ApiError(
             "stale_checkpoint",
             "Checkpoint has changed. Refresh before continuing.",
             checkpoint?.version ?? null,
             409,
           );
-        if (!command.resolution?.trim())
+        if (!checkpoint.allowed_actions.includes(command.resolution))
           throw new ApiError(
             "invalid_resolution",
             "Choose a checkpoint resolution.",
             null,
             422,
           );
-        checkpoint = null;
+        const assignments = command.cohort_assignments ?? {};
+        const cohortIds = new Set([
+          ...wireFixtures.findings.items.flatMap(
+            (finding) => finding.cohort_ids,
+          ),
+          ...proposals.variants.flatMap((variant) => variant.cohort_ids),
+          ...conflicts.flatMap((conflict) =>
+            conflict.alternatives.flatMap((scope) => scope.cohort_ids ?? []),
+          ),
+        ]);
+        if (
+          command.resolution === "regroup_variants" &&
+          !Object.keys(assignments).length
+        )
+          throw new ApiError(
+            "invalid_cohort",
+            "Choose at least one existing variant for regrouping.",
+            null,
+            422,
+          );
+        if (
+          command.resolution !== "regroup_variants" &&
+          Object.keys(assignments).length
+        )
+          throw new ApiError(
+            "invalid_resolution",
+            "Cohort assignments require the supported regroup action.",
+            null,
+            422,
+          );
+        for (const [variantId, ids] of Object.entries(assignments)) {
+          if (
+            !proposals.variants.some(
+              (variant) => variant.variant_id === variantId,
+            ) ||
+            !Array.isArray(ids) ||
+            ids.some((id) => !cohortIds.has(id)) ||
+            new Set(ids).size !== ids.length
+          )
+            throw new ApiError(
+              "invalid_cohort",
+              "Choose existing variant and cohort IDs from the checkpoint scope.",
+              null,
+              422,
+            );
+        }
+        const next = structuredClone(proposals);
+        for (const variant of next.variants) {
+          if (!assignments[variant.variant_id]) continue;
+          variant.cohort_ids = [...assignments[variant.variant_id]];
+          for (const change of next.changes.filter((change) =>
+            variant.change_ids.includes(change.change_id),
+          )) {
+            change.scope = {
+              ...change.scope,
+              cohort_ids: [...variant.cohort_ids],
+            };
+            change.version++;
+            change.uncertainty = [
+              ...new Set([
+                ...change.uncertainty,
+                "PM regroup changes applicability; uploaded feedback counts retain their original cohort scope.",
+              ]),
+            ];
+          }
+        }
+        next.unresolved_conflict_ids = next.unresolved_conflict_ids.filter(
+          (id) => !checkpoint!.conflict_ids.includes(id),
+        );
+        next.proposal_set_version++;
+        proposals = next;
+        snapshot.current_proposal_set_version = proposals.proposal_set_version;
+        conflicts.forEach((conflict) => {
+          if (checkpoint!.conflict_ids.includes(conflict.conflict_id)) {
+            conflict.resolution_status = "resolved";
+            conflict.version++;
+          }
+        });
+        checkpoint = { ...checkpoint, wait_state: "continued" };
         snapshot.analysis_status = "proposals_ready";
         snapshot.stage = "Proposals complete";
         snapshot.available_actions = ["edit", "reimagine", "export"];

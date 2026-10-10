@@ -10,7 +10,6 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
-  Check,
   Download,
   GitBranch,
   History,
@@ -30,6 +29,8 @@ import FindingDetails from "./components/FindingDetails";
 import EvidenceList from "./components/EvidenceList";
 import GraphPanel from "./components/GraphPanel";
 import SourceDialog from "./components/SourceDialog";
+import ResearchPanel from "./components/ResearchPanel";
+import ConflictPanel from "./components/ConflictPanel";
 import { recoverRun } from "./runRecovery";
 import { readSession, saveSession, clearSession } from "./session";
 import type { PendingRun } from "./session";
@@ -154,6 +155,8 @@ function WorkspaceApp({
   const [uploads, setUploads] = useState<UploadRow[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [runId, setRunId] = useState<string | null>(restored?.runId ?? null);
+  const activeRunId = useRef(runId);
+  const runEpoch = useRef(0);
   const [tab, setTab] = useState<Tab>(
     tabs.some((t) => t.title === restored?.tab)
       ? (restored!.tab as Tab)
@@ -311,7 +314,9 @@ function WorkspaceApp({
 
   const refresh = useCallback(
     async (id: string) => {
+      const epoch = runEpoch.current;
       const next = await api.workspace(id);
+      if (activeRunId.current !== id || runEpoch.current !== epoch) return next;
       setWorkspace((old) =>
         old?.snapshot.run_id === id &&
         old.snapshot.revision > next.snapshot.revision
@@ -509,6 +514,7 @@ function WorkspaceApp({
           setPendingRun(null);
         throw error;
       }
+      activeRunId.current = result.run_id;
       setRunId(result.run_id);
       setPendingRun(null);
       await refresh(result.run_id);
@@ -581,6 +587,8 @@ function WorkspaceApp({
   }
 
   const reset = () => {
+    activeRunId.current = null;
+    runEpoch.current++;
     clearSession(sessionNamespace);
     proposalDrafts.current.clear();
     scopeDrafts.current.clear();
@@ -1193,38 +1201,12 @@ function WorkspaceApp({
                 </div>
               ) : (
                 <>
-                  {workspace.checkpoint && (
-                    <section className="checkpoint">
-                      <h3>{workspace.checkpoint.question}</h3>
-                      {workspace.checkpoint.alternatives.map((a) => (
-                        <div key={a.id}>
-                          <strong>{a.title}</strong>
-                          <p>{a.tradeoff}</p>
-                          <button
-                            disabled={!can("continue_checkpoint")}
-                            onClick={() =>
-                              void act(async () => {
-                                await api.request(
-                                  `/runs/${encodeURIComponent(runId!)}/checkpoints/${encodeURIComponent(workspace.checkpoint!.checkpoint_id)}/continue`,
-                                  {
-                                    checkpoint_version:
-                                      workspace.checkpoint!.version,
-                                    selected_resolution: a.id,
-                                  },
-                                  commandKey(),
-                                );
-                                setVariantId(a.id);
-                                await refresh(runId!);
-                              })
-                            }
-                          >
-                            <Check size={15} />
-                            Choose approach
-                          </button>
-                        </div>
-                      ))}
-                    </section>
-                  )}
+                  <ConflictPanel
+                    api={api}
+                    workspace={workspace}
+                    busy={busy}
+                    onRefresh={() => refresh(runId!)}
+                  />
                   {tab === "Findings" && (
                     <>
                       <div className="section-title">
@@ -1351,67 +1333,15 @@ function WorkspaceApp({
                           onOpen={setSource}
                         />
                         {savedConfig?.deep_dive.enabled && (
-                          <section className="research-section">
-                            <h3>Deep Dive</h3>
-                            {workspace.research
-                              .filter(
-                                (r) =>
-                                  r.finding_id === selectedFinding.finding_id,
-                              )
-                              .map((r) => (
-                                <div key={r.research_id}>
-                                  <span className="status">{r.status}</span>
-                                  <p>
-                                    {r.competitor_scope} / {r.as_of}
-                                  </p>
-                                  {r.claims.map((claim, i) => (
-                                    <article className="evidence-card" key={i}>
-                                      <strong>{claim.type}</strong>
-                                      <p>{claim.text}</p>
-                                      {claim.evidence_ids.map((id) => (
-                                        <button
-                                          key={id}
-                                          onClick={() =>
-                                            void act(async () =>
-                                              setSource(
-                                                await api.request<Evidence>(
-                                                  `/runs/${encodeURIComponent(runId!)}/evidence/${encodeURIComponent(id)}`,
-                                                ),
-                                              ),
-                                            )
-                                          }
-                                        >
-                                          <BookOpen size={14} />
-                                          Open citation {id}
-                                        </button>
-                                      ))}
-                                    </article>
-                                  ))}
-                                  <h4>Recommended improvement</h4>
-                                  <p>{r.recommendation}</p>
-                                  <h4>Alternatives and counterevidence</h4>
-                                  {[
-                                    ...r.candidate_approaches,
-                                    ...r.counterevidence,
-                                  ].map((text) => (
-                                    <p key={text}>{text}</p>
-                                  ))}
-                                  {r.gaps.map((gap) => (
-                                    <p className="notice" key={gap}>
-                                      {gap}
-                                    </p>
-                                  ))}
-                                </div>
-                              ))}
-                            {!workspace.research.some(
-                              (r) =>
-                                r.finding_id === selectedFinding.finding_id,
-                            ) && (
-                              <p className="muted">
-                                No research bundle available for this finding.
-                              </p>
-                            )}
-                          </section>
+                          <ResearchPanel
+                            api={api}
+                            runId={runId!}
+                            finding={selectedFinding}
+                            bundles={workspace.research}
+                            error={workspace.resourceErrors?.research}
+                            onRetry={() => refresh(runId!)}
+                            onOpen={setSource}
+                          />
                         )}
                       </>
                     ) : (

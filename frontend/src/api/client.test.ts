@@ -139,13 +139,13 @@ describe("application API boundary", () => {
     await expect(
       api.request(
         `${root}/checkpoints/checkpoint-comfort/continue`,
-        { checkpoint_version: 0, selected_resolution: "variant-digital" },
+        { checkpoint_version: 0, selected_resolution: "continue" },
         "bad-checkpoint",
       ),
     ).rejects.toMatchObject({ code: "stale_checkpoint" });
     const body = {
       checkpoint_version: 1,
-      selected_resolution: "variant-digital",
+      selected_resolution: "continue",
     };
     await api.request(
       `${root}/checkpoints/checkpoint-comfort/continue`,

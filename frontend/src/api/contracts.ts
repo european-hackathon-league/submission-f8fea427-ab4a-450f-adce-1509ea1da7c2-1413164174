@@ -198,6 +198,7 @@ export interface Instruction {
   };
 }
 export interface Workspace {
+  resourceErrors?: { research?: string };
   counts?: Wire.Counts;
   conflicts?: Wire.Conflicts;
   snapshot: Snapshot;

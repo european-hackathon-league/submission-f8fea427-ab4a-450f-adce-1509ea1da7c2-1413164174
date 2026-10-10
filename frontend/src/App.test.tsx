@@ -597,12 +597,11 @@ describe("frontend plan workspace", () => {
   it("continues a guided checkpoint in a panel and records the PM selection", async () => {
     const user = await createRun({ guided: true });
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    await user.click(
-      screen.getAllByRole("button", { name: "Choose approach" })[0],
-    );
+    await user.selectOptions(screen.getByLabelText("Resolution for checkpoint-comfort"), "continue");
+    await user.click(screen.getByRole("button", { name: "Continue checkpoint checkpoint-comfort" }));
     await screen.findByText("proposals_ready");
     expect(
-      screen.queryByRole("button", { name: "Choose approach" }),
+      screen.queryByRole("button", { name: "Continue checkpoint checkpoint-comfort" }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "History" }));
     expect(screen.getByText("PM selected continue")).toBeInTheDocument();
@@ -851,4 +850,54 @@ it("opens mapped evidence from a keyboard component tag", async () => {
   await user.click(screen.getByRole("button", { name: /^Body.*Cohorts/ }));
   expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeInTheDocument();
   expect(screen.getByRole("heading", { name: "Trunk gesture reliability" })).toBeInTheDocument();
+});
+
+it("keeps findings usable during research failure and retries retrieval without changing uploaded counts", async () => {
+  const base = createMockApi(); let failed = true;
+  const api = { ...base, workspace: async (id: string) => { const w = await base.workspace(id); if (failed) { w.research = []; return { ...w, resourceErrors: { research: "Research temporarily unavailable" } }; } return w; } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.click(screen.getByRole("checkbox", { name: "Deep Dive" }));
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ }));
+  expect(screen.getByText("Research temporarily unavailable")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Comfort controls" })).toBeInTheDocument();
+  failed = false; await user.click(screen.getByRole("button", { name: /Retry research/ }));
+  await screen.findByText(/Owner sample unavailable/);
+  expect(screen.getAllByText(/172 of 400 negative feedback records/).length).toBeGreaterThan(0);
+});
+
+it("never asks autonomous runs to continue unexpected backend checkpoints", async () => {
+  const base = createMockApi();
+  const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id); return { ...w, checkpoint: { checkpoint_id: "unexpected", version: 7, question: "Unexpected PM request", alternatives: [{ id: "continue", title: "Continue", tradeoff: "Server issue" }] }, conflicts: { conflicts: [], checkpoints: [{ checkpoint_id: "unexpected", version: 7, allowed_actions: ["continue"], conflict_ids: [], wait_state: "waiting" as const }] } };
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  expect(screen.queryByRole("button", { name: /Choose approach|Continue checkpoint|Submit checkpoint/ })).not.toBeInTheDocument();
+  expect(screen.getByRole("radio", { name: "Autonomous" })).toBeChecked();
+});
+
+
+it("discards late research refresh after New run", async () => {
+  const base = createMockApi(); let paused = false; let release!: () => void; let started = false;
+  const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id);
+    if (paused) { started = true; await new Promise<void>(resolve => { release = resolve; }); }
+    return { ...w, research: [], resourceErrors: { research: "Research offline" } };
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.click(screen.getByRole("checkbox", { name: "Deep Dive" }));
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ }));
+  paused = true; await user.click(screen.getByRole("button", { name: /Retry research/ })); await waitFor(() => expect(started).toBe(true));
+  await user.click(screen.getByRole("button", { name: "New run" }));
+  await user.click(within(screen.getByRole("dialog", { name: "Start a new run?" })).getByRole("button", { name: "Start new run" }));
+  release(); await waitFor(() => expect(screen.queryByText("proposals_ready")).not.toBeInTheDocument());
+  expect(screen.getByRole("heading", { name: "New analysis run" })).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: "Vehicle evidence workspace" })).toBeInTheDocument();
+  expect(screen.getByText(/Findings and proposals will appear here after you start a run/)).toBeInTheDocument();
+  expect(screen.queryByText("Research offline")).not.toBeInTheDocument();
 });

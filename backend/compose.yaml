@@ -19,13 +19,29 @@ services:
     ports: ["127.0.0.1:7233:7233", "127.0.0.1:8233:8233"]
     volumes: ["temporal-data:/data"]
   api:
-    build: .
+    build:
+      context: .
+      target: runtime
     environment:
       DATABASE_URL: postgresql+psycopg://vehicle:vehicle@postgres:5432/vehicle
       TEMPORAL_ADDRESS: temporal:7233
       STORAGE_PATH: /data/objects
     ports: ["127.0.0.1:8000:8000"]
-    volumes: ["objects:/data/objects"]
+    volumes: ["objects:/data/objects", "../contracts:/srv/contracts:ro"]
+    depends_on:
+      postgres: {condition: service_healthy}
+      temporal: {condition: service_started}
+  worker:
+    build:
+      context: .
+      target: runtime
+    command: ["python", "-m", "app.worker"]
+    restart: on-failure
+    environment:
+      DATABASE_URL: postgresql+psycopg://vehicle:vehicle@postgres:5432/vehicle
+      TEMPORAL_ADDRESS: temporal:7233
+      STORAGE_PATH: /data/objects
+    volumes: ["objects:/data/objects", "../contracts:/srv/contracts:ro"]
     depends_on:
       postgres: {condition: service_healthy}
       temporal: {condition: service_started}

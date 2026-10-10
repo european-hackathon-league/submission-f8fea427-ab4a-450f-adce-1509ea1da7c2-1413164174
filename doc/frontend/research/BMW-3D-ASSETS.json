@@ -1,0 +1,1004 @@
+{
+  "checkedOn": "2026-10-10",
+  "sizeUnits": "bytes; report MB uses decimal 1000000 bytes",
+  "scope": "F70, G60, G68, G70 and 23 option-list derivatives; G68 has no supplied trim list",
+  "limitations": [
+    "Public metadata and selected exterior previews reviewed. No authenticated model archives downloaded.",
+    "Archive fields are publisher/API export metadata, not locally audited geometry.",
+    "No full cabin or selectable component topology verified.",
+    "Search coverage is not proof of global absence."
+  ],
+  "candidates": [
+    {
+      "uid": "207fd872d28b4cafa7fefe061ae98e26",
+      "name": "2023 BMW I5 M60",
+      "author": "Nazh Design \u2714",
+      "source": "https://sketchfab.com/3d-models/2023-bmw-i5-m60-207fd872d28b4cafa7fefe061ae98e26",
+      "metadataSource": "https://api.sketchfab.com/v3/models/207fd872d28b4cafa7fefe061ae98e26",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 1477883,
+      "modelVertices": 795020,
+      "materialCount": 2,
+      "textureCount": 0,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 0,
+          "size": 42990308,
+          "type": "glb",
+          "textureMaxResolution": 0,
+          "faceCount": 1477883,
+          "vertexCount": 855789
+        },
+        "gltf": {
+          "textureCount": 0,
+          "size": 18585806,
+          "type": "gltf",
+          "textureMaxResolution": 0,
+          "faceCount": 1477883,
+          "vertexCount": 855789
+        },
+        "source": {
+          "textureCount": null,
+          "size": 28426636,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 20960602,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [
+        "bmw",
+        "M60",
+        "i5",
+        "m-sport",
+        "electric"
+      ],
+      "description": "2023 BMW I5 M60",
+      "status": "shortlist-exterior",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "07937cca69864dfe9f4b4ed235fc32f7",
+      "name": "2023 BMW I7 G70",
+      "author": "Nazh Design \u2714",
+      "source": "https://sketchfab.com/3d-models/2023-bmw-i7-g70-07937cca69864dfe9f4b4ed235fc32f7",
+      "metadataSource": "https://api.sketchfab.com/v3/models/07937cca69864dfe9f4b4ed235fc32f7",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 210138,
+      "modelVertices": 123059,
+      "materialCount": 1,
+      "textureCount": 0,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 0,
+          "size": 9357008,
+          "type": "glb",
+          "textureMaxResolution": 0,
+          "faceCount": 210138,
+          "vertexCount": 170789
+        },
+        "gltf": {
+          "textureCount": 0,
+          "size": 3399003,
+          "type": "gltf",
+          "textureMaxResolution": 0,
+          "faceCount": 210138,
+          "vertexCount": 170789
+        },
+        "source": {
+          "textureCount": null,
+          "size": 4491966,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 4494295,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [
+        "bmw",
+        "ev",
+        "g70",
+        "i7",
+        "elertric-car"
+      ],
+      "description": "2023 BMW I7 G70",
+      "status": "shortlist-exterior-unspecified-trim",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "5ef18af79916408ababa187fb0428429",
+      "name": "BMW i7 M70",
+      "author": "akyolefe319",
+      "source": "https://sketchfab.com/3d-models/bmw-i7-m70-5ef18af79916408ababa187fb0428429",
+      "metadataSource": "https://api.sketchfab.com/v3/models/5ef18af79916408ababa187fb0428429",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 357968,
+      "modelVertices": 214837,
+      "materialCount": 11,
+      "textureCount": 1,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 0,
+          "size": 14191588,
+          "type": "glb",
+          "textureMaxResolution": 0,
+          "faceCount": 357843,
+          "vertexCount": 308559
+        },
+        "gltf": {
+          "textureCount": 0,
+          "size": 6417346,
+          "type": "gltf",
+          "textureMaxResolution": 0,
+          "faceCount": 357843,
+          "vertexCount": 308559
+        },
+        "source": {
+          "textureCount": null,
+          "size": 52143808,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 8472336,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [
+        "bmw",
+        "i7",
+        "bmw7"
+      ],
+      "description": "2024 BMW i7 M70 xDrive",
+      "status": "shortlist-exterior",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "aca5bc34dd014aff89eef647124b485d",
+      "name": "Bmw-1-series 2025",
+      "author": "teenlin3",
+      "source": "https://sketchfab.com/3d-models/bmw-1-series-2025-aca5bc34dd014aff89eef647124b485d",
+      "metadataSource": "https://api.sketchfab.com/v3/models/aca5bc34dd014aff89eef647124b485d",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 499999,
+      "modelVertices": 249962,
+      "materialCount": 1,
+      "textureCount": 4,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 3,
+          "size": 49069256,
+          "type": "glb",
+          "textureMaxResolution": 4096,
+          "faceCount": 499999,
+          "vertexCount": 325142
+        },
+        "gltf": {
+          "textureCount": 3,
+          "size": 41093390,
+          "type": "gltf",
+          "textureMaxResolution": 4096,
+          "faceCount": 499999,
+          "vertexCount": 325142
+        },
+        "source": {
+          "textureCount": null,
+          "size": 77263711,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 14288239,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [
+        "bmw",
+        "hatchback",
+        "automotive",
+        "high-poly",
+        "realistic",
+        "unreal-engine",
+        "3D Model,",
+        "m-sport",
+        "unity3d",
+        "low-poly",
+        "vehicle",
+        "pbr",
+        "1-series",
+        "m135",
+        "german-car",
+        "ai-generated",
+        "f70",
+        "hunyuan3d",
+        "2025bmw",
+        "curved-display",
+        "digital-cockpit"
+      ],
+      "description": "Title: BMW 1 Series 2025 (F70) - The All-New Digital Hatchback\nDescription:\nDiscover the bold redesign of the fourth-generation 2025 BMW 1 Series (F70). This 3D model masterfully recreates BMW\u2019s latest design language, featuring a significantly flattened front end and a digital-first interior. Optimized for high-end visualization, this model captures the transition of the 1 Series into a more premium, tech-focused compact athlete. \ud83c\udde9\ud83c\uddea\u26a1\nCar Highlights:\nThe F70 generation redefines the premium hatchback with sharpened aesthetics and cutting-edge tech:\n\n* \ud83d\udca0 New Face & Kidney Grille: Recreates the flatter, wider kidney grille with its innovative vertical and diagonal bar structure, complemented by vertical-signature LED headlights.\n* \ud83c\udfc1 M-Sport Evolution: Captures the aggressive M-specific front apron with large air intakes, 18-inch Midnight Grey alloy wheels, and a powerful rear diffuser with vertical reflectors.",
+      "status": "reject-ai-generated-accuracy",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "6b60ebea0cba431fbf0eb024c8869a8f",
+      "name": "Bmw-520d",
+      "author": "teenlin3",
+      "source": "https://sketchfab.com/3d-models/bmw-520d-6b60ebea0cba431fbf0eb024c8869a8f",
+      "metadataSource": "https://api.sketchfab.com/v3/models/6b60ebea0cba431fbf0eb024c8869a8f",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 499999,
+      "modelVertices": 249988,
+      "materialCount": 1,
+      "textureCount": 4,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 3,
+          "size": 50017848,
+          "type": "glb",
+          "textureMaxResolution": 4096,
+          "faceCount": 499999,
+          "vertexCount": 333592
+        },
+        "gltf": {
+          "textureCount": 3,
+          "size": 41823095,
+          "type": "gltf",
+          "textureMaxResolution": 4096,
+          "faceCount": 499999,
+          "vertexCount": 333592
+        },
+        "source": {
+          "textureCount": null,
+          "size": 78295692,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 14612929,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [
+        "bmw",
+        "sedan",
+        "luxury",
+        "tags",
+        "3D Model,",
+        "g60",
+        "5-series",
+        "loypoly",
+        "german-engineering",
+        "executive-car",
+        "520d"
+      ],
+      "description": "Title: BMW 520d Sedan (G60) 2024 - The Executive Business Athlete \nDescription:\nElevate your digital showroom with the all-new 2024 BMW 520d (G60). This 3D model captures the essence of the world's most successful business sedan, now evolved with a sharper, more minimalist design language and mild-hybrid diesel efficiency. Perfect for high-end architectural renders and automotive simulations. \ud83c\udde9\ud83c\uddea\ud83d\udcbc\ud83d\udd25\nCar Highlights:\nThe G60 generation redefines the executive class with its \"Sport Executive\" presence:\n\n* \ud83d\udca0 Iconic Glow Presence: Features the new, more upright kidney grille with available Iconic Glow contour lighting and twin-signature vertical LED headlights.\n* \ud83c\udfc1 Clean Design Language: Captures the monolithic surfaces, flush-fitting door handles, and the embossed \"5\" on the Hofmeister kink for a premium, modern feel.\n* \ud83d\udcf1 Digital Leadership: Includes a detailed recreation of the BMW Curved Display and the crystalline Interaction Bar that spans the dashboard.",
+      "status": "reject-suspect-generation",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "dc7cb373178a4572a506f8d4886a5d3c",
+      "name": "BMW 7 Series MK7 (G70/G73) 2022",
+      "author": "Merc_TV",
+      "source": "https://sketchfab.com/3d-models/bmw-7-series-mk7-g70g73-2022-dc7cb373178a4572a506f8d4886a5d3c",
+      "metadataSource": "https://api.sketchfab.com/v3/models/dc7cb373178a4572a506f8d4886a5d3c",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 200169,
+      "modelVertices": 119891,
+      "materialCount": 50,
+      "textureCount": 0,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 0,
+          "size": 8699956,
+          "type": "glb",
+          "textureMaxResolution": 0,
+          "faceCount": 200169,
+          "vertexCount": 163435
+        },
+        "gltf": {
+          "textureCount": 0,
+          "size": 4288996,
+          "type": "gltf",
+          "textureMaxResolution": 0,
+          "faceCount": 200169,
+          "vertexCount": 163435
+        },
+        "source": {
+          "textureCount": null,
+          "size": 31721690,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 4645479,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [],
+      "description": "",
+      "status": "reserve-trim-unverified",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "d99f809798894a6187fc5e94144ad80f",
+      "name": "BMW Series 7 MK7 (G70) 2022",
+      "author": "Merc_TV",
+      "source": "https://sketchfab.com/3d-models/bmw-series-7-mk7-g70-2022-d99f809798894a6187fc5e94144ad80f",
+      "metadataSource": "https://api.sketchfab.com/v3/models/d99f809798894a6187fc5e94144ad80f",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 845957,
+      "modelVertices": 454460,
+      "materialCount": 4,
+      "textureCount": 9,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 5,
+          "size": 64514472,
+          "type": "glb",
+          "textureMaxResolution": 8,
+          "faceCount": 845912,
+          "vertexCount": 853935
+        },
+        "gltf": {
+          "textureCount": 5,
+          "size": 23902212,
+          "type": "gltf",
+          "textureMaxResolution": 8,
+          "faceCount": 845912,
+          "vertexCount": 853935
+        },
+        "source": {
+          "textureCount": null,
+          "size": 46111364,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 28692212,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [],
+      "description": "",
+      "status": "reserve-heavy-trim-unverified",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "1e52b6b8821040c2aea037b7c029a20d",
+      "name": "i5",
+      "author": "akyolefe319",
+      "source": "https://sketchfab.com/3d-models/i5-1e52b6b8821040c2aea037b7c029a20d",
+      "metadataSource": "https://api.sketchfab.com/v3/models/1e52b6b8821040c2aea037b7c029a20d",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 306132,
+      "modelVertices": 175804,
+      "materialCount": 10,
+      "textureCount": 0,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 0,
+          "size": 15242400,
+          "type": "glb",
+          "textureMaxResolution": 0,
+          "faceCount": 306046,
+          "vertexCount": 360406
+        },
+        "gltf": {
+          "textureCount": 0,
+          "size": 4889848,
+          "type": "gltf",
+          "textureMaxResolution": 0,
+          "faceCount": 306046,
+          "vertexCount": 360406
+        },
+        "source": {
+          "textureCount": null,
+          "size": 61822713,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 9320751,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [
+        "bmw",
+        "g60",
+        "i5"
+      ],
+      "description": "all belongs to BMW AG",
+      "status": "hold-provenance",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "39f68b5bef64479a9cff309b7502a77f",
+      "name": "Bmw I7",
+      "author": "MattDoesBlender",
+      "source": "https://sketchfab.com/3d-models/bmw-i7-39f68b5bef64479a9cff309b7502a77f",
+      "metadataSource": "https://api.sketchfab.com/v3/models/39f68b5bef64479a9cff309b7502a77f",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 238202,
+      "modelVertices": 139836,
+      "materialCount": 56,
+      "textureCount": 0,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 0,
+          "size": 19965480,
+          "type": "glb",
+          "textureMaxResolution": 0,
+          "faceCount": 238184,
+          "vertexCount": 194211
+        },
+        "gltf": {
+          "textureCount": 0,
+          "size": 4573254,
+          "type": "gltf",
+          "textureMaxResolution": 0,
+          "faceCount": 238184,
+          "vertexCount": 194211
+        },
+        "source": {
+          "textureCount": null,
+          "size": 48958890,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 5216669,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [],
+      "description": "",
+      "status": "reserve-trim-unverified",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "237c4db0df1c43abadbe3cfad707cb7e",
+      "name": "BMW 760  I7",
+      "author": "CloudHubOmniTeam",
+      "source": "https://sketchfab.com/3d-models/bmw-760-i7-237c4db0df1c43abadbe3cfad707cb7e",
+      "metadataSource": "https://api.sketchfab.com/v3/models/237c4db0df1c43abadbe3cfad707cb7e",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 507066,
+      "modelVertices": 290987,
+      "materialCount": 79,
+      "textureCount": 1,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 1,
+          "size": 46041752,
+          "type": "glb",
+          "textureMaxResolution": 256,
+          "faceCount": 507053,
+          "vertexCount": 1242469
+        },
+        "gltf": {
+          "textureCount": 1,
+          "size": 19405713,
+          "type": "gltf",
+          "textureMaxResolution": 256,
+          "faceCount": 507053,
+          "vertexCount": 1242469
+        },
+        "source": {
+          "textureCount": null,
+          "size": 67274636,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 30078367,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [],
+      "description": "",
+      "status": "outside-documented-trims",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "e5454f274c4f44fa84e274c2583d7f5c",
+      "name": "2023 BMW i7",
+      "author": "tonielpro520",
+      "source": "https://sketchfab.com/3d-models/2023-bmw-i7-e5454f274c4f44fa84e274c2583d7f5c",
+      "metadataSource": "https://api.sketchfab.com/v3/models/e5454f274c4f44fa84e274c2583d7f5c",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 210142,
+      "modelVertices": 126577,
+      "materialCount": 39,
+      "textureCount": 21,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 22,
+          "size": 21314472,
+          "type": "glb",
+          "textureMaxResolution": 2048,
+          "faceCount": 210142,
+          "vertexCount": 517407
+        },
+        "gltf": {
+          "textureCount": 22,
+          "size": 10014617,
+          "type": "gltf",
+          "textureMaxResolution": 2048,
+          "faceCount": 210142,
+          "vertexCount": 517407
+        },
+        "source": {
+          "textureCount": null,
+          "size": 14585002,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 13849561,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [
+        "bmw",
+        "i",
+        "7",
+        "m",
+        "b",
+        "w",
+        "i7",
+        "car",
+        "free",
+        "2023"
+      ],
+      "description": "2023 BMW i7\n![](https://soymotor.com/sites/default/files/2023-04/bmw-i7-2023-exterior-1-soymotor.jpg)\nFree\nREUPLOAD",
+      "status": "hold-explicit-reupload",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    },
+    {
+      "uid": "f13b9b405f214f9aaa54bbe2466141d4",
+      "name": "BMW M5 MK7 (G60) 2024",
+      "author": "Merc_TV",
+      "source": "https://sketchfab.com/3d-models/bmw-m5-mk7-g60-2024-f13b9b405f214f9aaa54bbe2466141d4",
+      "metadataSource": "https://api.sketchfab.com/v3/models/f13b9b405f214f9aaa54bbe2466141d4",
+      "license": {
+        "uri": "https://api.sketchfab.com/v3/licenses/322a749bcfa841b29dff1e8a1bb74b0b",
+        "label": "CC Attribution",
+        "fullName": "Creative Commons Attribution",
+        "requirements": "Author must be credited. Commercial use is allowed.",
+        "url": "http://creativecommons.org/licenses/by/4.0/",
+        "slug": "by"
+      },
+      "downloadable": true,
+      "modelFaces": 397876,
+      "modelVertices": 234000,
+      "materialCount": 74,
+      "textureCount": 15,
+      "archivesAsReported": {
+        "glb": {
+          "textureCount": 15,
+          "size": 45248032,
+          "type": "glb",
+          "textureMaxResolution": 2048,
+          "faceCount": 397876,
+          "vertexCount": 403033
+        },
+        "gltf": {
+          "textureCount": 15,
+          "size": 24038871,
+          "type": "gltf",
+          "textureMaxResolution": 2048,
+          "faceCount": 397876,
+          "vertexCount": 403033
+        },
+        "source": {
+          "textureCount": null,
+          "size": 102895859,
+          "type": "source",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        },
+        "usdz": {
+          "textureCount": null,
+          "size": 17230746,
+          "type": "usdz",
+          "textureMaxResolution": null,
+          "faceCount": null,
+          "vertexCount": null
+        }
+      },
+      "tags": [],
+      "description": "",
+      "status": "reject-wrong-family-g90",
+      "meshDownloaded": false,
+      "interiorVerified": false,
+      "componentMeshMappingVerified": false
+    }
+  ],
+  "publicSketchfabQueries": [
+    {
+      "query": "BMW 520d",
+      "downloadable": true,
+      "resultCount": 17,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 520d xDrive G60",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 520i",
+      "downloadable": true,
+      "resultCount": 21,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 530e",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 530e G60",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 540d",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 540d xDrive G60",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 550e",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 550e G60",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 5 Series 2024",
+      "downloadable": true,
+      "resultCount": 3,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 740",
+      "downloadable": true,
+      "resultCount": 1,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 740 xDrive G70",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 740d",
+      "downloadable": true,
+      "resultCount": 4,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 740d xDrive G70",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 750e",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 750e G70",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW 7 Series 2023",
+      "downloadable": true,
+      "resultCount": 1,
+      "nextPage": false
+    },
+    {
+      "query": "BMW F70",
+      "downloadable": true,
+      "resultCount": 1,
+      "nextPage": false
+    },
+    {
+      "query": "BMW G60",
+      "downloadable": true,
+      "resultCount": 3,
+      "nextPage": false
+    },
+    {
+      "query": "BMW G60 interior",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW G68",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW G70",
+      "downloadable": true,
+      "resultCount": 4,
+      "nextPage": false
+    },
+    {
+      "query": "BMW M760e",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW M760e G70",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i5",
+      "downloadable": true,
+      "resultCount": 2,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i5 M60",
+      "downloadable": true,
+      "resultCount": 1,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i5 eDrive40",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i5 xDrive40",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i7",
+      "downloadable": true,
+      "resultCount": 8,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i7 50 xDrive",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i7 60 xDrive",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i7 M70",
+      "downloadable": true,
+      "resultCount": 1,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i7 xDrive50",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    },
+    {
+      "query": "BMW i7 xDrive60",
+      "downloadable": true,
+      "resultCount": 0,
+      "nextPage": false
+    }
+  ]
+}

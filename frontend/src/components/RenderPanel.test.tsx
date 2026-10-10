@@ -458,3 +458,23 @@ it("aborts owned status reads when switching to another run", async () => {
     screen.queryByRole("region", { name: "Render job job-1" }),
   ).not.toBeInTheDocument();
 });
+it("recovers a failed variant preview by retrieving authorized asset links without submitting another render", async () => {
+  const user = userEvent.setup(); let reads = 0;
+  const {api,request} = service(async (path,body) => {
+    if (body === undefined && path.includes('/renders/')) {
+      const next = result();
+      next.wire!.assets[0].url = ++reads === 1 ? 'https://assets.example/expired.png' : 'https://assets.example/refreshed.png';
+      return next;
+    }
+  });
+  render(<RenderPanel {...props(api)} />);
+  await user.click(screen.getByRole('button',{name:'Reimagine'}));
+  const assets = await screen.findByRole('region',{name:'Current render assets'});
+  const image = within(assets).getByRole('img');
+  expect(image).toHaveAttribute('src','https://assets.example/expired.png');
+  fireEvent.error(image);
+  expect(screen.getByRole('button',{name:'Explain change 1 change-dashboard'})).toBeEnabled();
+  await user.click(screen.getByRole('button',{name:/^Refresh asset links/}));
+  await waitFor(()=>expect(within(assets).getByRole('img')).toHaveAttribute('src','https://assets.example/refreshed.png'));
+  expect(request.mock.calls.filter(([,body])=>body!==undefined)).toHaveLength(1);
+});

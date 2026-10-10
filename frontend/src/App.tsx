@@ -31,6 +31,7 @@ import ProposalWorkspace from "./components/ProposalWorkspace";
 import HistoryPanel from "./components/HistoryPanel";
 import RenderPanel from "./components/RenderPanel";
 import ChangeExplanation from "./components/ChangeExplanation";
+import SceneCapabilities from "./components/SceneCapabilities";
 import { recoverRun } from "./runRecovery";
 import { readSession, saveSession, clearSession } from "./session";
 import type { PendingRun, ProposalSelection } from "./session";
@@ -587,7 +588,13 @@ function WorkspaceApp({
               {setupLocked ? "Saved configuration" : "New analysis run"}
             </h1>
             {setupLocked && (
-              <button onClick={() => setConfirmNewRun(true)} disabled={busy}>
+              <button
+                onClick={(event) => {
+                  event.currentTarget.focus();
+                  setConfirmNewRun(true);
+                }}
+                disabled={busy}
+              >
                 <Plus size={16} />
                 New run
               </button>
@@ -998,6 +1005,14 @@ function WorkspaceApp({
                 </div>
               )}
             </div>
+            <SceneCapabilities
+              vehicle={vehicle}
+              config={savedConfig ?? {
+                vehicle_id: vehicleId,
+                baseline_asset_id: vehicle?.baseline_asset_id ?? "",
+                part_catalog_version: vehicle?.part_catalog_version ?? "",
+              }}
+            />
             {run?.warnings.map((w) => (
               <p className="coverage-note" key={w}>
                 {w}
@@ -1339,10 +1354,12 @@ function ConfirmDialog({
   const [failed, setFailed] = useState(false);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    if (ref.current?.showModal) ref.current.showModal();
-    else ref.current?.setAttribute("open", "");
-    ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    const dialog = ref.current;
+    if (dialog?.showModal) dialog.showModal();
+    else dialog?.setAttribute("open", "");
+    dialog?.querySelector<HTMLButtonElement>("button")?.focus();
     return () => {
+      if (dialog?.open && typeof dialog.close === "function") dialog.close();
       if (opener?.isConnected) opener.focus();
       else document.querySelector<HTMLHeadingElement>("main h1")?.focus();
     };

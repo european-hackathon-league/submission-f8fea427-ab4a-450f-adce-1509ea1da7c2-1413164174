@@ -176,7 +176,17 @@ it.each([
     for (let n = 0; n < 5 && done.status === "rendering"; n++)
       done = await api.request(path);
     expect(done.status).toBe(terminal);
-    expect(done.assets).toEqual([]);
+    if (terminal === "failed") expect(done.assets).toEqual([]);
+    else {
+      expect(done.assets).toHaveLength(1);
+      expect(done.assets[0].url).toBe(
+        "/vehicles/frontend-render-annotation.svg",
+      );
+      expect(
+        done.outcomes.every((outcome) => outcome.status === "annotated"),
+      ).toBe(true);
+      expect(done.outcomes[0].reason).toMatch(/static synthetic/i);
+    }
     expect(done.proposal_set_version).toBe(1);
     if (terminal === "failed") {
       const retry = await api.request<Accepted>(

@@ -9,10 +9,10 @@ import type {
 } from "../api/contracts";
 import type { Accepted } from "../api/wire";
 import ChangeExplanation from "./ChangeExplanation";
+import RenderAssets from "./RenderAssets";
 import {
   bindingKey,
   readRenderJobs,
-  renderAssetUrl,
   saveRenderJobs,
   validateRenderResult,
 } from "./renderJobs";
@@ -52,6 +52,7 @@ function Job({
   const [proposalError, setProposalError] = useState("");
   const [proposalAttempt, setProposalAttempt] = useState(0);
   const [explained, setExplained] = useState<string | null>(null);
+  const [showEarlierAssets, setShowEarlierAssets] = useState(false);
   const explanation = useRef<HTMLDivElement>(null);
   useEffect(() => {
     mounted.current = true;
@@ -213,28 +214,9 @@ function Job({
   const assets =
     result?.wire?.assets.filter((asset) => assetIds.has(asset.asset_id)) ?? [];
   const assetList = (
-    <>
-      {assets.map((asset) => {
-        const url = renderAssetUrl(
-          api.linkUrl ? (api.linkUrl(asset.url) ?? "") : asset.url,
-        );
-        return url ? (
-          <a key={asset.asset_id} href={url} target="_blank" rel="noreferrer">
-            Open variant asset {asset.asset_id}
-          </a>
-        ) : (
-          <p key={asset.asset_id}>
-            Asset {asset.asset_id}: authorized web link unavailable.
-          </p>
-        );
-      })}
-      {!assets.length && (
-        <p>
-          No bound asset supplied for this variant. Baseline remains
-          independently available.
-        </p>
-      )}
-    </>
+    <div className="render-assets">
+      <RenderAssets api={api} assets={assets} identity={JSON.stringify([bindingKey(job.binding), job.requestId, renderedVariant?.variant_id])} onRefreshLinks={() => setPollAttempt(old => old + 1)} />
+    </div>
   );
   return (
     <section
@@ -287,9 +269,9 @@ function Job({
           {current && !stale ? (
             <section aria-label="Current render assets">{assetList}</section>
           ) : (
-            <details>
+            <details onToggle={event => setShowEarlierAssets(event.currentTarget.open)}>
               <summary>Inspect earlier render assets {job.requestId}</summary>
-              {assetList}
+              {showEarlierAssets && assetList}
             </details>
           )}
           {["failed", "partial"].includes(result.status) && (

@@ -1,12 +1,13 @@
 import {
   cleanup,
+  fireEvent,
   render,
   screen,
   within,
   waitFor,
 } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { ApiError, createMockApi } from "./api/client";
 import type { Api } from "./api/contracts";
@@ -341,6 +342,24 @@ describe("frontend plan workspace", () => {
     expect(screen.getByLabelText("Proposal text")).toHaveValue("Keep draft");
   });
 
+  it("restores New run focus after a pointer-opened native dialog closes", async () => {
+    await createRun();
+    const opener = screen.getByRole("button", { name: "New run" });
+    const heading = screen.getByRole("heading", { name: "Saved configuration" });
+    heading.focus();
+    fireEvent.click(opener);
+    const dialog = screen.getByRole("dialog", { name: "Start a new run?" });
+    const close = vi.fn(() => dialog.removeAttribute("open"));
+    Object.defineProperty(dialog, "close", { configurable: true, value: close });
+    const focus = vi.spyOn(opener, "focus");
+    fireEvent.click(within(dialog).getByRole("button", { name: "Keep working" }));
+    expect(close).toHaveBeenCalledOnce();
+    expect(focus).toHaveBeenCalledOnce();
+    expect(close.mock.invocationCallOrder[0]).toBeLessThan(focus.mock.invocationCallOrder[0]);
+    expect(opener).toHaveFocus();
+    focus.mockRestore();
+  });
+
   it("keeps proposal drafts when New run is canceled and resets only after confirmation", async () => {
     const user = await createRun();
     await user.click(screen.getByRole("tab", { name: "Proposals" }));
@@ -468,6 +487,9 @@ describe("frontend plan workspace", () => {
     render(<App />);
     await screen.findByRole("option", { name: "BMW 1 Series / F70" });
     await user.selectOptions(screen.getByLabelText("Vehicle"), "f70");
+    const scene = screen.getByRole("region", { name: "Scene capabilities" });
+    expect(scene).toHaveTextContent("f70");
+    expect(within(scene).queryByRole("link", { name: "Open baseline preview" })).not.toBeInTheDocument();
     expect(
       screen.getByText(
         "No baseline asset for this vehicle. Choose a vehicle with an available baseline.",
@@ -563,7 +585,7 @@ describe("frontend plan workspace", () => {
       await screen.findByText(/Render proposal version 1/),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText(/Annotation only/, {}, { timeout: 7000 }),
+      await screen.findByText(/Static synthetic annotation reference/, {}, { timeout: 7000 }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Rendering does not mean validated or approved/)).toBeInTheDocument();
   }, 12000);

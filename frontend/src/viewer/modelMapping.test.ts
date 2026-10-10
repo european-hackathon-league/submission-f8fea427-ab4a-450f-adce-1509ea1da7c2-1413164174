@@ -77,3 +77,12 @@ describe("scene catalog validation",()=>{
     expect(validate({...catalog,parts:[{...photo,reference_photo_anchor:[.5,.7]}]}).parts[0].part_id).toBe("body");
   });
 });
+describe('catalog asset reference safety',()=>{
+ it.each(['javascript:alert(1)','data:image/svg+xml,test','https://user:secret@example.test/asset','//foreign.example/asset','/\\foreign.example/asset'])('rejects unsafe asset reference %s',url=>{
+  const catalog=validCatalog();catalog.baseline_asset.preview_url=url;expect(()=>mapping.validateSceneCatalog(catalog)).toThrow(/asset|reference/i);
+  catalog.baseline_asset.preview_url=sceneCatalog.baseline_asset.preview_url;catalog.interior_reference.url=url;expect(()=>mapping.validateSceneCatalog(catalog)).toThrow(/asset|reference/i);
+ });
+ it('requires baseline and cabin references to have distinct asset identities',()=>{
+  const catalog=validCatalog();catalog.interior_reference.asset_id=catalog.baseline_asset_id;expect(()=>mapping.validateSceneCatalog(catalog)).toThrow(/asset|reference/i);
+ });
+});

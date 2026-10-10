@@ -1,7 +1,7 @@
 import { ApiError, commandKey } from "./client";
 import type { Send } from "./client";
 import type * as Wire from "./wire";
-import { wireFixtures } from "./fixtures";
+import { wireFixtures, renderFixtures } from "./fixtures";
 
 export function createMockTransport(scenario: string): {
   send: Send;
@@ -37,7 +37,7 @@ export function createMockTransport(scenario: string): {
   const commands = new Map<string, { input: string; result: unknown }>();
   const renders = new Map<string, Wire.RenderResult>();
   const renderPolls = new Map<string, number>();
-  const renderOutcomes = new Map<string, Wire.RenderResult["outcomes"]>();
+  const renderCompletions = new Map<string, Wire.RenderResult>();
   const exports = new Map<string, Wire.ExportResult>();
   const blobUrls = new Set<string>();
   let pending = false;
@@ -648,29 +648,73 @@ export function createMockTransport(scenario: string): {
               .filter((v) => command.variant_ids.includes(v.variant_id))
               .flatMap((v) => v.change_ids),
           );
-          renders.set(id, {
+          const template =
+            renderFixtures[
+              scenario === "render_failed"
+                ? "failure"
+                : scenario === "render_success"
+                  ? "success"
+                  : scenario === "render_late"
+                    ? "late"
+                    : "partial"
+            ];
+          const assetIds = new Map(
+            template.assets.map((asset) => [
+              asset.asset_id,
+              `${id}-${asset.asset_id}`,
+            ]),
+          );
+          const outcomes: Wire.RenderOutcome[] = proposals.changes
+            .filter((change) => changeIds.has(change.change_id))
+            .map((change) => {
+              const outcome = template.outcomes.find(
+                (item) => item.change_id === change.change_id,
+              );
+              return outcome
+                ? {
+                    ...structuredClone(outcome),
+                    asset_ids: outcome.asset_ids.map((assetId) =>
+                      assetIds.get(assetId)!,
+                    ),
+                  }
+                : {
+                    change_id: change.change_id,
+                    outcome:
+                      template.status === "failed" ? "failed" : "unsupported",
+                    asset_ids: [],
+                    reason:
+                      "No synthetic visual mapping exists for this requested change. Proposal and evidence remain available; geometry and edit text are not fabricated.",
+                  };
+            });
+          const usedAssets = new Set(
+            outcomes.flatMap((outcome) => outcome.asset_ids),
+          );
+          const assets = template.assets
+            .map((asset) => ({
+              ...asset,
+              asset_id: assetIds.get(asset.asset_id)!,
+            }))
+            .filter((asset) => usedAssets.has(asset.asset_id));
+          const bound: Wire.RenderResult = {
+            ...structuredClone(renderFixtures.queued),
             render_request_id: id,
             proposal_set_version: command.proposal_set_version,
-            variant_ids: command.variant_ids,
+            variant_ids: [...command.variant_ids],
             baseline_asset_id: command.baseline_asset_id,
             part_catalog_version: snapshot.config.part_catalog_version,
-            status: "queued",
-            assets: [],
-            outcomes: proposals.changes
-              .filter((c) => changeIds.has(c.change_id))
-              .map((c) => ({
-                change_id: c.change_id,
-                outcome: "annotated",
-                asset_ids: [],
-                reason:
-                  "Annotation only. New geometry is unsupported by this synthetic frontend fixture.",
-              })),
-            stale: false,
-            failure_reason: null,
-            job_id: null,
+          };
+          renders.set(id, bound);
+          renderCompletions.set(id, {
+            ...structuredClone(bound),
+            status:
+              template.status === "succeeded" &&
+              outcomes.some((outcome) => outcome.outcome === "unsupported")
+                ? "partial"
+                : template.status,
+            assets,
+            outcomes,
+            failure_reason: template.failure_reason,
           });
-          renderOutcomes.set(id, structuredClone(renders.get(id)!.outcomes));
-          renders.get(id)!.outcomes = [];
           renderPolls.set(id, 0);
           record(
             `Render requested for proposal version ${command.proposal_set_version}`,
@@ -700,6 +744,7 @@ export function createMockTransport(scenario: string): {
             409,
           );
         render.status = "queued";
+        render.assets = [];
         render.outcomes = [];
         render.failure_reason = null;
         renderPolls.set(id, 0);
@@ -725,27 +770,13 @@ export function createMockTransport(scenario: string): {
         result = structuredClone(render);
         const polls = renderPolls.get(id) ?? 0;
         renderPolls.set(id, polls + 1);
-        if (render.status === "queued") render.status = "rendering";
+        if (render.status === "queued")
+          render.status = renderFixtures.rendering.status;
         else if (
           render.status === "rendering" &&
           (scenario !== "render_late" || polls >= 3)
         ) {
-          render.status =
-            scenario === "render_failed"
-              ? "failed"
-              : scenario === "render_success"
-                ? "succeeded"
-                : "partial";
-          render.outcomes = structuredClone(renderOutcomes.get(id) ?? []);
-          if (render.status === "failed") {
-            render.failure_reason =
-              "Synthetic renderer failure; no generated geometry available.";
-            render.outcomes = render.outcomes.map((outcome) => ({
-              ...outcome,
-              outcome: "failed",
-              reason: render.failure_reason,
-            }));
-          }
+          Object.assign(render, structuredClone(renderCompletions.get(id)!));
         }
       } else if (resource === "/exports" && body) {
         const command = body as Wire.ExportCommand;

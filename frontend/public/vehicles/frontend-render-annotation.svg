@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="960" height="500" viewBox="0 0 960 500" role="img" aria-labelledby="title description">
+  <title id="title">Synthetic frontend annotation reference</title>
+  <desc id="description">A numbered text annotation for change-dashboard. This static test asset contains no vehicle geometry, generated image, exact trim, or verified hardware changes.</desc>
+  <rect x="2" y="2" width="956" height="496" rx="16" fill="#f6f8fa" stroke="#394856" stroke-width="4"/>
+  <text x="48" y="70" fill="#44596a" font-family="sans-serif" font-size="23" font-weight="700">SYNTHETIC FRONTEND FIXTURE</text>
+  <text x="48" y="125" fill="#182a38" font-family="sans-serif" font-size="34">Static annotation reference</text>
+  <circle cx="82" cy="215" r="32" fill="#182a38"/>
+  <text x="82" y="226" fill="white" font-family="sans-serif" font-size="30" text-anchor="middle">1</text>
+  <text x="134" y="212" fill="#182a38" font-family="sans-serif" font-size="27">change-dashboard</text>
+  <text x="134" y="251" fill="#44596a" font-family="sans-serif" font-size="21">Stable identity; inspect proposal for exact requested text.</text>
+  <path d="M48 300H912" stroke="#c0cad2" stroke-width="2"/>
+  <text x="48" y="348" fill="#182a38" font-family="sans-serif" font-size="23">No vehicle or generated design is depicted.</text>
+  <text x="48" y="389" fill="#44596a" font-family="sans-serif" font-size="21">Geometry, exact trim and preservation remain unverified.</text>
+  <text x="48" y="437" fill="#44596a" font-family="sans-serif" font-size="21">Annotation completion does not imply validation or approval.</text>
+</svg>

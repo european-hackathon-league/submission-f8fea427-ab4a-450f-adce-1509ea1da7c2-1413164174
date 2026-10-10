@@ -35,6 +35,9 @@ describe('prepared pitch workflows',()=>{
     expect(screen.queryByRole('heading',{name:/Period comparison/i})).not.toBeInTheDocument();
     expect(screen.getByRole('heading',{name:/Market comparison/i})).toBeInTheDocument();
     expect(screen.getByRole('table',{name:'Market snapshot'})).toBeInTheDocument();
+    await user.selectOptions(screen.getByRole('combobox',{name:'Comparison component'}),'steering');
+    expect(screen.getByText(/Steering-wheel controls · 2026 snapshots/)).toBeInTheDocument();
+    expect(within(screen.getByRole('row',{name:/Europe/})).getByText('25%')).toBeInTheDocument();
   });
 
   it('keeps unsupported research questions unresolved, and allows cancel and retry of prepared results',async()=>{
@@ -62,6 +65,25 @@ describe('prepared pitch workflows',()=>{
     await user.click(within(dialog).getByRole('radio',{name:'Choose concept 2'}));
     await user.click(within(dialog).getByRole('button',{name:'Create draft requirement'}));
     expect(screen.getByRole('heading',{name:'Keep the most-used climate controls visible.'})).toBeInTheDocument();
+  });
+
+  it('keeps the research scope and edited preferred concept when inspecting its linked evidence inline',async()=>{
+    const user=userEvent.setup();render(<App/>);
+    await user.click(within(screen.getByRole('navigation',{name:/main navigation/i})).getByRole('button',{name:/Requirements/}));
+    await user.click(screen.getByRole('button',{name:'Reimagine'}));
+    const dialog=screen.getByRole('dialog');
+    await user.clear(within(dialog).getByRole('textbox',{name:'Edit concept 2'}));
+    await user.type(within(dialog).getByRole('textbox',{name:'Edit concept 2'}),'Keep common controls visible.');
+    await user.click(within(dialog).getByRole('radio',{name:'Choose concept 2'}));
+    const concept=dialog.querySelectorAll('.proposal')[1];
+    await user.click(within(concept as HTMLElement).getByRole('button',{name:/View evidence/}));
+    expect(screen.getByRole('dialog',{name:/Deep Research and Reimagine/})).toBeInTheDocument();
+    expect(within(concept as HTMLElement).getByText(/Local source locator · body-E2/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('combobox',{name:'Research scope'})).toHaveValue('Europe');
+    expect(within(dialog).getByRole('radio',{name:'Choose concept 2'})).toBeChecked();
+    expect(within(dialog).getByRole('textbox',{name:'Edit concept 2'})).toHaveValue('Keep common controls visible.');
+    await user.click(within(dialog).getByRole('button',{name:'Create draft requirement'}));
+    expect(screen.getByRole('heading',{name:'Keep common controls visible.'})).toBeInTheDocument();
   });
 
   it('sorts by current negative share and edits an approved requirement into a new draft version',async()=>{

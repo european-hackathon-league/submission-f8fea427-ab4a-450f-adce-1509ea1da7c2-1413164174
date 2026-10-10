@@ -189,14 +189,13 @@ function metricText(finding:VehicleViewerProps['findings'][number]|undefined,per
   return sample.total?`${sample.negative}/${sample.total} mentions`:'No sample';
 }
 
-function WebGLFallback({onFallback}:{onFallback:()=>void}){
-  useEffect(()=>onFallback(),[onFallback]);
+function WebGLFallback(){
   return <div className="vehicle-viewer__fallback" role="img" aria-label="3D view unavailable. Use component controls below."><div className="vehicle-viewer__fallback-car"><div className="vehicle-viewer__fallback-roof"/><div className="vehicle-viewer__fallback-body"/><i/><i/></div><p>3D view unavailable</p><span>Use component controls below to explore the study.</span></div>;
 }
 
 export default function VehicleViewer({selectedComponent,onSelectComponent,view,onViewChange,heatmap,period,findings,className,modelUrl,onStatusChange}:VehicleViewerProps){
   const [resetSignal,setResetSignal]=useState(0);
-  const [webglFailed,setWebglFailed]=useState(()=>typeof window!=='undefined'&&typeof window.WebGLRenderingContext==='undefined'&&typeof window.WebGL2RenderingContext==='undefined');
+  const [webglFailed,setWebglFailed]=useState(()=>typeof window!=='undefined'&&typeof window.ResizeObserver==='undefined');
   const [keyboardTurn,setKeyboardTurn]=useState(0);
   const root=useRef<HTMLElement>(null);
   const report=useCallback((status:'ready'|'fallback')=>onStatusChange?.(status),[onStatusChange]);
@@ -214,7 +213,7 @@ export default function VehicleViewer({selectedComponent,onSelectComponent,view,
     </header>
     <div className="vehicle-viewer__stage" data-view={view}>
       {!webglFailed?<SceneBoundary onError={failed} fallback={<div className="vehicle-viewer__fallback" role="img" aria-label="3D view unavailable. Use component controls below."><div className="vehicle-viewer__fallback-car"><div className="vehicle-viewer__fallback-roof"/><div className="vehicle-viewer__fallback-body"/><i/><i/></div><p>3D view unavailable</p><span>Use component controls below to explore the study.</span></div>}>
-        <Canvas dpr={[1,1.5]} shadows frameloop="demand" camera={{position:[4.1,2.6,4.8],fov:34,near:.1,far:100}} gl={{antialias:true,alpha:false,powerPreference:'high-performance'}} onCreated={({gl})=>{gl.domElement.tabIndex=0;gl.domElement.setAttribute('aria-label','3D vehicle view. Use arrow keys to rotate.');gl.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();failed();},{once:true});report('ready');}} fallback={<WebGLFallback onFallback={failed}/> }>
+        <Canvas dpr={[1,1.5]} shadows frameloop="demand" camera={{position:[4.1,2.6,4.8],fov:34,near:.1,far:100}} gl={{antialias:true,alpha:false,powerPreference:'high-performance'}} onCreated={({gl})=>{gl.domElement.tabIndex=0;gl.domElement.setAttribute('aria-label','3D vehicle view. Use arrow keys to rotate.');gl.domElement.addEventListener('webglcontextlost',event=>{event.preventDefault();failed();},{once:true});report('ready');}} fallback={<WebGLFallback/> }>
           <VehicleScene view={view} selected={selectedComponent} heatmap={heatmap} period={period} findings={findings} onSelect={onSelectComponent} resetSignal={resetSignal} modelUrl={modelUrl} onModelStatus={report} keyboardTurn={keyboardTurn}/>
         </Canvas>
       </SceneBoundary>:<div className="vehicle-viewer__fallback" role="img" aria-label="3D view unavailable. Use component controls below."><div className="vehicle-viewer__fallback-car"><div className="vehicle-viewer__fallback-roof"/><div className="vehicle-viewer__fallback-body"/><i/><i/></div><p>3D view unavailable</p><span>Use component controls below to explore the study.</span></div>}

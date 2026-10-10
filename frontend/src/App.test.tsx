@@ -5,7 +5,7 @@ import {cleanup} from '@testing-library/react';
 import {afterEach} from 'vitest';
 import App from './App';
 
-afterEach(()=>cleanup());
+afterEach(()=>{cleanup();window.localStorage.clear();});
 
 describe('vehicle insights workflows',()=>{
   it('opens evidence details and returns focus to the evidence action on Escape',async()=>{
@@ -58,4 +58,23 @@ describe('vehicle insights workflows',()=>{
     expect(screen.getAllByText(/feedback\.csv/).length).toBeGreaterThan(0);
     expect(screen.getByText(/no analysis run/i)).toBeInTheDocument();
   });
+  it('keeps the summary count scoped to the selected market and period',async()=>{
+    const user=userEvent.setup();
+    render(<App/>);
+    await user.selectOptions(screen.getByRole('combobox',{name:'Market'}),'China');
+    const metric=screen.getByText('Steering feedback').closest('.metric')!;
+    expect(metric).toHaveTextContent('38%');
+    expect(metric).toHaveTextContent('76 of 200 records');
+    await user.selectOptions(screen.getByRole('combobox',{name:'Period'}),'2025');
+    expect(metric).toHaveTextContent('No sample');
+  });
+
+  it('ignores malformed saved version history',async()=>{
+    window.localStorage.setItem('fwd-history',JSON.stringify({'REQ-001':[{id:'REQ-001',componentId:'steering',version:1,status:'Draft',title:{invalid:true}}]}));
+    const user=userEvent.setup();
+    render(<App/>);
+    await user.click(within(screen.getByRole('navigation',{name:/main navigation/i})).getByRole('button',{name:/requirements/i}));
+    expect(screen.queryByRole('button',{name:/view version history/i})).not.toBeInTheDocument();
+  });
+
 });

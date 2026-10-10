@@ -41,6 +41,8 @@ class Source(Base):
     __tablename__ = "sources"
     id: Mapped[str] = mapped_column(primary_key=True)
     workspace_id: Mapped[str] = mapped_column(ForeignKey("workspaces.id"), index=True)
+    dataset_namespace: Mapped[str] = mapped_column(String(200))
+    namespace_warnings: Mapped[list[str]] = mapped_column(JSONB, default=list)
     filename: Mapped[str]
     detected_type: Mapped[str]
     status: Mapped[str]
@@ -76,6 +78,7 @@ class RunSource(Base):
     source_version_id: Mapped[str] = mapped_column(
         ForeignKey("source_versions.id"), primary_key=True
     )
+    binding: Mapped[dict[str, Any]] = mapped_column(JSONB, default=dict)
 
 
 class Command(Base):

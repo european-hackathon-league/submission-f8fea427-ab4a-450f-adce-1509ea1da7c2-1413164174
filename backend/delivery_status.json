@@ -37,7 +37,7 @@
       ],
       "status": "in_progress",
       "branch": "be/S2-ingestion",
-      "pr_url": null,
+      "pr_url": "https://github.com/indkhan/vehicle-requirements-ai/pull/3",
       "tested_commit": null,
       "tests": [],
       "merge_sha": null,

@@ -118,6 +118,20 @@
       },
       "Body_uploads_api_v1_uploads_post": {
         "properties": {
+          "dataset_namespace": {
+            "anyOf": [
+              {
+                "maxLength": 200,
+                "minLength": 1,
+                "pattern": "^[A-Za-z0-9_.:-]+$",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dataset Namespace"
+          },
           "files": {
             "items": {
               "contentMediaType": "application/octet-stream",

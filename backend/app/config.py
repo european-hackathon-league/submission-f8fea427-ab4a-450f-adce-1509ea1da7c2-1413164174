@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 from typing import Literal, Self
 
-from pydantic import SecretStr, model_validator
+from pydantic import Field, SecretStr, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -37,6 +37,11 @@ class Settings(BaseSettings):
     max_archive_bytes: int = 256 * 1024 * 1024
     max_pdf_pages: int = 500
     max_pdf_stream_bytes: int = 8 * 1024 * 1024
+    reference_year: int = Field(default=2026, ge=1900, le=2200)
+    feedback_header_aliases: dict[str, str] = {}
+    pdf_artifacts_path: Path | None = None
+    pdf_timeout_seconds: int = Field(default=180, ge=1, le=600)
+    pdf_memory_mb: int = Field(default=4096, ge=512, le=8192)
     event_retention: int = 10000
     catalog_path: Path = (
         Path(__file__).resolve().parents[2] / "contracts/catalog.example.json"

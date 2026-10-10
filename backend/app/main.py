@@ -11,6 +11,7 @@ from fastapi import (
     Depends,
     FastAPI,
     File,
+    Form,
     Header,
     HTTPException,
     Query,
@@ -32,6 +33,7 @@ from app.auth import Actor, actor, reject
 from app.commands import audit, command, emit, new_id
 from app.config import Settings
 from app.db import Outbox, Run, RunSource, Session, Source, SourceVersion
+from app.ingestion import parser_binding
 from app.limits import BodyLimit
 from app.storage import digest, inspect_upload, storage
 from app.telemetry import configure, latency, requests, tracer
@@ -174,16 +176,22 @@ def vehicles(limit: Limit = 50, cursor: str | None = None) -> w.Page[w.Vehicle]:
 
 @router.post("/uploads", response_model=w.Uploads)
 def uploads(
-    idempotency_key: Key, files: Annotated[list[UploadFile], File()], identity: Auth
+    idempotency_key: Key,
+    files: Annotated[list[UploadFile], File()],
+    identity: Auth,
+    dataset_namespace: Annotated[
+        str | None, Form(min_length=1, max_length=200, pattern=r"^[A-Za-z0-9_.:-]+$")
+    ] = None,
 ) -> w.Uploads:
     settings = Settings()
     if len(files) > 20:
         reject("upload_limit", "At most twenty files per upload", 413)
     content = [(upload.filename or "unnamed", upload.file.read()) for upload in files]
     body = {
+        "dataset_namespace": dataset_namespace,
         "files": [
             {"filename": filename, "sha256": digest(data)} for filename, data in content
-        ]
+        ],
     }
     objects = storage(settings)
     written: list[str] = []
@@ -193,9 +201,16 @@ def uploads(
         for filename, data in content:
             source_id = new_id()
             kind, reason = inspect_upload(filename, data, settings)
+            namespace = dataset_namespace
+            namespace_warnings = []
+            if namespace is None:
+                namespace = new_id()
+                namespace_warnings = ["generated_dataset_namespace"]
             source = Source(
                 id=source_id,
                 workspace_id=identity.workspace_id,
+                dataset_namespace=namespace,
+                namespace_warnings=namespace_warnings,
                 filename=filename,
                 detected_type=kind,
                 status="rejected" if reason else "ready",
@@ -302,12 +317,25 @@ def create_run(
             stage="queued",
             revision=1,
             event_sequence=0,
-            warnings=[],
+            warnings=[
+                f"Source {source.id}: dataset namespace was generated; overlapping-file identity is not established without an explicit shared namespace"
+                for source in sources
+                if source.namespace_warnings
+            ],
         )
         session.add(run)
         session.flush()
         for version in versions:
-            session.add(RunSource(run_id=run.id, source_version_id=version.id))
+            source = next(
+                source for source in sources if source.id == version.source_id
+            )
+            session.add(
+                RunSource(
+                    run_id=run.id,
+                    source_version_id=version.id,
+                    binding=parser_binding(source),
+                )
+            )
         session.add(Outbox(command_id=command_id))
         emit(session, run, "analysis.updated", "analysis", run.id)
         return {

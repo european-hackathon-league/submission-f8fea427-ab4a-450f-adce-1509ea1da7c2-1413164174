@@ -70,13 +70,17 @@ def _inspect_upload(
                 return kind, "password_required"
             if len(pdf.pages) > settings.max_pdf_pages:
                 return kind, "page_limit"
+            decoded_bytes = 0
             for page in pdf.pages:
                 content = page.get_contents()
-                if (
-                    content is not None
-                    and len(content.get_data()) > settings.max_pdf_stream_bytes
-                ):
-                    return kind, "parser_resource_limit"
+                if content is not None:
+                    page_bytes = len(content.get_data())
+                    decoded_bytes += page_bytes
+                    if (
+                        page_bytes > settings.max_pdf_stream_bytes
+                        or decoded_bytes > settings.max_archive_bytes
+                    ):
+                        return kind, "parser_resource_limit"
             if not any((page.extract_text() or "").strip() for page in pdf.pages):
                 return kind, "image_only_pdf"
     except LimitReachedError, MemoryError:
@@ -113,7 +117,7 @@ def inspect_upload(
             [sys.executable, "-m", "app.preflight"],
             input=request,
             capture_output=True,
-            timeout=10,
+            timeout=30 if kind == "pdf" else 10,
             env={
                 key: value
                 for key, value in os.environ.items()

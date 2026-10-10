@@ -156,3 +156,58 @@ def test_compressed_pdf_stream_cannot_bypass_expansion_limit():
         Settings(_env_file=None, max_pdf_stream_bytes=1024),
     )
     assert result == ("pdf", "parser_resource_limit")
+
+
+@pytest.mark.parametrize(
+    ("filename", "timeout"), [("report.pdf", 30), ("book.xlsx", 10)]
+)
+def test_preflight_uses_format_specific_wall_time_budget(
+    monkeypatch, filename, timeout
+):
+    import subprocess
+
+    def checked_run(command, **options):
+        assert options["timeout"] == timeout
+        return subprocess.CompletedProcess(command, 0, stdout=b'["pdf", null]')
+
+    monkeypatch.setattr(subprocess, "run", checked_run)
+    inspect_upload(filename, b"synthetic", Settings(_env_file=None))
+
+
+def text_pdf(pages):
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    font = DictionaryObject(
+        {
+            NameObject("/Type"): NameObject("/Font"),
+            NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject("/Helvetica"),
+        }
+    )
+    for _ in range(pages):
+        page = writer.add_blank_page(width=100, height=100)
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+        )
+        stream = DecodedStreamObject()
+        stream.set_data(b"BT /F1 12 Tf 10 50 Td (Synthetic report text) Tj ET")
+        page[NameObject("/Contents")] = writer._add_object(stream.flate_encode())
+    buffer = BytesIO()
+    writer.write(buffer)
+    return buffer.getvalue()
+
+
+def test_434_page_text_report_is_supported_with_bounded_preflight():
+    assert inspect_upload("report.pdf", text_pdf(434), Settings(_env_file=None)) == (
+        "pdf",
+        None,
+    )
+
+
+def test_pdf_aggregate_decoded_stream_budget_is_enforced():
+    assert inspect_upload(
+        "report.pdf",
+        text_pdf(2),
+        Settings(_env_file=None, max_archive_bytes=70),
+    ) == ("pdf", "parser_resource_limit")

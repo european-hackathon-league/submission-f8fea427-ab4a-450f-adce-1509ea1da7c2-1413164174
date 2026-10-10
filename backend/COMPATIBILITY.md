@@ -9,6 +9,17 @@ parser build imports Docling 2.137.0, Torch 2.14.1+cpu, and torchvision 0.29.1
 on Linux x86_64. It does not verify corpus extraction quality or download model
 artifacts during requests; those are ingestion gates.
 
+Supplied-corpus upload preflight on 2026-10-10: all three option-list PDFs were
+accepted (F70: 3.639 s; G60: 3.240 s; G70: 3.809 s). After setting the PDF child
+budget to fifteen CPU seconds and thirty wall seconds, the 434-page annual report
+was accepted in 9.955 s using the Linux runtime with the current application bind
+mount. Both formats retain the 512 MiB address-space limit; XLSX retains five CPU
+seconds and ten wall seconds. The PDF defaults remain 500 pages and 8 MiB per
+decoded page content stream, with an explicit 256 MiB aggregate decoded-page
+content limit. These checks verify upload preflight only, not Docling extraction,
+table/locator fidelity, or interpretation accuracy. No private passages were
+included in the check output.
+
 Local host: Docker Engine 29.7.2, Docker Compose 5.5.1 (planned 5.6.0).
 No host upgrade was performed. Persisted development Temporal uses CLI 1.9.1,
 embedded Server 1.32.0, UI 2.54.1. The planned server 1.32.1 is not a CLI image

@@ -8,11 +8,12 @@ def main() -> None:
     import resource
 
     resource.setrlimit(resource.RLIMIT_AS, (512 * 1024 * 1024,) * 2)
-    resource.setrlimit(resource.RLIMIT_CPU, (5, 5))
+    request = json.loads(sys.stdin.buffer.readline())
+    cpu_seconds = 15 if request["filename"].lower().endswith(".pdf") else 5
+    resource.setrlimit(resource.RLIMIT_CPU, (cpu_seconds, cpu_seconds))
     from app.config import Settings
     from app.storage import _inspect_upload
 
-    request = json.loads(sys.stdin.buffer.readline())
     result = _inspect_upload(
         request["filename"],
         sys.stdin.buffer.read(),

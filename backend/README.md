@@ -51,8 +51,12 @@ The worker dispatches the database outbox and polls Temporal for Activities.
 PostgreSQL, Temporal history, and private original files persist in the Compose
 volumes. `docker compose down` preserves them; deleting volumes deletes local data.
 Upload preflight runs in an isolated Linux process with a 512 MiB address-space
-limit, five CPU seconds, and a ten-second wall deadline. PDF content streams are
-limited to 8 MiB each; limits produce explicit per-file rejections.
+limit for both formats. XLSX has five CPU seconds and a ten-second wall deadline;
+PDF has fifteen CPU seconds and a thirty-second wall deadline. PDFs are limited
+to 500 pages, 8 MiB per decoded page content stream, and 256 MiB aggregate decoded
+page content by default. Limits produce explicit per-file rejections. Permissions
+encryption with an empty user password is supported; PDFs requiring a password
+are rejected.
 
 OIDC requires issuer, audience and JWKS URL. Only signed RS256 access tokens with
 `typ: at+jwt` or `token_use: access` are accepted. Register subject/workspace

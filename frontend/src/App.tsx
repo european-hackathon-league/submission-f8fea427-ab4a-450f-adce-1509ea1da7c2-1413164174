@@ -86,6 +86,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   const [restored] = useState(() => api.mode === "real" ? readSession(sessionNamespace) : null);
   const [pendingRun, setPendingRun] = useState<PendingRun | null>(restored?.pendingRun ?? null);
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [catalogReady, setCatalogReady] = useState(false);
   const [vehicleId, setVehicleId] = useState("g60-i5-m60");
   const [deepDive, setDeepDive] = useState(false);
   const [mode, setMode] = useState<"autonomous" | "guided">("autonomous");
@@ -140,10 +141,12 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
 
   useEffect(() => {
     let active = true;
+    setCatalogReady(false);
     (api.vehicles ? api.vehicles() : api.request<Page<Vehicle>>("/vehicles").then(page => page.items))
       .then((result) => {
         if (active) {
           setVehicles(result);
+          setCatalogReady(true);
           setVehicleId(current => result.some(v => v.vehicle_id === current) ? current : result[0]?.vehicle_id ?? current);
         }
       })
@@ -292,8 +295,9 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
     if (findingFocusRequest && tab === "Evidence") document.getElementById("panel-Evidence")?.focus();
   }, [findingFocusRequest, tab]);
   useEffect(() => {
+    if (!catalogReady || (runId && !workspace)) return;
     if (selectedComponent && (!baselineAvailable || (selectedFindingId && !finding?.part_ids.includes(selectedComponent)))) setSelectedComponent(null);
-  }, [baselineAvailable, finding, selectedFindingId, selectedComponent]);
+  }, [catalogReady, runId, workspace, baselineAvailable, finding, selectedFindingId, selectedComponent]);
 
   const reset = () => {
     activeRunId.current = null;

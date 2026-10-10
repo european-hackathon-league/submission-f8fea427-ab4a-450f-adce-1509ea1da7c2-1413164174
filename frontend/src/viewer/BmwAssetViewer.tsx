@@ -62,7 +62,7 @@ function severityFor(findings:VehicleViewerProps['findings'],id:ComponentId,peri
 }
 
 function useSketchfabViewer(
-  iframeRef:React.RefObject<HTMLIFrameElement|null>,
+  iframe:HTMLIFrameElement|null,
   onReady:()=>void,
   onFailure:()=>void,
   onPick:(component:ComponentId)=>void,
@@ -75,11 +75,14 @@ function useSketchfabViewer(
   callbacksRef.current={onReady,onFailure,onPick,onSceneInfo};
 
   useEffect(()=>{
+    if(!iframe)return;
+    setSceneReady(false);
     let disposed=false;
-    const loadTimeout=window.setTimeout(()=>{if(!disposed&&!sceneReady)callbacksRef.current.onFailure();},20000);
+    let viewerIsReady=false;
+    const loadTimeout=window.setTimeout(()=>{if(!disposed&&!viewerIsReady)callbacksRef.current.onFailure();},20000);
     void loadSketchfabApi().then(()=>{
-      if(disposed||!iframeRef.current||!window.Sketchfab)return;
-      const client=new window.Sketchfab('1.12.1',iframeRef.current);
+      if(disposed||!iframe||!window.Sketchfab)return;
+      const client=new window.Sketchfab('1.12.1',iframe);
       client.init(BMW_I5_MODEL_UID,{
         autostart:1,
         camera:0,
@@ -92,6 +95,7 @@ function useSketchfabViewer(
           api.addEventListener('viewerready',()=>{
             if(disposed)return;
             window.clearTimeout(loadTimeout);
+            viewerIsReady=true;
             setSceneReady(true);
             callbacksRef.current.onReady();
             api.getCameraLookAt((error,camera)=>{if(!error&&!disposed)initialCameraRef.current=camera;});
@@ -121,7 +125,7 @@ function useSketchfabViewer(
       apiRef.current?.stop();
       apiRef.current=null;
     };
-  },[iframeRef]);
+  },[iframe]);
 
   const resetCamera=useCallback(()=>{
     const api=apiRef.current;
@@ -138,7 +142,7 @@ function useSketchfabViewer(
 }
 
 export default function BmwAssetViewer({selectedComponent,onSelectComponent,view,onViewChange,heatmap,period,findings,className,onStatusChange}:VehicleViewerProps){
-  const iframeRef=useRef<HTMLIFrameElement>(null);
+  const [iframe,setIframe]=useState<HTMLIFrameElement|null>(null);
   const [apiFailed,setApiFailed]=useState(false);
   const [sceneSummary,setSceneSummary]=useState('Connecting to hosted 3D model…');
   const [liveMessage,setLiveMessage]=useState('');
@@ -146,7 +150,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
   const reportReady=useCallback(()=>{setApiFailed(false);setLiveMessage('3D model ready. Drag to orbit; use Sketchfab viewer keyboard controls.');onStatusChange?.('ready');},[onStatusChange]);
   const reportFailure=useCallback(()=>{setApiFailed(true);setLiveMessage('3D model unavailable. Showing verified preview image.');onStatusChange?.('fallback');},[onStatusChange]);
   const onSceneInfo=useCallback((summary:string)=>setSceneSummary(summary),[]);
-  const {resetCamera,pause,resume,sceneReady}=useSketchfabViewer(iframeRef,reportReady,reportFailure,onSelectComponent,onSceneInfo);
+  const {resetCamera,pause,resume,sceneReady}=useSketchfabViewer(iframe,reportReady,reportFailure,onSelectComponent,onSceneInfo);
 
   useEffect(()=>{if(view==='interior')pause();else resume();},[view,pause,resume]);
 
@@ -178,7 +182,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
         {view==='exterior'?<>
           <img className="bmw-asset-viewer__preview" src="/vehicles/i5-m60-preview.jpg" alt="BMW i5 M60 three-quarter exterior preview"/>
           {!apiFailed&&<iframe
-            ref={iframeRef}
+            ref={setIframe}
             className={`bmw-asset-viewer__frame ${sceneReady?'is-ready':''}`}
             title="Interactive 3D model of the 2023 BMW i5 M60"
             allow="autoplay; fullscreen; xr-spatial-tracking"
@@ -216,7 +220,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
           })}
         </div>
         <div className="bmw-asset-viewer__selection" aria-live="polite"><span className="bmw-asset-viewer__selection-label">Selected component</span><strong>{labels[selectedComponent]}</strong><span>{currentSample}</span></div>
-        {view==='exterior'?<p className="bmw-asset-viewer__scene-info">{sceneSummary}</p>:<p className="bmw-asset-viewer__photo-note">3D cabin geometry unavailable in source model. This authentic photo is a separate G60 520i cabin reference.</p>}
+        {view==='exterior'?<p className="bmw-asset-viewer__scene-info">{sceneSummary}</p>:<p className="bmw-asset-viewer__photo-note">Detailed 3D cabin not verified in source asset. This authentic photo is a separate G60 520i cabin reference.</p>}
       </aside>
     </div>
 

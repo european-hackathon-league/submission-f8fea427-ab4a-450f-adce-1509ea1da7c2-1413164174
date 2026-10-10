@@ -24,7 +24,7 @@ describe('BmwAssetViewer', () => {
     render(<BmwAssetViewer selectedComponent="dashboard" onSelectComponent={onSelectComponent} view="interior" onViewChange={vi.fn()} heatmap period="2026" findings={findings}/>);
 
     expect(screen.getByRole('img',{name:/BMW 5 Series G60 cabin reference photo/i})).toHaveAttribute('src','/vehicles/g60-interior.jpg');
-    expect(screen.getByText(/3D cabin geometry unavailable/i)).toBeInTheDocument();
+    expect(screen.getByText(/Detailed 3D cabin not verified/i)).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button',{name:/Dashboard feedback marker/}));
     expect(onSelectComponent).toHaveBeenCalledWith('dashboard');
   });
@@ -52,6 +52,26 @@ describe('BmwAssetViewer', () => {
     await waitFor(()=>expect(onStatusChange).toHaveBeenCalledWith('ready'));
     events.click({instanceID:77});
     expect(onSelectComponent).toHaveBeenCalledWith('lighting');
+  });
+
+  it('reinitializes the hosted model after switching away from and back to exterior', async () => {
+    const events:Record<string,(value?:any)=>void>={};
+    const api={
+      start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
+      getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
+      getNodeMap:(callback:(error:unknown,nodes:any[])=>void)=>callback(null,[]),getMaterialList:(callback:(error:unknown,materials:any[])=>void)=>callback(null,[]),
+      setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+    };
+    const init=vi.fn((_uid:string,options:InitOptions)=>options.success(api));
+    class SketchfabMock { init=init; }
+    Object.assign(window,{Sketchfab:SketchfabMock});
+    const props={selectedComponent:'body' as const,onSelectComponent:vi.fn(),view:'exterior' as const,onViewChange:vi.fn(),heatmap:false,period:'2026' as const,findings};
+    const {rerender}=render(<BmwAssetViewer {...props}/>);
+    await waitFor(()=>expect(init).toHaveBeenCalledTimes(1));
+    rerender(<BmwAssetViewer {...props} view="interior"/>);
+    rerender(<BmwAssetViewer {...props}/>);
+    await waitFor(()=>expect(init).toHaveBeenCalledTimes(2));
+    expect(api.stop).toHaveBeenCalled();
   });
 
   it('reports initialization failure and keeps verified preview available', async () => {

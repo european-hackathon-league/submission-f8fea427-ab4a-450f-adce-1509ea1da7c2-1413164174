@@ -360,6 +360,7 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                     tools=[{"type": "web_search", "search_context_size": "low"}],
                     max_tool_calls=1,
                     max_output_tokens=output_allowance,
+                    store=False,
                 )
                 urls = list(
                     dict.fromkeys(
@@ -486,6 +487,7 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                         input=assessment_input,
                         text_format=Assessment,
                         max_output_tokens=output_allowance,
+                        store=False,
                     )
                     assessment = checked.output_parsed
                     if assessment is None:

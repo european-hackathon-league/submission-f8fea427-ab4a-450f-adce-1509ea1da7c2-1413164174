@@ -282,6 +282,7 @@ def draft_changes(
         ],
         text_format=Draft,
         max_output_tokens=policy.get("ai_max_output_tokens", 6000),
+        store=False,
     )
     draft = response.output_parsed
     if draft is None:

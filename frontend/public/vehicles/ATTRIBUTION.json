@@ -1,0 +1,22 @@
+[
+  {
+    "file": "i5-m60-preview.jpg",
+    "title": "2023 BMW I5 M60",
+    "creator": "Nazh Design",
+    "source": "https://sketchfab.com/3d-models/2023-bmw-i5-m60-207fd872d28b4cafa7fefe061ae98e26",
+    "license": "CC BY 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/",
+    "changes": "Unmodified published model thumbnail. Application may crop display and add separate synthetic feedback markers.",
+    "sha256": "bc56f25ef60e12fb8cd63cea347e6eeb2d6b015180062b840f97568802cefcce"
+  },
+  {
+    "file": "g60-interior.jpg",
+    "title": "BMW 520i G60 Oxide Grey Metallic 03",
+    "creator": "Ethan Llamas",
+    "source": "https://commons.wikimedia.org/wiki/File:BMW_520i_G60_Oxide_Grey_Metallic_03.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0/",
+    "changes": "1280px Wikimedia thumbnail, no pixel edits. Application may crop display and add separate synthetic feedback markers. Photograph remains CC BY-SA 4.0.",
+    "sha256": "a3c8aa68680a6d84c5d2d432665eb15352aeb8e1e901548528b07e34f849547b"
+  }
+]

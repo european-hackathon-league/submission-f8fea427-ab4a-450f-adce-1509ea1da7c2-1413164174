@@ -1,9 +1,11 @@
-# Frontend integration scope
+# Frontend scope
 
-Controlling specification: [`frontend_plan.md`](../../frontend_plan.md), together with [`plan.md`](../../plan.md). The user explicitly selected the car, graph and Deep Dive workspace in that plan. `PITCH-PLAN.md` is an archived earlier brief, not the controlling specification.
+User direction, 10 October 2026: the frontend must contain only the experience specified by [frontend_plan.md](../../frontend_plan.md). Read [plan.md](../../plan.md) for its shared integration contract. Do not treat older pitch briefs or previous UI implementations as additional product scope.
 
-Branch `frontend` consolidates the completed pitch UI and vehicle viewer from `codex/pitch-ui`, `codex/pitch-workspace-ui` and `codex/pitch-vehicle-3d`, based on main at `80e328e`. Integrated fixes take precedence over older worktree versions. The rejected procedural sedan remains excluded.
+Keep vehicle selection, uploads, participation mode, initial Deep Dive selection, Create run, baseline car navigation, tags, typed graph, finding/evidence panels, scoped alternatives, proposal editing, explicit Reimagine, numbered change explanations, history and version-bound export interactions within one workspace. Counts, scores and research come from the application API boundary. Unsupported assets and rendering capabilities must remain explicit.
 
-This is a consolidation checkpoint, not completion of the newer scope rebuild. The current prototype still has older navigation and comparison features. Removing those extras and implementing the graph, versioned backend adapter, Deep Dive and Reimagine contracts remain pending. Interrupted work is preserved in the `frontend-plan-only`, `frontend-plan-3d` and `pitch-visual-redesign` worktrees; it is not included in the runnable checkpoint.
+Removed: separate Overview and Compare destinations, period/market comparison modes and baseline-period controls, executive KPI summaries and trends, pitch analysis updates, presentation/print controls, prepared-question research controls, mandatory sample-review steps, browser-owned approval/history state, local requirement scoring, and CSV reconstruction from partially loaded UI state. Obsolete pitch planning documents were removed as well.
 
-The i5 M60 exterior uses a hosted creator model. The interior is a separately credited G60 520i reference photograph, not a verified 3D M60 cabin. All metrics and research are synthetic. Backend branches and source data are outside this consolidation.
+Deep Dive evidence stays attached to the current finding. It does not authorize a general competitor dashboard. Regional evidence and variant cohort grouping remain in scope; a separate market-comparison workspace does not. Scheduled imports, source refresh and ongoing monitoring remain deferred in [backlog.md](../../backlog.md).
+
+Default operation is a synthetic mock, with a configurable real API adapter. Server integration and the renderer service are not complete. Current supported assets and limits are documented in [frontend/README.md](../../frontend/README.md). Future additions must map to the controlling plan, and acceptance claims must distinguish mock checks from joint backend checks.

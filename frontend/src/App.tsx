@@ -1,105 +1,1508 @@
-import {lazy,Suspense,useEffect,useMemo,useRef,useState} from 'react';
-import type {ChangeEvent,KeyboardEvent} from 'react';
-import {Activity,ArrowDownRight,ArrowUpRight,BarChart3,BookOpen,Check,ChevronDown,ChevronRight,Clock3,Download,FileText,Filter,FolderUp,History,Lightbulb,PanelLeftClose,Plus,Printer,Search,ShieldCheck,Upload,X} from 'lucide-react';
-import type {ComponentId,Finding,Market,Period,Requirement,VehicleView} from './domain/contracts';
-import {findings,initialRequirements,markets,sampleFor} from './domain/fixtures';
-import {compareSamples,negativeShare} from './domain/metrics';
-import {requirementsCsv} from './domain/export';
-import {overviewSummary} from './domain/summary';
-import './ui/workspace.css';
+import {
+  lazy,
+  Suspense,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
+import type { CSSProperties } from "react";
+import {
+  ArrowRight,
+  BookOpen,
+  Check,
+  Download,
+  GitBranch,
+  History,
+  LoaderCircle,
+  Network,
+  Plus,
+  RefreshCw,
+  Save,
+  Trash2,
+  Upload as UploadIcon,
+  WandSparkles,
+  X,
+} from "lucide-react";
+import { ApiError, commandKey, createApi } from "./api/client";
+import type {
+  Api,
+  Change,
+  Evidence,
+  Finding,
+  Instruction,
+  Page,
+  RenderResult,
+  Upload,
+  Vehicle,
+  Workspace,
+} from "./api/contracts";
+import type { ComponentId, VehicleView } from "./domain/contracts";
+import sceneCatalog from "../public/vehicles/scene-catalog-v1.json";
+import "./ui/workspace.css";
 
-const VehicleViewer=lazy(()=>import('./viewer/BmwAssetViewer'));
-type Destination='Overview'|'Vehicle Explorer'|'Compare'|'Requirements'|'Data & History';
-type Drawer={type:'evidence'|'review'|'research';finding:Finding;requirement?:Requirement}|null;
-type HistoryVersion=Requirement&{action?:'Edited'|'Challenged'|'Approved'|'Deferred'|'Rejected';actor?:'Local user';actionAt?:string};
-const nav:Destination[]=['Overview','Vehicle Explorer','Compare','Requirements','Data & History'];
-const componentIds:ComponentId[]=['steering','dashboard','seats','charging','body','lighting'];
-const isRequirement=(x:unknown):x is Requirement=>{if(!x||typeof x!=='object')return false;const r=x as Requirement;return typeof r.id==='string'&&typeof r.title==='string'&&Number.isInteger(r.version)&&r.version>0&&(r.priority===null||(typeof r.priority==='number'&&Number.isFinite(r.priority)&&r.priority>=0&&r.priority<=100))&&componentIds.includes(r.componentId)&&typeof r.rationale==='string'&&Array.isArray(r.evidenceIds)&&r.evidenceIds.every(id=>typeof id==='string')&&['Draft','Approved','Deferred','Rejected'].includes(r.status);};
-const safeLoad=():Requirement[]=>{try{const raw=window.localStorage.getItem('fwd-requirements');if(!raw)return initialRequirements;const data:unknown=JSON.parse(raw);return Array.isArray(data)?data.filter(isRequirement):initialRequirements;}catch{return initialRequirements;}};
-const safeHistory=():Record<string,HistoryVersion[]>=>{try{const data:unknown=JSON.parse(window.localStorage.getItem('fwd-history')??'{}');if(!data||typeof data!=='object'||Array.isArray(data))return {};return Object.fromEntries(Object.entries(data).filter((entry):entry is [string,unknown[]]=>Array.isArray(entry[1])).map(([key,rows])=>[key,rows.filter(isRequirement).map(r=>{const old=r as HistoryVersion;return {...r,...(['Edited','Challenged','Approved','Deferred','Rejected'].includes(old.action??'')?{action:old.action}:{}),...(old.actor==='Local user'?{actor:old.actor}:{}),...(typeof old.actionAt==='string'&&Number.isFinite(Date.parse(old.actionAt))?{actionAt:old.actionAt}:{})};})]));}catch{return {}}};
-const fmt=(n:number|null)=>n===null?'—':`${n.toFixed(n%1?1:0)}%`;
-const findingFor=(id:ComponentId)=>findings.find(f=>f.id===id)!;
-const supersessionReason=(action:HistoryVersion['action'])=>action==='Edited'?'edited':action==='Challenged'?'challenged':action==='Approved'?'approved':action==='Rejected'?'rejected':'deferred';
+const VehicleViewer = lazy(() => import("./viewer/BmwAssetViewer"));
+const tabs = [
+  { title: "Findings", icon: BookOpen },
+  { title: "Graph", icon: Network },
+  { title: "Evidence", icon: BookOpen },
+  { title: "Proposals", icon: GitBranch },
+  { title: "History", icon: History },
+] as const;
+type Tab = (typeof tabs)[number]["title"];
+type UploadRow = {
+  id: string;
+  filename: string;
+  status: "uploading" | "failed" | "ready" | "rejected";
+  source_id?: string;
+  reason?: string | null;
+};
+type ProposalDraft = { text: string; target: string; baseVersion: number };
 
-export default function App(){
- const [destination,setDestination]=useState<Destination>('Overview');const [market,setMarket]=useState<Market>('Europe');const [period,setPeriod]=useState<Period>('2026');const [baseline,setBaseline]=useState<Period>('2025');
- const [selected,setSelected]=useState<ComponentId>('body');const [view,setView]=useState<VehicleView>('exterior');const [heatmap,setHeatmap]=useState(true);const [drawer,setDrawer]=useState<Drawer>(null);const [query,setQuery]=useState('');const [filter,setFilter]=useState('All');const [requirements,setRequirements]=useState<Requirement[]>(safeLoad);const [present,setPresent]=useState(false);const [message,setMessage]=useState('');const [uploaded,setUploaded]=useState<string[]>([]);const [versionHistory,setVersionHistory]=useState<Record<string,HistoryVersion[]>>(safeHistory);const [historyOpen,setHistoryOpen]=useState('');
- const [compareMode,setCompareMode]=useState<'period'|'market'>('period');const [prioritySort,setPrioritySort]=useState<'negative-high'|'negative-low'|'unscored'>('negative-high');
- const [researchQuestion,setResearchQuestion]=useState('');const [researchScope,setResearchScope]=useState<Market>('Europe');const [researchStatus,setResearchStatus]=useState<'ready'|'cancelled'|'unresolved'>('ready');const [concepts,setConcepts]=useState<string[]>([]);const [selectedConcept,setSelectedConcept]=useState(0);
- const [fixtureStep,setFixtureStep]=useState<'add'|'review'|'analyzing'|'changes'>('add');
- const opener=useRef<HTMLElement|null>(null);const drawerRef=useRef<HTMLDivElement>(null);const drawerWasOpen=useRef(false);const selectedFinding=findingFor(selected);
- useEffect(()=>{try{window.localStorage.setItem('fwd-requirements',JSON.stringify(requirements));}catch{/* Storage can be disabled; workspace remains usable. */}},[requirements]);
- useEffect(()=>{try{window.localStorage.setItem('fwd-history',JSON.stringify(versionHistory));}catch{/* History remains available for this session. */}},[versionHistory]);
- useEffect(()=>{if(drawer){if(!drawerWasOpen.current){opener.current=document.activeElement as HTMLElement;drawerWasOpen.current=true;}drawerRef.current?.querySelector<HTMLElement>('button,textarea,input,[tabindex="0"]')?.focus();return;}if(drawerWasOpen.current){drawerWasOpen.current=false;opener.current?.focus();}},[drawer]);
- useEffect(()=>{if(!drawer)return;const onEscape=(event:globalThis.KeyboardEvent)=>{if(event.key==='Escape'){event.preventDefault();setDrawer(null);}};window.addEventListener('keydown',onEscape);return()=>window.removeEventListener('keydown',onEscape);},[drawer]);
- useEffect(()=>{if(!message)return;const t=window.setTimeout(()=>setMessage(''),3500);return()=>clearTimeout(t);},[message]);
- useEffect(()=>{if(fixtureStep!=='analyzing')return;const t=window.setTimeout(()=>setFixtureStep('changes'),420);return()=>clearTimeout(t);},[fixtureStep]);
- const openDrawer=(next:Drawer)=>{setDrawer(next);};
- const onDialogKey=(e:KeyboardEvent<HTMLDivElement>)=>{if(e.key==='Escape'){setDrawer(null);return;}if(e.key==='Tab'&&drawerRef.current){const nodes=[...drawerRef.current.querySelectorAll<HTMLElement>('button:not([disabled]),input,textarea,select,[tabindex="0"]')];if(!nodes.length)return;const first=nodes[0],last=nodes[nodes.length-1];if(e.shiftKey&&document.activeElement===first){e.preventDefault();last.focus();}else if(!e.shiftKey&&document.activeElement===last){e.preventDefault();first.focus();}}};
- const changePeriod=(next:Period)=>{setPeriod(next);if(next===baseline)setBaseline(next==='2025'?'2026':'2025');};
- const changeBaseline=(next:Period)=>{setBaseline(next);if(next===period)setPeriod(next==='2025'?'2026':'2025');};
- const contextSample=sampleFor(selectedFinding,period,market);const headlineComparison=compareSamples(sampleFor(selectedFinding,baseline,market),sampleFor(selectedFinding,period,market));const comparisonBefore=sampleFor(selectedFinding,baseline,market),comparisonAfter=sampleFor(selectedFinding,period,market);
- const overview=overviewSummary(findings,requirements,market,period,baseline);
- const filteredRequirements=useMemo(()=>requirements.filter(r=>`${r.id} ${r.title} ${findingFor(r.componentId).name}`.toLowerCase().includes(query.toLowerCase())&&(filter==='All'||r.status===filter)).slice().sort((a,b)=>{const av=negativeShare(sampleFor(findingFor(a.componentId),period,market)),bv=negativeShare(sampleFor(findingFor(b.componentId),period,market));if(prioritySort==='unscored')return Number(bv===null)-Number(av===null);if(av===null)return 1;if(bv===null)return -1;return (prioritySort==='negative-high'?-1:1)*(av-bv);}),[requirements,query,filter,period,market,prioritySort]);
- const exportCsv=()=>{const context={market,period,baseline,analysisDate:'2026-10-10',filter,search:query};const blob=new Blob([requirementsCsv(filteredRequirements,context)],{type:'text/csv;charset=utf-8'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='fwd-requirements.csv';a.click();window.setTimeout(()=>URL.revokeObjectURL(url),1000);setMessage('CSV exported with current context and filters');};
- const createRequirement=(f:Finding,title:string,sourceMarket:Market=market)=>{const next=Math.max(0,...requirements.map(r=>Number(r.id.split('-')[1])||0))+1;const id=`REQ-${String(next).padStart(3,'0')}`;const share=negativeShare(sampleFor(f,period,sourceMarket));const req:Requirement={id,version:1,title,componentId:f.id,priority:share,status:'Draft',rationale:'',evidenceIds:f.evidence.filter(e=>e.stance==='supports-friction'&&e.market===sourceMarket).slice(0,2).map(e=>e.id)};setRequirements(x=>[req,...x]);setQuery('');setFilter('All');setDrawer(null);setDestination('Requirements');setMessage('Draft requirement created');};
- const decide=(req:Requirement,action:'approve'|'defer'|'reject'|'edit'|'challenge',title:string,rationale:string)=>{if(!rationale.trim()||!title.trim()){setMessage('Add requirement text and a rationale before saving.');return false;}const status:Requirement['status']=action==='approve'?'Approved':action==='reject'?'Rejected':action==='edit'?'Draft':'Deferred';const historyAction=action==='edit'?'Edited':action==='challenge'?'Challenged':status as HistoryVersion['action'];setVersionHistory(h=>({...h,[req.id]:[...(h[req.id]??[]),{...req,action:historyAction,actor:'Local user',actionAt:new Date().toISOString()}]}));setRequirements(all=>all.map(r=>r.id===req.id?{...r,version:r.version+1,title:title.trim(),status,rationale:rationale.trim()}:r));setDrawer(null);setMessage(`${historyAction} · version ${req.version+1} saved`);return true;};
- const changeView=(next:VehicleView)=>{setView(next);if(findingFor(selected).category!==next)setSelected(next==='exterior'?'body':'steering');};
- const upload=(e:ChangeEvent<HTMLInputElement>)=>{const names=[...Array.from(e.target.files??[]).map(f=>f.name)];if(names.length){setUploaded(x=>[...names,...x]);setMessage(`${names.length} file${names.length===1?'':'s'} added. Analysis requires backend integration.`);e.target.value='';}};
- const openResearch=(finding:Finding)=>{setDrawer({type:'research',finding});const question=`Why does ${finding.name} receive more negative feedback?`;setResearchQuestion(question);setResearchScope(market);setResearchStatus(market==='Europe'?'ready':'unresolved');setConcepts([`Make ${finding.name.toLowerCase()} easier to understand at a glance.`,`Reduce steps for the most frequent ${finding.name.toLowerCase()} actions.`,`Help drivers discover key ${finding.name.toLowerCase()} functions without distraction.`]);setSelectedConcept(0);};
- const route=(name:Destination)=>setDestination(name);
- const renderTop=(title:string,sub:string)=><div className="page-heading"><div><h1 className={title==='THE i5.'?'hero-title':''}>{title==='THE i5.'?<>THE i5.</>:title}</h1><p className="subheading">{sub}</p></div><div className="heading-actions"><button className="button button-secondary print-action" onClick={()=>window.print()}><Printer size={16}/>Print report</button><button className="button button-secondary" onClick={()=>setPresent(!present)} aria-pressed={present}><PanelLeftClose size={16}/>{present?'Exit presentation':'Present'}</button></div></div>;
- return <div className={`app-shell ${present?'presentation':''}`}>
-  <a className="skip-link" href="#main-content">Skip to content</a><header className="masthead" inert={!!drawer}><a className="brand" href="#overview" onClick={e=>{e.preventDefault();route('Overview');}}><strong>FWD</strong><span>Vehicle intelligence</span></a><div className="masthead-meta"><span>PRODUCT STRATEGY</span><i/> <span>G60 PROGRAMME</span></div><span className="masthead-synthetic"><span/> Illustrative workspace</span></header>
-  <nav className="primary-nav" aria-label="Main navigation" inert={!!drawer}>{nav.map(item=><button key={item} className={`nav-item ${destination===item?'active':''}`} onClick={()=>route(item)} aria-current={destination===item?'page':undefined}>{item}{item==='Requirements'&&requirements.filter(r=>r.status==='Draft').length>0&&<span className="nav-count">{requirements.filter(r=>r.status==='Draft').length}</span>}</button>)}</nav>
-  <main className="main-content" id="main-content" inert={!!drawer}>
-   <header className="context-bar"><div className="vehicle-context"><strong>BMW i5 M60</strong><span className="context-separator">/</span><span>G60</span><span className="context-illustrative">Illustrative case</span></div><div className="context-spacer"/><label className="context-select"><span>Market</span><select value={market} onChange={e=>setMarket(e.target.value as Market)} aria-label="Market">{markets.map(m=><option key={m}>{m}</option>)}</select><ChevronDown size={14}/></label><span className="context-divider"/><label className="context-select"><span>Period</span><select value={period} onChange={e=>changePeriod(e.target.value as Period)} aria-label="Period"><option value="2026">2026</option><option value="2025">2025</option></select><ChevronDown size={14}/></label><span className="baseline-context">Compare with <select aria-label="Baseline period" value={baseline} onChange={e=>changeBaseline(e.target.value as Period)}><option value="2025">2025</option><option value="2026">2026</option></select></span><span className="context-analysis-date"><span>Latest prepared analysis</span><strong>10 Oct 2026</strong></span></header>
-   <div className="page-wrap"><div className="report-context"><strong>BMW i5 M60 / G60</strong><span>{market} · {period} · baseline {baseline}</span><span>Synthetic pitch demonstration</span></div>
-    {destination==='Overview'&&<>
-     {renderTop('THE i5.','Customer feedback. Clear product decisions.')}
-     <div className="hero-grid">
-      <section className="vehicle-stage" aria-label="BMW vehicle insights"><div className="viewer-frame"><Suspense fallback={<div className="viewer-loading">Preparing BMW vehicle…</div>}><VehicleViewer className="bmw-asset-viewer--compact" selectedComponent={selected} onSelectComponent={setSelected} view={view} onViewChange={changeView} heatmap={heatmap} period={period} findings={findings.map(f=>({...f,previous:sampleFor(f,'2025',market),current:sampleFor(f,'2026',market)}))}/></Suspense></div><div className="stage-bottom"><span className="stage-context">Synthetic feedback indicators</span><button className={`heat-toggle ${heatmap?'on':''}`} onClick={()=>setHeatmap(x=>!x)} aria-pressed={heatmap}><span className="heat-dot"/> Feedback indicators</button></div></section>
-      <aside className="insight-panel"><div className="insight-heading"><span className="insight-icon"><Activity size={17}/></span><span>Selected component</span><span className="synthetic-tag">Synthetic</span></div><h2>{selectedFinding.name}</h2><p className="insight-copy">{headlineComparison?`Negative feedback share in the ${market} sample, ${baseline} to ${period}.`:`No ${baseline} longitudinal fixture is available for ${market}.`}</p><div className="comparison"><div><span>{baseline}</span><strong>{fmt(headlineComparison?.before??null)}</strong></div>{headlineComparison?.points===0?<Activity size={18} className="down-icon"/>:headlineComparison&&headlineComparison.points>0?<ArrowUpRight size={20} className="down-icon"/>:<ArrowDownRight size={20} className="down-icon"/>}<div><span>{period}</span><strong>{fmt(headlineComparison?.after??null)}</strong></div></div><div className="change-line"><strong>{headlineComparison?`${Math.abs(headlineComparison.points)} percentage points ${headlineComparison.points<0?'lower':headlineComparison.points>0?'higher':'unchanged'}`: 'No comparable baseline'}</strong>{headlineComparison?.reduction!==null&&headlineComparison&&<span>{Math.abs(headlineComparison.reduction)}% relative {headlineComparison.reduction<0?'increase':'reduction'}</span>}</div><p className="sample-line">{comparisonBefore.negative} of {comparisonBefore.total} → {comparisonAfter.negative} of {comparisonAfter.total} records · {market}</p><button className="button button-primary full-button" onClick={()=>openDrawer({type:'evidence',finding:selectedFinding})}><BookOpen size={16}/>View evidence</button><button className="text-button" onClick={()=>{setDestination('Compare');}}>Explore comparison <ChevronRight size={15}/></button></aside>
-     </div>
-     <section className="overview-indicators" aria-label="Executive summary"><div className="summary-intro"><span className="eyebrow">EXECUTIVE SUMMARY</span><h2>Where to focus next</h2><p>Negative share describes feedback records, not vehicle defects.</p></div><Metric value={overview.feedbackRecords.toLocaleString()} label="Feedback volume" meta="component feedback records · not unique customers"/><Metric value={fmt(overview.negativeShare)} label="Negative-feedback share" meta={`${overview.negativeRecords.toLocaleString()} negative records of ${overview.feedbackRecords.toLocaleString()} eligible`}/><Metric value={overview.largestChange?`${overview.largestChange.points<0?'−':overview.largestChange.points>0?'+':''}${Math.abs(overview.largestChange.points)} pp`:'Unavailable'} label="Largest comparable change" meta={overview.largestChange?`${overview.largestChange.name} · ${baseline} to ${period}`:`No ${baseline} baseline for ${market}`}/><Metric value={String(overview.awaitingDecision)} label="Requirements awaiting decision" meta="Draft or deferred · local demo state"/></section>
-     <section className="analysis-updates"><div className="section-heading"><div><h2>Analysis updates</h2><p>Prepared synthetic fixtures; uploaded files are not analyzed.</p></div><span className="synthetic-tag">Prepared demo</span></div><div className="analysis-update-row"><strong>Latest prepared analysis</strong><span>10 Oct 2026 · fixture date</span><small>Europe has a 2025–26 comparison; China and United States contain 2026 snapshots only.</small></div><div className="analysis-update-row"><strong>Current scope</strong><span>{market} · {period}</span><small>{overview.feedbackRecords.toLocaleString()} component feedback records · no unique-customer estimate.</small></div></section>
-     <section className="findings-section"><div className="section-heading"><div><h2>Priority findings</h2><p>Choose a component to inspect its feedback pattern.</p></div><button className="text-button" onClick={()=>route('Vehicle Explorer')}>Open explorer <ChevronRight size={15}/></button></div><div className="finding-list">{findings.every(f=>!sampleFor(f,period,market).total)&&<p className="local-note">No feedback sample for this market and period. Select Europe or 2026.</p>}{findings.filter(f=>sampleFor(f,period,market).total>0).slice().sort((a,b)=>(negativeShare(sampleFor(b,period,market))??-1)-(negativeShare(sampleFor(a,period,market))??-1)).slice(0,3).map((f,i)=><button className={`finding-row ${selected===f.id?'row-selected':''}`} key={f.id} onClick={()=>{setSelected(f.id);setView(f.category);}}><span className={`priority-number priority-${i+1}`}>{i+1}</span><span className="finding-name"><strong>{f.name}</strong><small>{f.summary}</small></span><span className="finding-trend"><Sparkline values={f.trend}/><small>Europe trend only</small></span><span className="finding-rate">{fmt(negativeShare(sampleFor(f,period,market)))}</span><span className="finding-records">{sampleFor(f,period,market).negative}/{sampleFor(f,period,market).total}<small>Next: select to inspect</small><small>Europe fixture: {f.evidence.filter(e=>e.stance==='supports-friction').length} supporting · {f.evidence.filter(e=>e.stance==='counter-signal').length} counter signals</small></span><ChevronRight size={17}/></button>)}</div></section>
-    </>}
-    {destination==='Vehicle Explorer'&&<>{renderTop('Vehicle Explorer','Explore component feedback and the customer records behind it.')}<div className="explorer-layout"><section className="explorer-vehicle"><div className="explorer-controls"><button className={`heat-toggle ${heatmap?'on':''}`} onClick={()=>setHeatmap(x=>!x)} aria-pressed={heatmap}><span className="heat-dot"/> Feedback indicators</button></div><Suspense fallback={<div className="viewer-loading">Preparing BMW vehicle…</div>}><VehicleViewer className="bmw-asset-viewer--explorer" selectedComponent={selected} onSelectComponent={setSelected} view={view} onViewChange={changeView} heatmap={heatmap} period={period} findings={findings.map(f=>({...f,previous:sampleFor(f,'2025',market),current:sampleFor(f,'2026',market)}))}/></Suspense></section><aside className="detail-panel"><span className="detail-kicker">COMPONENT INSIGHT</span><h2>{selectedFinding.name}</h2><p>{selectedFinding.summary}</p><div className="detail-stat"><strong>{fmt(negativeShare(contextSample))}</strong><span>negative feedback share<br/>{contextSample.negative} / {contextSample.total} records</span></div><div className="chart-block"><div className="chart-title"><strong>Feedback over time</strong><span>Europe · illustrative trend</span></div><Sparkline values={selectedFinding.trend} large/><div className="chart-years"><span>Prior period</span><span>Current period</span></div></div><div className="detail-actions"><button className="button button-secondary" onClick={()=>openDrawer({type:'evidence',finding:selectedFinding})}><BookOpen size={16}/>Evidence</button><button className="button button-primary" onClick={()=>openResearch(selectedFinding)}><Activity size={16}/>Deep Research</button></div><div className="hypothesis-note"><Lightbulb size={16}/><span>{selectedFinding.hypotheses[0]}</span></div></aside></div></>}
-    {destination==='Compare'&&<>{renderTop('Compare feedback','Read change with sample size and population context.')}<div className="compare-tabs" role="tablist" aria-label="Comparison mode" onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();const tabs=[...e.currentTarget.querySelectorAll<HTMLButtonElement>('[role="tab"]')];const index=tabs.indexOf(document.activeElement as HTMLButtonElement);const next=(index+(e.key==='ArrowRight'?1:-1)+tabs.length)%tabs.length;tabs[next].focus();setCompareMode(next===0?'period':'market');}}}><button role="tab" id="period-comparison-tab" aria-controls="period-comparison-panel" aria-selected={compareMode==='period'} tabIndex={compareMode==='period'?0:-1} onClick={()=>setCompareMode('period')}>Period comparison</button><button role="tab" id="market-comparison-tab" aria-controls="market-comparison-panel" aria-selected={compareMode==='market'} tabIndex={compareMode==='market'?0:-1} onClick={()=>setCompareMode('market')}>Market comparison</button></div>{compareMode==='period'&&<section className="compare-panel" role="tabpanel" id="period-comparison-panel" aria-labelledby="period-comparison-tab" tabIndex={0}><div className="compare-head"><div><h2>{selectedFinding.name}</h2><p>{market} sample · negative feedback share</p></div><div className="compare-selector"><label>Component<select aria-label="Comparison component" value={selected} onChange={e=>{const id=e.target.value as ComponentId;setSelected(id);setView(findingFor(id).category);}}>{findings.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></label><label>Baseline<select value={baseline} onChange={e=>changeBaseline(e.target.value as Period)}><option>2025</option><option>2026</option></select></label><ArrowDownRight size={19}/><label>Current<select value={period} onChange={e=>changePeriod(e.target.value as Period)}><option>2025</option><option>2026</option></select></label></div></div>{headlineComparison?<><div className="compare-chart"><div className="bar-group"><span className="bar-value">{fmt(headlineComparison.before)}</span><div className="bar bar-before" style={{height:`${Math.max(12,headlineComparison.before*2.25)}px`}}/><span className="bar-label">{baseline}</span><small>{comparisonBefore.negative} / {comparisonBefore.total}</small></div><div className="chart-annotation"><span>{headlineComparison.points<0?'↓':'↑'} {Math.abs(headlineComparison.points)} pp</span><small>{headlineComparison.reduction===null?'Relative change unavailable':`${Math.abs(headlineComparison.reduction)}% relative ${headlineComparison.reduction<0?'increase':'reduction'}`}</small></div><div className="bar-group"><span className="bar-value">{fmt(headlineComparison.after)}</span><div className="bar bar-current" style={{height:`${Math.max(12,headlineComparison.after*2.25)}px`}}/><span className="bar-label">{period}</span><small>{comparisonAfter.negative} / {comparisonAfter.total}</small></div></div><div className="compare-note"><ShieldCheck size={17}/><p><strong>Sample scope</strong> {baseline}: {comparisonBefore.negative} negative / {comparisonBefore.total} eligible · {period}: {comparisonAfter.negative} / {comparisonAfter.total}. Negative feedback share is not a failure rate. Population mix may differ.</p></div></>:<div className="empty-state"><BarChart3 size={28}/><h3>No comparable baseline</h3><p>This comparison needs samples for {baseline} and {period}. {market} has 2026 snapshots only; the longitudinal 2025 sample is Europe-only.</p><button className="button button-secondary" onClick={()=>setMarket('Europe')}>Switch to Europe</button></div>}</section>}{compareMode==='market'&&<section className="market-compare" role="tabpanel" id="market-comparison-panel" aria-labelledby="market-comparison-tab" tabIndex={0}><div className="section-heading"><div><h2>Market comparison</h2><p>{selectedFinding.name} · {period} snapshots · populations differ by market and are not longitudinal.</p></div><div className="compare-selector"><label>Component<select aria-label="Comparison component" value={selected} onChange={e=>{const id=e.target.value as ComponentId;setSelected(id);setView(findingFor(id).category);}}>{findings.map(f=><option key={f.id} value={f.id}>{f.name}</option>)}</select></label><span className="synthetic-tag">Synthetic</span></div></div><div className="market-table" role="table" aria-label="Market snapshot"><div className="table-head" role="row"><span role="columnheader">Market</span><span role="columnheader">Negative share</span><span role="columnheader">Records</span><span role="columnheader">Reading</span></div>{markets.map(m=>{const s=sampleFor(selectedFinding,period,m);return <div className={`market-row ${m===market?'market-current':''}`} key={m} role="row"><strong role="rowheader">{m}{m===market&&<small>Selected</small>}</strong><span role="cell">{fmt(negativeShare(s))}</span><span role="cell">{s.negative} / {s.total}</span><span role="cell">{s.total?'Snapshot · unmatched population':'No fixture for this period'}</span></div>;})}</div></section>}</>}
-    {destination==='Requirements'&&<>{renderTop('Requirements','Shape customer evidence into reviewable product intent.')}<div className="requirements-toolbar"><div className="search-field"><Search size={16}/><input aria-label="Search requirements" name="requirement-search" autoComplete="off" placeholder="Search requirements…" value={query} onChange={e=>setQuery(e.target.value)}/></div><label className="filter-select"><Filter size={16}/><select aria-label="Filter requirements" value={filter} onChange={e=>setFilter(e.target.value)}><option>All</option><option>Draft</option><option>Approved</option><option>Deferred</option><option>Rejected</option></select></label><label className="filter-select"><span>Sort</span><select aria-label="Sort requirements" value={prioritySort} onChange={e=>setPrioritySort(e.target.value as typeof prioritySort)}><option value="negative-high">Negative share · high to low</option><option value="negative-low">Negative share · low to high</option><option value="unscored">Unscored first</option></select></label><button className="button button-secondary" onClick={exportCsv}><Download size={16}/>Export CSV</button><button className="button button-primary" onClick={()=>openResearch(selectedFinding)}><Activity size={16}/>Reimagine</button></div><p className="priority-explanation">Priority sort uses the selected context’s negative-feedback share as a demo signal, not a defect rate. Older saved priority values stay preserved.</p><div className="req-list">{filteredRequirements.map(r=><article className="req-row" key={r.id}><div className="req-priority"><span>NEGATIVE SHARE</span><strong>{fmt(negativeShare(sampleFor(findingFor(r.componentId),period,market)))}</strong></div><div className="req-main"><div className="req-meta"><span>{r.id} · v{r.version}</span><span className={`status status-${r.status.toLowerCase()}`}>{r.status}</span><span>{findingFor(r.componentId).name}</span></div><h3>{r.title}</h3><p>{r.rationale||'No decision rationale yet.'}</p>{negativeShare(sampleFor(findingFor(r.componentId),period,market))===null&&<p>Unscored · No sample for this market and period.</p>}<div className="req-foot"><span>{r.evidenceIds.length} evidence records linked</span>{versionHistory[r.id]?.length>0&&<button className="version-info" onClick={()=>setHistoryOpen(historyOpen===r.id?'':r.id)} aria-expanded={historyOpen===r.id}><History size={13}/> {historyOpen===r.id?'Hide':'View'} version history</button>}</div>{historyOpen===r.id&&<div className="version-history">{versionHistory[r.id].map(previous=><div key={previous.version}><strong>Version {previous.version} · {previous.status}</strong><p>{previous.title}</p><small>{previous.rationale||'No rationale recorded for this version.'}{previous.action?` · Superseded when version ${previous.version+1} was ${supersessionReason(previous.action)}`:''}{previous.actor&&previous.actionAt?` · ${previous.actor} · ${new Date(previous.actionAt).toLocaleDateString()}`:''}</small></div>)}</div>}</div><div className="req-actions"><button className="button button-secondary" onClick={()=>openDrawer({type:'review',finding:findingFor(r.componentId),requirement:r})}>Review <ChevronRight size={15}/></button></div></article>)}{!filteredRequirements.length&&<div className="empty-state"><Search size={26}/><h3>No requirements match</h3><p>Try a different search or status filter.</p><button className="text-button" onClick={()=>{setQuery('');setFilter('All');}}>Clear filters</button></div>}</div><p className="local-note">Decisions are saved in this browser only. This demo does not grant production approval authority.</p></>}
-    {destination==='Data & History'&&<>{renderTop('Data & History','See where this workspace data comes from and what it can support.')}<div className="data-banner"><div className="data-banner-icon"><Activity size={18}/></div><div><strong>Local research preview</strong><p>All findings and research summaries use synthetic demo records. Uploaded files stay local and are not analyzed.</p></div><span className="synthetic-tag">No backend connected</span></div><div className="data-grid"><section className="data-section"><div className="section-heading"><div><h2>Sources in this workspace</h2><p>Fixture inputs used by the current demo.</p></div></div><div className="source-list">{[{name:'Customer feedback sample',type:'Synthetic records',meta:'2 periods · 3 markets · 6 components'},{name:'Prepared research notes',type:'Illustrative synthesis',meta:'Supporting and counter evidence included'},{name:'Requirements',type:'Local decisions',meta:`${requirements.length} items · browser storage`}].map((s,i)=><div className="source-row" key={s.name}><div className="source-icon">{i===0?<Activity size={18}/>:i===1?<BookOpen size={18}/>:<FileText size={18}/>}</div><div><strong>{s.name}</strong><small>{s.type} · {s.meta}</small></div><span className="source-ready">Available</span></div>)}</div></section><section className="upload-section"><div className="section-heading"><div><h2>Add source files</h2><p>Attach local file metadata to this demo workspace.</p></div></div><div className="prepared-fixture-flow" data-step={fixtureStep}><ol className="fixture-steps" aria-label="Prepared sample workflow"><li aria-current={fixtureStep==='add'?'step':undefined}>Add</li><li aria-current={fixtureStep==='review'?'step':undefined}>Review</li><li aria-current={fixtureStep==='analyzing'?'step':undefined}>Analyze</li><li aria-current={fixtureStep==='changes'?'step':undefined}>Changes</li></ol>{fixtureStep==='add'&&<div><p>Walk through the documented sample only. Uploaded files stay metadata-only.</p><button className="button button-secondary" onClick={()=>setFixtureStep('review')}>Use built-in sample</button></div>}{fixtureStep==='review'&&<div><h3>Review prepared fixture</h3><p>Six mapped component summaries and 18 synthetic evidence records. Europe has 2025 and 2026; China and United States have 2026 snapshots only. This aggregate fixture has no row-level duplicate or missing-field checks; those counts are unavailable. No uploaded file is included.</p><ul className="fixture-component-list">{findings.map(f=><li key={f.id}><strong>{f.name}</strong><span>{f.summary}</span></li>)}</ul><button className="button button-primary" onClick={()=>setFixtureStep('analyzing')}>Analyze prepared fixture</button><button className="text-button" onClick={()=>setFixtureStep('add')}>Cancel</button></div>}{fixtureStep==='analyzing'&&<div role="status"><strong>Preparing fixture result…</strong><p>Checking component records and available comparison coverage. Existing analysis remains the baseline.</p><button className="button button-secondary" onClick={()=>{setFixtureStep('review');setMessage('Prepared fixture run cancelled; existing analysis remains available.');}}>Cancel analysis</button></div>}{fixtureStep==='changes'&&<div><h3>Prepared analysis changes</h3><p>Fixture result only: {findings.length} component snapshots reviewed for {market} · {period}. {overview.largestChange?`${overview.largestChange.name} changed ${overview.largestChange.points<0?'down':'up'} ${Math.abs(overview.largestChange.points)} percentage points against ${baseline}.`:`No comparable ${baseline} baseline for ${market}.`}</p><p>Uploaded files were not parsed. This local run uses documented synthetic fixtures.</p><button className="button button-secondary" onClick={()=>setFixtureStep('analyzing')}>Run prepared fixture again</button></div>}</div><label className="upload-zone"><input type="file" multiple accept=".csv,.xlsx,.pdf,.docx" onChange={upload}/><FolderUp size={25}/><strong>Choose files to add</strong><span>CSV, XLSX, PDF or DOCX</span><small>File names only. Analysis requires backend integration.</small></label>{uploaded.length>0&&<div className="uploaded-list"><strong>Added locally</strong>{uploaded.map((name,i)=><div key={`${name}-${i}`}><FileText size={14}/>{name}<span>Metadata only</span></div>)}</div>}</section></div><section className="history-section"><div className="section-heading"><div><h2>Workspace activity</h2><p>Local demo events, current session.</p></div></div><div className="history-row"><span className="history-icon"><Clock3 size={16}/></span><span><strong>Fixture workspace opened</strong><small>Local sample · synthetic data</small></span><time>Now</time></div>{requirements.filter(r=>r.version>1).map(r=><div className="history-row" key={r.id}><span className="history-icon"><Check size={16}/></span><span><strong>{r.status} {r.id} · version {r.version}</strong><small>{r.rationale}</small></span><time>Local</time></div>)}{uploaded.map((name,i)=><div className="history-row" key={`${name}-${i}`}><span className="history-icon"><Upload size={16}/></span><span><strong>File metadata added</strong><small>{name} · no analysis run</small></span><time>Local</time></div>)}</section></>}
-   </div>
-  </main>
-  {drawer&&<div className="dialog-scrim" onMouseDown={e=>{if(e.target===e.currentTarget)setDrawer(null);}}><div ref={drawerRef} className="dialog-panel" role="dialog" aria-modal="true" aria-label={drawer.type==='evidence'?'Evidence details':drawer.type==='review'?'Review requirement':'Deep Research and Reimagine'} onKeyDown={onDialogKey}><div className="dialog-header"><div><span className="detail-kicker">{drawer.type==='evidence'?'CUSTOMER EVIDENCE':drawer.type==='review'?'REQUIREMENT REVIEW':'PREPARED RESEARCH'}</span><h2>{drawer.type==='review'?drawer.requirement?.id:drawer.finding.name}</h2></div><button className="icon-button" aria-label="Close dialog" onClick={()=>setDrawer(null)}><X size={20}/></button></div>
-   {drawer.type==='evidence'&&<><p className="dialog-intro">Synthetic customer-study quotes for {drawer.finding.name}; source market is shown beside each record. Counts above follow the selected market and period.</p><div className="evidence-stat"><strong>{fmt(negativeShare(sampleFor(drawer.finding,period,market)))}</strong><span>negative feedback · {market} · {period}</span><small>{sampleFor(drawer.finding,period,market).negative} negative records among {sampleFor(drawer.finding,period,market).total} eligible records</small></div><div className="evidence-list">{drawer.finding.evidence.map(e=><article className="evidence-card" key={e.id}><div><span className="evidence-id">{e.id}</span><span className={`evidence-polarity ${e.stance==='counter-signal'?'counter':'support'}`}>{e.stance==='counter-signal'?'Counter signal':'Supporting signal'}</span></div><blockquote>“{e.quote}”</blockquote><small>{e.source} · {e.period} · {e.market}</small></article>)}</div><div className="dialog-footer"><span>Fixture IDs are local synthetic source locators; no external source links are included.</span><button className="button button-primary" onClick={()=>openResearch(drawer.finding)}><Activity size={16}/>Explore research</button></div></>}
-   {drawer.type==='research'&&<ResearchAndConcepts finding={drawer.finding} question={researchQuestion} scope={researchScope} status={researchStatus} concepts={concepts} selectedConcept={selectedConcept} onQuestionChange={value=>{setResearchQuestion(value);setResearchStatus('unresolved');}} onScopeChange={value=>{setResearchScope(value);setResearchStatus('unresolved');}} onConceptChange={(index,value)=>setConcepts(current=>current.map((concept,i)=>i===index?value:concept))} onSelectConcept={setSelectedConcept} onLoad={()=>setResearchStatus(researchQuestion===`Why does ${drawer.finding.name} receive more negative feedback?`&&researchScope==='Europe'?'ready':'unresolved')} onCancel={()=>setResearchStatus('cancelled')} onRetry={()=>setResearchStatus(researchQuestion===`Why does ${drawer.finding.name} receive more negative feedback?`&&researchScope==='Europe'?'ready':'unresolved')} onCreate={()=>createRequirement(drawer.finding,concepts[selectedConcept]??'',researchScope)}/>}
-   {drawer.type==='review'&&drawer.requirement&&<ReviewForm requirement={drawer.requirement} market={market} period={period} onSave={decide} onClose={()=>setDrawer(null)}/>}
-  </div></div>}
-  <div className="toast" role="status" aria-live="polite" data-visible={!!message}>{message}</div>
- </div>
+export default function App({ api: suppliedApi }: { api?: Api }) {
+  const [api, setApi] = useState(() => suppliedApi ?? createApi());
+  const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [vehicleId, setVehicleId] = useState("g60-i5-m60");
+  const [deepDive, setDeepDive] = useState(false);
+  const [mode, setMode] = useState<"autonomous" | "guided">("autonomous");
+  const [uploads, setUploads] = useState<UploadRow[]>([]);
+  const [workspace, setWorkspace] = useState<Workspace | null>(null);
+  const [runId, setRunId] = useState<string | null>(null);
+  const [tab, setTab] = useState<Tab>("Findings");
+  const [selectedFindingId, setSelectedFindingId] =
+    useState("finding-dashboard");
+  const [selectedComponent, setSelectedComponent] =
+    useState<ComponentId>("dashboard");
+  const [view, setView] = useState<VehicleView>("exterior");
+  const [variantId, setVariantId] = useState("variant-digital");
+  const [heatmap, setHeatmap] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [connection, setConnection] = useState("");
+  const [source, setSource] = useState<Evidence | null>(null);
+  const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
+  const [exportJob, setExportJob] = useState<{
+    export_id: string;
+    proposal_set_version: number;
+    status: string;
+    download_url?: string;
+  } | null>(null);
+  const lock = useRef(false);
+  const proposalDrafts = useRef(new Map<string, ProposalDraft>());
+  const [ideaDraft, setIdeaDraft] = useState("");
+  const run = workspace?.snapshot;
+  const vehicle = vehicles.find(
+    (v) => v.vehicle_id === (run?.config.vehicle_id ?? vehicleId),
+  );
+  const baselineAvailable =
+    vehicle?.vehicle_id === sceneCatalog.vehicle_id &&
+    vehicle.baseline_asset_id === sceneCatalog.baseline_asset_id &&
+    vehicle.part_catalog_version === sceneCatalog.catalog_version;
+  const finding =
+    workspace?.findings.find((f) => f.finding_id === selectedFindingId) ??
+    workspace?.findings[0];
+  const variant =
+    workspace?.proposals.variants.find((v) => v.variant_id === variantId) ??
+    workspace?.proposals.variants[0];
+  const version = workspace?.proposals.proposal_set_version ?? 0;
+  const readySourceIds = [
+    ...new Set(
+      uploads.filter((u) => u.status === "ready").map((u) => u.source_id!),
+    ),
+  ];
+  const can = (action: string) =>
+    !busy && !!run?.available_actions.includes(action);
+
+  useEffect(() => {
+    let active = true;
+    api
+      .request<Page<Vehicle>>("/vehicles")
+      .then((result) => {
+        if (active) setVehicles(result.items);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api]);
+
+  const refresh = useCallback(
+    async (id: string) => {
+      const next = await api.workspace(id);
+      setWorkspace((old) =>
+        old?.snapshot.run_id === id &&
+        old.snapshot.revision > next.snapshot.revision
+          ? old
+          : next,
+      );
+      setConnection("");
+      return next;
+    },
+    [api],
+  );
+
+  useEffect(() => {
+    if (!runId) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout>;
+    async function poll() {
+      try {
+        const next = await api.workspace(runId!);
+        if (!cancelled) {
+          setWorkspace((old) =>
+            old && old.snapshot.revision > next.snapshot.revision ? old : next,
+          );
+          setConnection("");
+        }
+      } catch {
+        if (!cancelled)
+          setConnection(
+            "Connection interrupted. Retrying; your drafts remain here.",
+          );
+      }
+      if (!cancelled) timer = setTimeout(poll, 2000);
+    }
+    void poll();
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [api, runId]);
+
+  useEffect(() => {
+    if (
+      !runId ||
+      !renderResult ||
+      !["queued", "rendering"].includes(renderResult.status)
+    )
+      return;
+    let cancelled = false;
+    const timer = setInterval(() => {
+      api
+        .request<RenderResult>(
+          `/runs/${runId}/renders/${encodeURIComponent(renderResult.render_request_id)}`,
+        )
+        .then((result) => {
+          if (!cancelled) setRenderResult(result);
+        })
+        .catch((e) => {
+          if (!cancelled) setError(e.message);
+        });
+    }, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [api, runId, renderResult]);
+
+  useEffect(() => {
+    if (
+      !runId ||
+      !exportJob ||
+      !["queued", "processing"].includes(exportJob.status)
+    )
+      return;
+    let cancelled = false;
+    const timer = setInterval(() => {
+      api
+        .request<{ export_id: string; status: string; download_url?: string }>(
+          `/runs/${runId}/exports/${encodeURIComponent(exportJob.export_id)}`,
+        )
+        .then((result) => {
+          if (!cancelled) setExportJob((old) => old && { ...old, ...result });
+        })
+        .catch((e) => {
+          if (!cancelled) setError(e.message);
+        });
+    }, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [api, runId, exportJob]);
+
+  async function act(action: () => Promise<void>) {
+    if (lock.current) return false;
+    lock.current = true;
+    setBusy(true);
+    setError("");
+    try {
+      await action();
+      return true;
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Request failed. Retry.");
+      if (e instanceof ApiError && e.code === "stale_version" && runId)
+        await refresh(runId).catch(() =>
+          setConnection("Refresh failed. Retry; your draft remains here."),
+        );
+      return false;
+    } finally {
+      lock.current = false;
+      setBusy(false);
+    }
+  }
+
+  async function uploadFiles(files: File[]) {
+    const rows = files.map((file) => ({
+      id: commandKey(),
+      filename: file.name,
+      status: "uploading" as const,
+    }));
+    setUploads((old) => [...old, ...rows]);
+    await Promise.all(
+      files.map(async (file, index) => {
+        try {
+          const uploaded: Upload = await api.upload(file);
+          setUploads((old) =>
+            old.map((row) =>
+              row.id === rows[index].id ? { ...row, ...uploaded } : row,
+            ),
+          );
+        } catch (e) {
+          setUploads((old) =>
+            old.map((row) =>
+              row.id === rows[index].id
+                ? {
+                    ...row,
+                    status: "failed",
+                    reason:
+                      e instanceof Error
+                        ? e.message
+                        : "Upload failed. Remove and try again.",
+                  }
+                : row,
+            ),
+          );
+        }
+      }),
+    );
+  }
+
+  function selectFinding(next: Finding) {
+    setSelectedFindingId(next.finding_id);
+    if (next.part_ids[0]) {
+      setSelectedComponent(next.part_ids[0]);
+      setView(
+        ["dashboard", "steering", "seats"].includes(next.part_ids[0])
+          ? "interior"
+          : "exterior",
+      );
+    }
+  }
+  function selectPart(id: ComponentId) {
+    setSelectedComponent(id);
+    const next = workspace?.findings.find((f) => f.part_ids.includes(id));
+    setSelectedFindingId(next?.finding_id ?? `unreported-${id}`);
+  }
+  const selectedFinding = selectedFindingId.startsWith("unreported-")
+    ? undefined
+    : finding;
+
+  async function submitInstruction(instruction: Instruction) {
+    let savedVersion: number | null = null;
+    await act(async () => {
+      await api.request(
+        `/runs/${runId}/instructions`,
+        instruction,
+        commandKey(),
+      );
+      savedVersion = (await refresh(runId!)).proposals.proposal_set_version;
+    });
+    return savedVersion;
+  }
+
+  const reset = () => {
+    proposalDrafts.current.clear();
+    setIdeaDraft("");
+    setWorkspace(null);
+    setRunId(null);
+    setUploads([]);
+    setRenderResult(null);
+    setExportJob(null);
+    setSource(null);
+    setError("");
+    setConnection("");
+    setDeepDive(false);
+    setMode("autonomous");
+    setSelectedFindingId("finding-dashboard");
+    setVariantId("variant-digital");
+    setApi(suppliedApi ?? createApi());
+  };
+
+  return (
+    <div className="workspace-shell">
+      <a className="skip-link" href="#workspace">
+        Skip to workspace
+      </a>
+      <header className="app-header">
+        <div>
+          <strong className="wordmark">FWD</strong>
+          <span>Vehicle requirements</span>
+        </div>
+        <span className="environment">
+          {api.mode === "mock" ? "Synthetic workspace" : "Connected workspace"}
+        </span>
+      </header>
+      <main id="workspace">
+        <section className="run-setup" aria-label="Run setup">
+          <div className="section-title">
+            <h1>{run ? "Saved configuration" : "New analysis run"}</h1>
+            {run && (
+              <button onClick={reset} disabled={busy}>
+                <Plus size={16} />
+                New run
+              </button>
+            )}
+          </div>
+          <div className="setup-fields">
+            <label className="vehicle-field">
+              Vehicle
+              <select
+                aria-label="Vehicle"
+                value={run?.config.vehicle_id ?? vehicleId}
+                disabled={!!run || busy}
+                onChange={(e) => setVehicleId(e.target.value)}
+              >
+                {vehicles.length ? (
+                  vehicles.map((v) => (
+                    <option key={v.vehicle_id} value={v.vehicle_id}>
+                      {v.title}
+                    </option>
+                  ))
+                ) : (
+                  <option value="g60-i5-m60">Loading vehicles...</option>
+                )}
+              </select>
+            </label>
+            <fieldset disabled={!!run || busy}>
+              <legend>Participation</legend>
+              <label>
+                <input
+                  type="radio"
+                  name="participation"
+                  checked={
+                    (run?.config.participation_mode ?? mode) === "autonomous"
+                  }
+                  onChange={() => setMode("autonomous")}
+                />
+                Autonomous
+              </label>
+              <label>
+                <input
+                  type="radio"
+                  name="participation"
+                  checked={
+                    (run?.config.participation_mode ?? mode) === "guided"
+                  }
+                  onChange={() => setMode("guided")}
+                />
+                Guided
+              </label>
+            </fieldset>
+            <label className="check-field">
+              <input
+                type="checkbox"
+                checked={run?.config.deep_dive.enabled ?? deepDive}
+                disabled={!!run || busy}
+                onChange={(e) => setDeepDive(e.target.checked)}
+              />
+              Deep Dive
+            </label>
+            {!run && (
+              <button
+                className="primary"
+                disabled={
+                  busy ||
+                  !baselineAvailable ||
+                  !readySourceIds.length ||
+                  uploads.some((u) => u.status === "uploading")
+                }
+                onClick={() =>
+                  void act(async () => {
+                    const result = await api.request<{ run_id: string }>(
+                      "/runs",
+                      {
+                        vehicle_id: vehicle!.vehicle_id,
+                        baseline_asset_id: vehicle!.baseline_asset_id,
+                        part_catalog_version: vehicle!.part_catalog_version,
+                        source_ids: readySourceIds,
+                        market_context: [],
+                        participation_mode: mode,
+                        deep_dive: { enabled: deepDive },
+                      },
+                      commandKey(),
+                    );
+                    setRunId(result.run_id);
+                    await refresh(result.run_id);
+                  })
+                }
+              >
+                {busy ? <LoaderCircle size={16} /> : <ArrowRight size={16} />}
+                Create run
+              </button>
+            )}
+          </div>
+          {!run && (
+            <div className="upload-zone">
+              <label className="upload-control">
+                <UploadIcon size={18} />
+                <span>Upload files</span>
+                <input
+                  aria-label="Upload files"
+                  type="file"
+                  multiple
+                  disabled={busy}
+                  onChange={(e) => {
+                    void uploadFiles(Array.from(e.target.files ?? []));
+                    e.target.value = "";
+                  }}
+                />
+              </label>
+              <span className="muted">
+                Partial packages and multiple regional files accepted
+              </span>
+            </div>
+          )}
+          <ul className="upload-list">
+            {uploads.map((row) => (
+              <li key={row.id}>
+                <span>{row.filename}</span>
+                <span className={`status status-${row.status}`}>
+                  {row.status}
+                </span>
+                {row.reason && (
+                  <span className="upload-error">{row.reason}</span>
+                )}
+                {!run && (
+                  <button
+                    className="icon-button"
+                    aria-label={`Remove ${row.filename}`}
+                    title="Remove file"
+                    disabled={row.status === "uploading" || busy}
+                    onClick={() =>
+                      setUploads((old) => old.filter((u) => u.id !== row.id))
+                    }
+                  >
+                    <X size={15} />
+                  </button>
+                )}
+              </li>
+            ))}
+          </ul>
+          {!baselineAvailable && vehicles.length > 0 && (
+            <p className="notice">Baseline asset unavailable</p>
+          )}
+          {run && (
+            <div className="run-progress" role="status">
+              <span className="status">{run.analysis_status}</span>
+              <strong>{run.stage}</strong>
+              <span>{run.run_id}</span>
+              {busy && <LoaderCircle size={16} className="spin" />}
+            </div>
+          )}
+        </section>
+        {error && (
+          <div role="alert" className="error-bar">
+            {error}
+            <button
+              className="icon-button"
+              aria-label="Dismiss error"
+              title="Dismiss error"
+              onClick={() => setError("")}
+            >
+              <X size={16} />
+            </button>
+          </div>
+        )}
+        {connection && (
+          <div role="status" className="notice">
+            {connection}
+            <button
+              onClick={() =>
+                void act(async () => {
+                  await refresh(runId!);
+                })
+              }
+            >
+              <RefreshCw size={15} />
+              Reconnect
+            </button>
+          </div>
+        )}
+        <div className="work-area">
+          <section className="vehicle-column" aria-label="Vehicle workspace">
+            <div className="section-title">
+              <h2>Baseline vehicle</h2>
+              <label className="check-field">
+                <input
+                  type="checkbox"
+                  checked={heatmap}
+                  onChange={(e) => setHeatmap(e.target.checked)}
+                />
+                Feedback tags
+              </label>
+            </div>
+            {baselineAvailable ? (
+              <Suspense
+                fallback={
+                  <div className="empty-state">Loading baseline vehicle...</div>
+                }
+              >
+                <VehicleViewer
+                  className="bmw-asset-viewer--compact"
+                  selectedComponent={selectedComponent}
+                  onSelectComponent={selectPart}
+                  view={view}
+                  onViewChange={setView}
+                  heatmap={heatmap}
+                  findings={(run?.part_aggregates ?? []).map((a) => ({
+                    id: a.part_id,
+                    counts: a.counts,
+                  }))}
+                />
+              </Suspense>
+            ) : (
+              <div className="empty-state">
+                <h3>{vehicle?.title ?? "Vehicle catalog"}</h3>
+                <p>
+                  {vehicles.length
+                    ? "No verified baseline asset for this model."
+                    : "Loading asset availability..."}
+                </p>
+              </div>
+            )}
+            {run?.warnings.map((w) => (
+              <p className="coverage-note" key={w}>
+                {w}
+              </p>
+            ))}
+            {run && (
+              <div className="render-section">
+                <div className="section-title">
+                  <h2>Visualization</h2>
+                  <button
+                    className="primary"
+                    disabled={!can("reimagine") || !variant}
+                    onClick={() =>
+                      void act(async () => {
+                        const job = await api.request<{
+                          render_request_id: string;
+                        }>(
+                          `/runs/${runId}/renders`,
+                          {
+                            proposal_set_version: version,
+                            variant_ids: [variant!.variant_id],
+                            baseline_asset_id: run.config.baseline_asset_id,
+                          },
+                          commandKey(),
+                        );
+                        setRenderResult(
+                          await api.request<RenderResult>(
+                            `/runs/${runId}/renders/${encodeURIComponent(job.render_request_id)}`,
+                          ),
+                        );
+                        await refresh(runId!);
+                      })
+                    }
+                  >
+                    <WandSparkles size={16} />
+                    Reimagine
+                  </button>
+                </div>
+                {renderResult ? (
+                  <>
+                    <h3>
+                      Render proposal version{" "}
+                      {renderResult.proposal_set_version}
+                    </h3>
+                    <span className="status">{renderResult.status}</span>
+                    {renderResult.proposal_set_version !== version && (
+                      <p className="notice">
+                        Older render. Current proposal version {version};
+                        baseline remains selected.
+                      </p>
+                    )}
+                    <p className="muted">Not validated or approved</p>
+                    {renderResult.outcomes.map((o) => (
+                      <p key={o.change_id}>
+                        <strong>
+                          {o.change_id}: {o.status}
+                        </strong>
+                        <br />
+                        {o.reason}
+                      </p>
+                    ))}
+                    {renderResult.proposal_set_version === version &&
+                      renderResult.variant_ids.includes(
+                        variant?.variant_id ?? "",
+                      ) &&
+                      renderResult.assets.map((asset) =>
+                        safeUrl(asset.url) ? (
+                          <a
+                            key={asset.asset_id}
+                            href={asset.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open variant asset {asset.asset_id}
+                          </a>
+                        ) : null,
+                      )}
+                  </>
+                ) : (
+                  <p className="muted">
+                    No render requested for this proposal set.
+                  </p>
+                )}
+              </div>
+            )}
+          </section>
+          <section className="analysis-column" aria-label="Analysis panels">
+            <div
+              className="panel-tabs"
+              role="tablist"
+              aria-label="Analysis views"
+            >
+              {tabs.map(({ title, icon: Icon }, index) => (
+                <button
+                  id={`tab-${title}`}
+                  key={title}
+                  role="tab"
+                  aria-selected={tab === title}
+                  aria-controls={`panel-${title}`}
+                  tabIndex={tab === title ? 0 : -1}
+                  onClick={() => setTab(title)}
+                  onKeyDown={(e) => {
+                    const next =
+                      e.key === "ArrowRight"
+                        ? (index + 1) % tabs.length
+                        : e.key === "ArrowLeft"
+                          ? (index + tabs.length - 1) % tabs.length
+                          : e.key === "Home"
+                            ? 0
+                            : e.key === "End"
+                              ? tabs.length - 1
+                              : null;
+                    if (next !== null) {
+                      e.preventDefault();
+                      setTab(tabs[next].title);
+                      document
+                        .getElementById(`tab-${tabs[next].title}`)
+                        ?.focus();
+                    }
+                  }}
+                >
+                  <Icon size={16} />
+                  {title}
+                </button>
+              ))}
+            </div>
+            <div
+              className="analysis-panel"
+              role="tabpanel"
+              id={`panel-${tab}`}
+              aria-labelledby={`tab-${tab}`}
+            >
+              {!workspace ? (
+                <div className="empty-state">
+                  <Network size={30} />
+                  <h2>Vehicle evidence workspace</h2>
+                  <p>No analysis run yet.</p>
+                </div>
+              ) : (
+                <>
+                  {workspace.checkpoint && (
+                    <section className="checkpoint">
+                      <h3>{workspace.checkpoint.question}</h3>
+                      {workspace.checkpoint.alternatives.map((a) => (
+                        <div key={a.id}>
+                          <strong>{a.title}</strong>
+                          <p>{a.tradeoff}</p>
+                          <button
+                            disabled={!can("continue_checkpoint")}
+                            onClick={() =>
+                              void act(async () => {
+                                await api.request(
+                                  `/runs/${runId}/checkpoints/${workspace.checkpoint!.checkpoint_id}/continue`,
+                                  {
+                                    checkpoint_version:
+                                      workspace.checkpoint!.version,
+                                    selected_resolution: a.id,
+                                  },
+                                  commandKey(),
+                                );
+                                setVariantId(a.id);
+                                await refresh(runId!);
+                              })
+                            }
+                          >
+                            <Check size={15} />
+                            Choose approach
+                          </button>
+                        </div>
+                      ))}
+                    </section>
+                  )}
+                  {tab === "Findings" && (
+                    <>
+                      <div className="section-title">
+                        <h2>Customer findings</h2>
+                        <span className="muted">Feedback records</span>
+                      </div>
+                      <div className="finding-list">
+                        {workspace.findings.map((f) => (
+                          <button
+                            className="finding-item"
+                            key={f.finding_id}
+                            aria-pressed={selectedFindingId === f.finding_id}
+                            onClick={() => {
+                              selectFinding(f);
+                              setTab("Evidence");
+                            }}
+                          >
+                            <span
+                              className="feedback-dot"
+                              style={
+                                {
+                                  "--intensity": f.counts.intensity_value,
+                                } as CSSProperties
+                              }
+                            />
+                            <span>
+                              <strong>{f.title}</strong>
+                              <small>{f.customer_need}</small>
+                              <small>
+                                {f.counts.negative_records} of{" "}
+                                {f.counts.total_records} negative feedback
+                                records{f.provisional ? " / provisional" : ""}
+                                {f.counts.low_evidence ? " / low evidence" : ""}
+                              </small>
+                            </span>
+                            <ArrowRight size={16} />
+                          </button>
+                        ))}
+                      </div>
+                    </>
+                  )}
+                  {tab === "Graph" && (
+                    <GraphPanel
+                      workspace={workspace}
+                      onSelect={(id) => {
+                        const f = workspace.findings.find(
+                          (row) => row.finding_id === id,
+                        );
+                        if (f) {
+                          selectFinding(f);
+                          setTab("Evidence");
+                        }
+                      }}
+                    />
+                  )}
+                  {tab === "Evidence" &&
+                    (selectedFinding ? (
+                      <>
+                        <FindingDetails finding={selectedFinding} />
+                        <EvidenceList
+                          api={api}
+                          runId={runId!}
+                          ids={selectedFinding.supporting_evidence_ids}
+                          title="Supporting observations"
+                          onOpen={setSource}
+                        />
+                        <EvidenceList
+                          api={api}
+                          runId={runId!}
+                          ids={selectedFinding.opposing_evidence_ids}
+                          title="Opposing observations"
+                          onOpen={setSource}
+                        />
+                        {run?.config.deep_dive.enabled && (
+                          <section className="research-section">
+                            <h3>Deep Dive</h3>
+                            {workspace.research
+                              .filter(
+                                (r) =>
+                                  r.finding_id === selectedFinding.finding_id,
+                              )
+                              .map((r) => (
+                                <div key={r.research_id}>
+                                  <span className="status">{r.status}</span>
+                                  <p>
+                                    {r.competitor_scope} / {r.as_of}
+                                  </p>
+                                  {r.claims.map((claim, i) => (
+                                    <article className="evidence-card" key={i}>
+                                      <strong>{claim.type}</strong>
+                                      <p>{claim.text}</p>
+                                      {claim.evidence_ids.map((id) => (
+                                        <button
+                                          key={id}
+                                          onClick={() =>
+                                            void act(async () =>
+                                              setSource(
+                                                await api.request<Evidence>(
+                                                  `/runs/${runId}/evidence/${encodeURIComponent(id)}`,
+                                                ),
+                                              ),
+                                            )
+                                          }
+                                        >
+                                          <BookOpen size={14} />
+                                          Open citation {id}
+                                        </button>
+                                      ))}
+                                    </article>
+                                  ))}
+                                  <h4>Recommended improvement</h4>
+                                  <p>{r.recommendation}</p>
+                                  <h4>Alternatives and counterevidence</h4>
+                                  {[
+                                    ...r.candidate_approaches,
+                                    ...r.counterevidence,
+                                  ].map((text) => (
+                                    <p key={text}>{text}</p>
+                                  ))}
+                                  {r.gaps.map((gap) => (
+                                    <p className="notice" key={gap}>
+                                      {gap}
+                                    </p>
+                                  ))}
+                                </div>
+                              ))}
+                            {!workspace.research.some(
+                              (r) =>
+                                r.finding_id === selectedFinding.finding_id,
+                            ) && (
+                              <p className="muted">
+                                No research bundle available for this finding.
+                              </p>
+                            )}
+                          </section>
+                        )}
+                      </>
+                    ) : (
+                      <div className="empty-state">
+                        No finding mapped to this part. Vehicle-wide findings
+                        remain available in Findings.
+                      </div>
+                    ))}
+                  {tab === "Proposals" && (
+                    <>
+                      <div className="section-title">
+                        <h2>Proposal version {version}</h2>
+                        <span className="status">{run?.analysis_status}</span>
+                      </div>
+                      <label className="stacked-label">
+                        Variant
+                        <select
+                          value={variant?.variant_id ?? ""}
+                          onChange={(e) => setVariantId(e.target.value)}
+                        >
+                          {workspace.proposals.variants.map((v) => (
+                            <option key={v.variant_id} value={v.variant_id}>
+                              {v.title}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      {workspace.proposals.unresolved_conflicts.map((c) => (
+                        <p className="notice" key={c}>
+                          {c}
+                        </p>
+                      ))}
+                      {variant && (
+                        <>
+                          <p>
+                            <strong>Scope:</strong>{" "}
+                            {variant.cohort_scope.join(", ")}
+                          </p>
+                          {variant.assumptions.map((text) => (
+                            <p className="muted" key={text}>
+                              {text}
+                            </p>
+                          ))}
+                          <details>
+                            <summary>Regroup variant scope</summary>
+                            <ScopeEditor
+                              key={variant.variant_id}
+                              scope={variant.cohort_scope}
+                              disabled={!can("edit")}
+                              onSave={(cohort_scope) =>
+                                submitInstruction({
+                                  operation: "regroup_variants",
+                                  variant_id: variant.variant_id,
+                                  base_proposal_set_version: version,
+                                  fields: { cohort_scope },
+                                })
+                              }
+                            />
+                          </details>
+                          {variant.changes.map((change, index) => (
+                            <ProposalEditor
+                              initialDraft={proposalDrafts.current.get(
+                                variant.variant_id + ":" + change.change_id,
+                              )}
+                              rememberDraft={(draft) =>
+                                proposalDrafts.current.set(
+                                  variant.variant_id + ":" + change.change_id,
+                                  draft,
+                                )
+                              }
+                              key={variant.variant_id + ":" + change.change_id}
+                              change={change}
+                              number={index + 1}
+                              version={version}
+                              disabled={!can("edit")}
+                              onEvidence={() => {
+                                const f = workspace.findings.find(
+                                  (row) => row.finding_id === change.finding_id,
+                                );
+                                if (f) selectFinding(f);
+                                setTab("Evidence");
+                              }}
+                              onSave={(operation, fields, baseVersion) =>
+                                submitInstruction({
+                                  operation,
+                                  change_id: change.change_id,
+                                  variant_id: variant.variant_id,
+                                  base_proposal_set_version: baseVersion,
+                                  fields,
+                                })
+                              }
+                            />
+                          ))}
+                          <AddProposal
+                            idea={ideaDraft}
+                            setIdea={setIdeaDraft}
+                            disabled={!can("edit")}
+                            onAdd={(after) =>
+                              submitInstruction({
+                                operation: "add_change",
+                                variant_id: variant.variant_id,
+                                base_proposal_set_version: version,
+                                fields: { after },
+                              })
+                            }
+                          />
+                        </>
+                      )}
+                    </>
+                  )}
+                  {tab === "History" && (
+                    <>
+                      <div className="section-title">
+                        <h2>Run history</h2>
+                        <button
+                          disabled={!can("export") || !variant}
+                          onClick={() =>
+                            void act(async () => {
+                              const job = await api.request<{
+                                export_id: string;
+                              }>(
+                                `/runs/${runId}/exports`,
+                                {
+                                  proposal_set_version: version,
+                                  variant_ids: [variant!.variant_id],
+                                  format: "json",
+                                },
+                                commandKey(),
+                              );
+                              setExportJob({
+                                export_id: job.export_id,
+                                proposal_set_version: version,
+                                status: "queued",
+                              });
+                              const result = await api.request<{
+                                export_id: string;
+                                status: string;
+                                download_url?: string;
+                              }>(
+                                `/runs/${runId}/exports/${encodeURIComponent(job.export_id)}`,
+                              );
+                              setExportJob({
+                                ...result,
+                                proposal_set_version: version,
+                              });
+                              await refresh(runId!);
+                            })
+                          }
+                        >
+                          <Download size={16} />
+                          Request export
+                        </button>
+                      </div>
+                      {exportJob && (
+                        <p>
+                          Export proposal version{" "}
+                          {exportJob.proposal_set_version}: {exportJob.status}{" "}
+                          {exportJob.status === "ready" &&
+                            exportJob.download_url &&
+                            safeUrl(
+                              exportJob.download_url,
+                              api.mode === "mock",
+                            ) && (
+                              <a
+                                download="vehicle-requirements.json"
+                                href={exportJob.download_url}
+                              >
+                                Download export
+                              </a>
+                            )}
+                        </p>
+                      )}
+                      <ol className="audit-list">
+                        {workspace.history.map((event) => (
+                          <li key={event.event_id}>
+                            <span>
+                              {event.actor} / proposal v
+                              {event.proposal_set_version}
+                            </span>
+                            <strong>{event.description}</strong>
+                            <time dateTime={event.occurred_at}>
+                              {new Date(event.occurred_at).toLocaleString()}
+                            </time>
+                          </li>
+                        ))}
+                      </ol>
+                    </>
+                  )}
+                </>
+              )}
+            </div>
+          </section>
+        </div>
+      </main>
+      {source && (
+        <SourceDialog evidence={source} onClose={() => setSource(null)} />
+      )}
+    </div>
+  );
 }
-function Metric({value,label,meta}:{value:string;label:string;meta:string}){return <div className="metric"><strong>{value}</strong><span>{label}</span><small>{meta}</small></div>}
-function Sparkline({values,large=false}:{values:number[];large?:boolean}){const max=Math.max(...values),min=Math.min(...values),points=values.map((v,i)=>`${(i/(values.length-1))*100},${34-((v-min)/(max-min||1))*26}`).join(' ');return <svg className={`sparkline ${large?'sparkline-large':''}`} viewBox="0 0 100 38" role="img" aria-label={`Illustrative trend from ${values[0]} to ${values.at(-1)}`}><polyline points={points} fill="none" stroke="currentColor" strokeWidth="2" vectorEffect="non-scaling-stroke"/><circle cx="100" cy={34-((values.at(-1)!-min)/(max-min||1))*26} r="2.5" fill="currentColor"/></svg>}
-function ResearchAndConcepts({finding,question,scope,status,concepts,selectedConcept,onQuestionChange,onScopeChange,onConceptChange,onSelectConcept,onLoad,onCancel,onRetry,onCreate}:{finding:Finding;question:string;scope:Market;status:'ready'|'cancelled'|'unresolved';concepts:string[];selectedConcept:number;onQuestionChange:(value:string)=>void;onScopeChange:(value:Market)=>void;onConceptChange:(index:number,value:string)=>void;onSelectConcept:(index:number)=>void;onLoad:()=>void;onCancel:()=>void;onRetry:()=>void;onCreate:()=>void}){
- const [expandedEvidenceId,setExpandedEvidenceId]=useState<string|null>(null);
- const supports=finding.evidence.filter(e=>e.stance==='supports-friction'&&e.market===scope);
- const counters=finding.evidence.filter(e=>e.stance==='counter-signal'&&e.market===scope);
- const tradeoffs=['More visual emphasis may add clutter. Validate with a glance test.','Fewer steps may hide advanced actions. Validate task completion and discoverability.','Extra prompts may compete with road attention. Validate in a simulator study.'];
- const assumptions=['Clearer status reduces repeat checks.','Common tasks account for most reported friction.','Drivers miss functions they cannot discover.'];
- const validations=['Measure first-glance understanding with representative drivers.','Compare task time and error rate for common actions.','Test discovery without distracting from the driving task.'];
- return <div className="research-workspace">
-  <p className="dialog-intro"><span className="prepared-label"><Activity size={14}/> Prepared example</span> Synthetic fixture only. No live research job or external source lookup has run.</p>
-  <div className="research-controls"><label className="field-label" htmlFor="research-question">Research question</label><textarea id="research-question" name="research-question" value={question} onChange={e=>onQuestionChange(e.target.value)} rows={2}/><label className="field-label" htmlFor="research-scope">Research scope</label><select id="research-scope" aria-label="Research scope" value={scope} onChange={e=>onScopeChange(e.target.value as Market)}>{markets.map(m=><option key={m}>{m}</option>)}</select><div className="research-actions"><button className="button button-primary" onClick={onLoad}>Load prepared result</button><button className="button button-secondary" onClick={onCancel}>Cancel prepared result</button>{status!=='ready'&&<button className="button button-secondary" onClick={onRetry}>Retry prepared result</button>}</div></div>
-  {status==='cancelled'&&<p className="research-state" role="status"><strong>Cancelled by you.</strong> No live job was running; the prepared example is hidden.</p>}
-  {status==='unresolved'&&<p className="research-state" role="status"><strong>No prepared result covers this question.</strong> The fixture only supports its default question for Europe. No answer has been generated for this scope.</p>}
-  {status==='ready'&&<><div className="research-summary"><span className="detail-kicker">PREPARED SUMMARY · OBSERVED ASSOCIATION</span><p>{finding.research}</p><small>Europe fixture · {finding.current.negative} negative of {finding.current.total} records · synthetic</small></div><div className="research-columns"><div><h3>Supporting evidence</h3>{supports.map(e=><p className="research-signal" key={e.id}><Check size={15}/><span>{e.quote}<small>{e.id} · {e.market} · {e.period} · synthetic</small></span></p>)}{!supports.length&&<p>No supporting records in this scope.</p>}</div><div><h3>Counterevidence</h3>{counters.map(e=><p className="research-signal counter-signal" key={e.id}><ArrowUpRight size={15}/><span>{e.quote}<small>{e.id} · {e.market} · {e.period} · synthetic</small></span></p>)}{!counters.length&&<p>No counterevidence in this prepared sample.</p>}</div></div><div className="hypothesis-list"><h3>Hypotheses · not supported explanations</h3>{finding.hypotheses.map((h,i)=><p key={h}><span>{i+1}</span>{h}</p>)}</div><div className="validation-gap"><strong>Coverage gaps and recommended validation</strong><p>Equipment, software version and participant mix are unknown. Run matched usability studies before making causal claims.</p></div></>}
-  <section className="proposal-list"><h3>Reimagine · three prepared concepts</h3><p>Prepared directions for {finding.name}, not answers to the research question. Compare the tradeoffs, edit a preferred proposal, then create a draft. {supports.length?`Evidence is scoped to ${scope}.`:`No supporting evidence is available in ${scope}; draft creation is disabled.`}</p>{[0,1,2].map(i=>{const evidence=supports[i%supports.length];const evidenceOpen=evidence?.id===expandedEvidenceId;return <article className="proposal" key={i}><label className="concept-choice"><input type="radio" name="preferred-concept" aria-label={`Choose concept ${i+1}`} checked={selectedConcept===i} onChange={()=>onSelectConcept(i)}/><span>Concept {i+1}</span></label><div className="concept-detail"><strong>Customer need</strong><p>{i===0?'Understand status at a glance.':i===1?'Complete frequent actions with less effort.':'Discover useful functions without distraction.'}</p><strong>Complaint addressed</strong>{evidence?<blockquote>{evidence.quote}<small>{evidence.id} · {evidence.market} · synthetic supporting signal</small></blockquote>:<p>No supporting quote in this scope; concept is unresolved.</p>}<label className="field-label" htmlFor={`concept-${i}`}>Edit concept {i+1}</label><textarea id={`concept-${i}`} aria-label={`Edit concept ${i+1}`} value={concepts[i]??''} onChange={e=>onConceptChange(i,e.target.value)} rows={2}/><p><strong>Assumption:</strong> {assumptions[i]}</p><p><strong>Tradeoff:</strong> {tradeoffs[i]}</p><p><strong>Validation:</strong> {validations[i]}</p>{evidence&&<><button className="text-button" aria-expanded={evidenceOpen} aria-controls={`concept-evidence-${i}`} onClick={()=>setExpandedEvidenceId(evidenceOpen?null:evidence.id)}>{evidenceOpen?'Hide':'View'} evidence {evidence.id}</button>{evidenceOpen&&<div className="review-evidence" id={`concept-evidence-${i}`}><article><strong>{evidence.id} · Supporting signal</strong><blockquote>“{evidence.quote}”</blockquote><small>Local source locator · {evidence.id} · {evidence.source} · {evidence.market} · {evidence.period} · synthetic fixture</small></article></div>}</>}</div></article>})}<button className="button button-primary" disabled={status!=='ready'||supports.length===0||!concepts[selectedConcept]?.trim()} onClick={onCreate}><Plus size={15}/>Create draft requirement</button></section>
-  <div className="dialog-footer"><span>Prepared fixture · not a predicted outcome</span></div>
- </div>
+
+function FindingDetails({ finding: f }: { finding: Finding }) {
+  return (
+    <section className="finding-detail">
+      <h2>{f.title}</h2>
+      <p>{f.customer_need}</p>
+      <p>
+        <strong>
+          {f.counts.negative_records} of {f.counts.total_records} negative
+          feedback records
+        </strong>{" "}
+        /{" "}
+        {f.counts.negative_share === null
+          ? "Unknown share"
+          : `${f.counts.negative_share}% negative`}
+      </p>
+      <div className="tag-row">
+        {f.provisional && <span className="status">Provisional</span>}
+        {f.counts.low_evidence && <span className="status">Low evidence</span>}
+        <span>{f.cohort_ids.join(", ")}</span>
+      </div>
+      <dl>
+        <dt>Coverage</dt>
+        <dd>{f.coverage}</dd>
+        <dt>Baseline</dt>
+        <dd>{f.baseline}</dd>
+        <dt>Applicability</dt>
+        <dd>{f.applicability}</dd>
+      </dl>
+    </section>
+  );
 }
-function ReviewForm({requirement,market,period,onSave,onClose}:{requirement:Requirement;market:Market;period:Period;onSave:(r:Requirement,action:'approve'|'defer'|'reject'|'edit'|'challenge',title:string,reason:string)=>boolean;onClose:()=>void}){
- const [title,setTitle]=useState(requirement.title);const [reason,setReason]=useState('');const [error,setError]=useState(false);const [evidenceOpen,setEvidenceOpen]=useState(false);const linkedEvidence=requirement.evidenceIds.map(id=>findingFor(requirement.componentId).evidence.find(e=>e.id===id)).filter((e):e is NonNullable<typeof e>=>!!e);
- const save=(action:'approve'|'defer'|'reject'|'edit'|'challenge')=>{if(!title.trim()||!reason.trim()){setError(true);if(!title.trim())document.getElementById('requirement-text')?.focus();else document.getElementById('decision-rationale')?.focus();return;}onSave(requirement,action,title,reason);};
- return <><p className="dialog-intro">Review, edit, challenge or decide. Every saved change creates a version; editing an approved requirement returns the new version to Draft.</p><div className="review-summary"><span>{findingFor(requirement.componentId).name} · {market} {period} negative share {fmt(negativeShare(sampleFor(findingFor(requirement.componentId),period,market)))}</span><small>Version {requirement.version} · {requirement.evidenceIds.length} linked evidence records · {requirement.status}</small><button className="version-info" type="button" aria-expanded={evidenceOpen} aria-controls="review-evidence" onClick={()=>setEvidenceOpen(value=>!value)}><BookOpen size={14}/>{evidenceOpen?'Hide':'View'} linked evidence</button></div>{evidenceOpen&&<div id="review-evidence" className="review-evidence">{linkedEvidence.length?linkedEvidence.map(e=><article key={e.id}><strong>{e.id} · {e.stance==='supports-friction'?'Supporting signal':'Counter signal'}</strong><blockquote>“{e.quote}”</blockquote><small>{e.source} · {e.market} · {e.period} · synthetic fixture</small></article>):<p>No linked evidence records resolve in this fixture.</p>}</div>}<label className="field-label" htmlFor="requirement-text">Requirement text <span>Editable</span></label><textarea id="requirement-text" name="requirement-text" autoComplete="off" value={title} onChange={e=>setTitle(e.target.value)} rows={3}/><label className="field-label" htmlFor="decision-rationale">Decision rationale <span>Required</span></label><textarea id="decision-rationale" name="decision-rationale" autoComplete="off" aria-invalid={error&&!reason.trim()} aria-describedby={error?'rationale-error':undefined} value={reason} onChange={e=>{setReason(e.target.value);setError(false);}} placeholder="Explain the edit, challenge or decision…" rows={4}/>{error&&<p className="field-error" id="rationale-error" role="alert">Add a rationale before saving your decision.</p>}<div className="decision-actions"><button className="button button-secondary" onClick={()=>save('edit')}>Save edit</button><button className="button button-secondary" onClick={()=>save('challenge')}>Challenge</button><button className="button button-secondary" onClick={()=>save('defer')}>Defer</button><button className="button button-danger" onClick={()=>save('reject')}>Reject</button><button className="button button-primary" onClick={()=>save('approve')}><Check size={15}/>Approve</button></div><button className="text-button" onClick={onClose}>Cancel review</button><p className="local-note">Saved in this browser only. No production approval authority.</p></>
+
+function EvidenceList({
+  api,
+  runId,
+  ids,
+  title,
+  onOpen,
+}: {
+  api: Api;
+  runId: string;
+  ids: string[];
+  title: string;
+  onOpen: (e: Evidence) => void;
+}) {
+  const [rows, setRows] = useState<Evidence[]>([]);
+  const [error, setError] = useState("");
+  const idKey = ids.join("|");
+  useEffect(() => {
+    let active = true;
+    setRows([]);
+    setError("");
+    Promise.all(
+      ids.map((id) =>
+        api.request<Evidence>(
+          `/runs/${runId}/evidence/${encodeURIComponent(id)}`,
+        ),
+      ),
+    )
+      .then((data) => {
+        if (active) setRows(data);
+      })
+      .catch((e) => {
+        if (active) setError(e.message);
+      });
+    return () => {
+      active = false;
+    };
+  }, [api, runId, idKey]);
+  return (
+    <section className="evidence-section">
+      <h3>{title}</h3>
+      {error && <p role="alert">{error}</p>}
+      {!ids.length && <p className="muted">No observations supplied.</p>}
+      {rows.map((e) => (
+        <article key={e.evidence_id} className="evidence-card">
+          <strong>
+            {e.source_kind === "uploaded"
+              ? "Customer evidence"
+              : "External evidence"}
+          </strong>
+          <blockquote>{e.excerpt}</blockquote>
+          <p className="muted">
+            {e.scope} / {e.locator.label}
+          </p>
+          <button onClick={() => onOpen(e)}>
+            <BookOpen size={14} />
+            Open source {e.evidence_id}
+          </button>
+        </article>
+      ))}
+    </section>
+  );
+}
+
+function GraphPanel({
+  workspace,
+  onSelect,
+}: {
+  workspace: Workspace;
+  onSelect: (id: string) => void;
+}) {
+  const [filter, setFilter] = useState("all");
+  const nodes = workspace.graph.nodes.filter(
+    (n) => filter === "all" || n.entity_type === filter,
+  );
+  return (
+    <>
+      <div className="section-title">
+        <h2>Evidence graph</h2>
+        <label>
+          Node type
+          <select value={filter} onChange={(e) => setFilter(e.target.value)}>
+            <option value="all">All</option>
+            {[...new Set(workspace.graph.nodes.map((n) => n.entity_type))].map(
+              (type) => (
+                <option key={type}>{type}</option>
+              ),
+            )}
+          </select>
+        </label>
+      </div>
+      <div className="graph-nodes">
+        {nodes.map((node) => (
+          <button
+            key={node.node_id}
+            className={`graph-node node-${node.entity_type}`}
+            onClick={() => onSelect(node.finding_id)}
+          >
+            <small>{node.entity_type}</small>
+            <strong>{node.label}</strong>
+          </button>
+        ))}
+      </div>
+      <ul className="graph-edges">
+        {workspace.graph.edges
+          .filter((edge) =>
+            nodes.some(
+              (n) => n.node_id === edge.from_id || n.node_id === edge.to_id,
+            ),
+          )
+          .map((edge) => (
+            <li key={edge.edge_id}>
+              <span>
+                {workspace.graph.nodes.find((n) => n.node_id === edge.from_id)
+                  ?.label ?? edge.from_id}
+              </span>
+              <span>
+                <ArrowRight size={14} />
+                {edge.relationship}
+              </span>
+              <span>
+                {workspace.graph.nodes.find((n) => n.node_id === edge.to_id)
+                  ?.label ?? edge.to_id}
+              </span>
+            </li>
+          ))}
+      </ul>
+    </>
+  );
+}
+
+function ProposalEditor({
+  change,
+  number,
+  version,
+  disabled,
+  onSave,
+  onEvidence,
+  initialDraft,
+  rememberDraft,
+}: {
+  change: Change;
+  number: number;
+  version: number;
+  disabled: boolean;
+  onSave: (
+    operation: Instruction["operation"],
+    fields: Instruction["fields"],
+    baseVersion: number,
+  ) => Promise<number | null>;
+  onEvidence: () => void;
+  initialDraft?: ProposalDraft;
+  rememberDraft: (draft: ProposalDraft) => void;
+}) {
+  const [text, setText] = useState(initialDraft?.text ?? change.after);
+  const [target, setTarget] = useState(initialDraft?.target ?? change.target);
+  const [baseVersion, setBaseVersion] = useState(
+    initialDraft?.baseVersion ?? version,
+  );
+  useEffect(() => {
+    rememberDraft({ text, target, baseVersion });
+  }, [text, target, baseVersion, rememberDraft]);
+  const stale = version !== baseVersion;
+  async function save(
+    operation: Instruction["operation"],
+    fields: Instruction["fields"],
+  ) {
+    const saved = await onSave(operation, fields, baseVersion);
+    if (saved !== null) setBaseVersion(saved);
+  }
+  return (
+    <article className="proposal-item">
+      <h3>
+        <span className="change-number">{number}</span>
+        {change.origin === "pm" ? "PM idea" : "AI proposal"}{" "}
+        <small>{change.decision_state}</small>
+      </h3>
+      <p>
+        <strong>Before:</strong> {change.before}
+      </p>
+      <p>{change.rationale}</p>
+      <label className="stacked-label">
+        Proposal text
+        <textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          disabled={disabled}
+        />
+      </label>
+      <label className="stacked-label">
+        Target
+        <textarea
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+          disabled={disabled}
+        />
+      </label>
+      <p className="muted">Target maturity: {change.target_maturity}</p>
+      {change.assumptions.map((a) => (
+        <p className="muted" key={a}>
+          {a}
+        </p>
+      ))}
+      {stale && (
+        <div className="notice">
+          <strong>
+            Draft based on version {baseVersion}; current version {version}.
+          </strong>
+          <p>Current proposal: {change.after}</p>
+          <button onClick={() => setBaseVersion(version)}>
+            <RefreshCw size={15} />
+            Use current version with my draft
+          </button>
+        </div>
+      )}
+      <div className="action-row">
+        <button
+          disabled={disabled || stale || !text.trim()}
+          onClick={() => void save("edit_change", { after: text })}
+        >
+          <Save size={15} />
+          Save edit
+        </button>
+        <button
+          disabled={disabled || stale || !target.trim()}
+          onClick={() => void save("edit_target", { target })}
+        >
+          <Save size={15} />
+          Save target
+        </button>
+        <button onClick={onEvidence}>
+          <BookOpen size={15} />
+          View evidence
+        </button>
+        <button
+          className="icon-button"
+          aria-label={`Remove change ${number}`}
+          title="Remove change"
+          disabled={disabled || stale}
+          onClick={() => void save("remove_change", {})}
+        >
+          <Trash2 size={16} />
+        </button>
+      </div>
+    </article>
+  );
+}
+
+function AddProposal({
+  disabled,
+  onAdd,
+  idea,
+  setIdea,
+}: {
+  disabled: boolean;
+  onAdd: (after: string) => Promise<number | null>;
+  idea: string;
+  setIdea: (idea: string) => void;
+}) {
+  return (
+    <section className="add-proposal">
+      <h3>Add PM idea</h3>
+      <label className="stacked-label">
+        PM instruction
+        <textarea
+          value={idea}
+          onChange={(e) => setIdea(e.target.value)}
+          disabled={disabled}
+        />
+      </label>
+      <button
+        disabled={disabled || !idea.trim()}
+        onClick={async () => {
+          if ((await onAdd(idea)) !== null) setIdea("");
+        }}
+      >
+        <Plus size={16} />
+        Add proposal
+      </button>
+    </section>
+  );
+}
+
+function ScopeEditor({
+  scope,
+  disabled,
+  onSave,
+}: {
+  scope: string[];
+  disabled: boolean;
+  onSave: (scope: string[]) => Promise<number | null>;
+}) {
+  const [draft, setDraft] = useState(scope.join(", "));
+  return (
+    <div className="scope-editor">
+      <label className="stacked-label">
+        Cohort scope
+        <input
+          value={draft}
+          onChange={(e) => setDraft(e.target.value)}
+          disabled={disabled}
+        />
+      </label>
+      <button
+        disabled={disabled || !draft.trim()}
+        onClick={() =>
+          void onSave(
+            draft
+              .split(",")
+              .map((s) => s.trim())
+              .filter(Boolean),
+          )
+        }
+      >
+        <Save size={15} />
+        Save grouping
+      </button>
+      <p className="muted">
+        Scope changes require recomputation; overlapping cohorts are not added
+        together.
+      </p>
+    </div>
+  );
+}
+
+function SourceDialog({
+  evidence,
+  onClose,
+}: {
+  evidence: Evidence;
+  onClose: () => void;
+}) {
+  const ref = useRef<HTMLDialogElement>(null);
+  useEffect(() => {
+    const opener = document.activeElement as HTMLElement | null;
+    if (ref.current?.showModal) ref.current.showModal();
+    else ref.current?.setAttribute("open", "");
+    ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => opener?.focus();
+  }, []);
+  return (
+    <dialog
+      ref={ref}
+      aria-label="Source reference"
+      onCancel={(e) => {
+        e.preventDefault();
+        onClose();
+      }}
+      onKeyDown={(e) => {
+        if (e.key === "Escape") {
+          e.preventDefault();
+          onClose();
+        }
+      }}
+    >
+      <div className="section-title">
+        <h2>Source reference</h2>
+        <button
+          className="icon-button"
+          aria-label="Close source"
+          title="Close source"
+          onClick={onClose}
+        >
+          <X size={18} />
+        </button>
+      </div>
+      <p>{evidence.source_version_id}</p>
+      <p>{evidence.locator.label}</p>
+      <blockquote>{evidence.excerpt}</blockquote>
+      <p>{evidence.limitations}</p>
+      {evidence.source_url && safeUrl(evidence.source_url) ? (
+        <a href={evidence.source_url} target="_blank" rel="noreferrer">
+          Open original source
+        </a>
+      ) : (
+        <p className="muted">
+          Original file link unavailable; exact source locator retained.
+        </p>
+      )}
+    </dialog>
+  );
+}
+
+function safeUrl(value: string, allowBlob = false) {
+  try {
+    const url = new URL(value, window.location.href);
+    return (
+      ["http:", "https:"].includes(url.protocol) ||
+      (allowBlob && url.protocol === "blob:")
+    );
+  } catch {
+    return false;
+  }
 }

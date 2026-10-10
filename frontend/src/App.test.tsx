@@ -1,137 +1,221 @@
-import {render, screen, within} from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
-import {describe,it,expect} from 'vitest';
-import {cleanup} from '@testing-library/react';
-import {afterEach} from 'vitest';
-import App from './App';
+import {
+  cleanup,
+  render,
+  screen,
+  within,
+  waitFor,
+} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { afterEach, describe, expect, it } from "vitest";
+import App from "./App";
+import { createMockApi } from "./api/client";
 
-afterEach(()=>{cleanup();window.localStorage.clear();});
+afterEach(cleanup);
 
-describe('vehicle insights workflows',()=>{
-  it('does not create Reimagine drafts for a market with no prepared evidence',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.selectOptions(screen.getByRole('combobox',{name:'Market'}),'China');
-    await user.selectOptions(screen.getByRole('combobox',{name:/^Period$/}),'2025');
-    await user.click(within(screen.getByRole('navigation',{name:/main navigation/i})).getByRole('button',{name:/requirements/i}));
-    await user.click(screen.getByRole('button',{name:'Reimagine'}));
-    expect(screen.getByText(/No prepared result covers this question/i)).toBeInTheDocument();
-    expect(screen.getByRole('button',{name:'Create draft requirement'})).toBeDisabled();
+async function createRun(
+  options: { deepDive?: boolean; guided?: boolean; scenario?: string } = {},
+) {
+  const user = userEvent.setup();
+  render(<App api={createMockApi(options.scenario)} />);
+  if (options.deepDive)
+    await user.click(screen.getByRole("checkbox", { name: "Deep Dive" }));
+  if (options.guided)
+    await user.click(screen.getByRole("radio", { name: "Guided" }));
+  await user.upload(
+    screen.getByLabelText("Upload files"),
+    new File(["feedback"], "regional-feedback.csv", { type: "text/csv" }),
+  );
+  await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Create run" }));
+  await screen.findByText(
+    options.guided ? "waiting_for_pm" : "proposals_ready",
+  );
+  return user;
+}
+
+describe("frontend plan workspace", () => {
+  it("starts with autonomous setup and Deep Dive off, without separate pitch destinations", () => {
+    render(<App />);
+    expect(screen.getByRole("radio", { name: "Autonomous" })).toBeChecked();
+    expect(
+      screen.getByRole("checkbox", { name: "Deep Dive" }),
+    ).not.toBeChecked();
+    expect(screen.getByRole("button", { name: "Create run" })).toBeDisabled();
+    for (const name of [
+      "Overview",
+      "Compare",
+      "Present",
+      "Print report",
+      "Export CSV",
+    ]) {
+      expect(screen.queryByRole("button", { name })).not.toBeInTheDocument();
+    }
   });
 
-  it('labels evidence by its meaning and opens evidence for the selected component',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.click(screen.getByRole('button',{name:'View evidence'}));
-    const dialog=screen.getByRole('dialog');
-    const card=within(dialog).getByText(/trunk gesture only works sometimes/).closest('article')!;
-    expect(card).toHaveTextContent('Supporting signal');
-    await user.click(within(dialog).getByRole('button',{name:'Explore research'}));
-    const supporting=screen.getByRole('heading',{name:'Supporting evidence'}).parentElement!;
-    expect(supporting).toHaveTextContent('trunk gesture only works sometimes');
-    expect(supporting).not.toHaveTextContent('door handles are easier');
+  it("keeps unavailable vehicles honest and blocks mismatched asset creation", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await screen.findByRole("option", { name: "BMW 1 Series / F70" });
+    await user.selectOptions(screen.getByLabelText("Vehicle"), "f70");
+    expect(screen.getByText("Baseline asset unavailable")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("region", { name: "BMW i5 M60 vehicle viewer" }),
+    ).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create run" })).toBeDisabled();
   });
 
-  it('keeps baseline and current periods distinct when either changes',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.selectOptions(screen.getByRole('combobox',{name:/^Period$/}),'2025');
-    expect(screen.getByRole('combobox',{name:'Baseline period'})).toHaveValue('2026');
-    await user.selectOptions(screen.getByRole('combobox',{name:'Baseline period'}),'2025');
-    expect(screen.getByRole('combobox',{name:/^Period$/})).toHaveValue('2026');
+  it("allows partial uploads, freezes saved settings and exposes findings without PM approval", async () => {
+    const user = await createRun();
+    expect(screen.getByText("Saved configuration")).toBeInTheDocument();
+    expect(screen.getByLabelText("Vehicle")).toBeDisabled();
+    expect(screen.getByRole("checkbox", { name: "Deep Dive" })).toBeDisabled();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "Findings" }));
+    expect(
+      screen.getByRole("button", { name: /Comfort controls.*172 of 400/ }),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Vehicle-wide and unmapped/ }),
+    ).toBeInTheDocument();
   });
 
-  it('compares the component selected in the vehicle explorer',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    const navigation=within(screen.getByRole('navigation',{name:/main navigation/i}));
-    await user.click(navigation.getByRole('button',{name:'Vehicle Explorer'}));
-    await user.click(await screen.findByRole('button',{name:/Headlamps/}));
-    await user.click(navigation.getByRole('button',{name:'Compare'}));
-    expect(screen.getByRole('heading',{name:'Lighting & visibility'})).toBeInTheDocument();
-    expect(screen.getByText('28%')).toBeInTheDocument();
-    expect(screen.getAllByText('14%').length).toBeGreaterThan(0);
+  it("rejects unsupported files while retaining a usable partial package", async () => {
+    const user = userEvent.setup();
+    render(<App />);
+    await user.upload(screen.getByLabelText("Upload files"), [
+      new File(["x"], "bad.exe"),
+      new File(["x"], "good.csv"),
+    ]);
+    expect(await screen.findByText(/Unsupported file/)).toBeInTheDocument();
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Create run" })).toBeEnabled(),
+    );
   });
 
-  it('shows a newly created draft even when prior search and status filters exclude it',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.click(within(screen.getByRole('navigation',{name:/main navigation/i})).getByRole('button',{name:/requirements/i}));
-    await user.type(screen.getByRole('textbox',{name:'Search requirements'}),'nonexistent');
-    await user.selectOptions(screen.getByRole('combobox',{name:'Filter requirements'}),'Approved');
-    await user.click(screen.getByRole('button',{name:'Reimagine'}));
-    await user.click(screen.getAllByRole('button',{name:/create draft requirement/i})[0]);
-    expect(screen.getByRole('textbox',{name:'Search requirements'})).toHaveValue('');
-    expect(screen.getByRole('combobox',{name:'Filter requirements'})).toHaveValue('All');
-    expect(screen.getByRole('heading',{name:/Make body & access easier/i})).toBeInTheDocument();
-  });
-  it('opens evidence details and returns focus to the evidence action on Escape',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    const evidence=screen.getByRole('button',{name:/view evidence/i});
-    await user.click(evidence);
-    expect(screen.getByRole('dialog',{name:/evidence/i})).toBeInTheDocument();
-    await user.keyboard('{Escape}');
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
-    expect(evidence).toHaveFocus();
+  it("keeps Deep Dive evidence inside finding panels and exposes partial gaps", async () => {
+    const user = await createRun({ deepDive: true });
+    await user.click(screen.getByRole("tab", { name: "Evidence" }));
+    expect(
+      screen.getByRole("heading", { name: "Deep Dive" }),
+    ).toBeInTheDocument();
+    expect(screen.getByText("partial")).toBeInTheDocument();
+    expect(screen.getByText(/Owner sample unavailable/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/172 of 400 negative feedback records/),
+    ).toBeInTheDocument();
   });
 
-  it('creates a draft requirement from a proposal and requires rationale before review',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.click(within(screen.getByRole('navigation',{name:/main navigation/i})).getByRole('button',{name:/requirements/i}));
-    await user.click(screen.getByRole('button',{name:/reimagine/i}));
-    await user.click(screen.getAllByRole('button',{name:/create draft requirement/i})[0]);
-    expect(screen.getByText(/draft requirement created/i)).toBeInTheDocument();
-    const review=screen.getAllByRole('button',{name:/review/i})[0];
-    await user.click(review);
-    const dialog=screen.getByRole('dialog',{name:/review requirement/i});
-    await user.click(within(dialog).getByRole('button',{name:/approve/i}));
-    expect(within(dialog).getByText(/add a rationale/i)).toBeInTheDocument();
-    await user.type(within(dialog).getByLabelText(/decision rationale/i),'Validated with the study panel.');
-    await user.click(within(dialog).getByRole('button',{name:/approve/i}));
-    expect(screen.getByText(/approved · version 2/i)).toBeInTheDocument();
-    await user.click(screen.getByRole('button',{name:/view version history/i}));
-    expect(screen.getByText(/version 1 · draft/i)).toBeInTheDocument();
+  it("opens source references and keeps customer records separate from proposal edits", async () => {
+    const user = await createRun();
+    await user.click(screen.getByRole("tab", { name: "Evidence" }));
+    await user.click(
+      await screen.findByRole("button", { name: "Open source dashboard-E1" }),
+    );
+    const dialog = await screen.findByRole("dialog", {
+      name: "Source reference",
+    });
+    expect(within(dialog).getByText(/row 12/)).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(
+      screen.getByRole("button", { name: "Open source dashboard-E1" }),
+    ).toHaveFocus();
   });
 
-  it('keeps unsupported market-period baselines visibly unavailable',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.click(within(screen.getByRole('navigation',{name:/main navigation/i})).getByRole('button',{name:'Compare'}));
-    await user.selectOptions(screen.getByRole('combobox',{name:'Market'}),'United States');
-    await user.selectOptions(screen.getByRole('combobox',{name:'Period'}),'2025');
-    expect(screen.getByRole('heading',{name:/no comparable baseline/i})).toBeInTheDocument();
-    expect(screen.getByText(/2026 snapshots only; the longitudinal 2025 sample is Europe-only/i)).toBeInTheDocument();
+  it("submits version-bound edits and keeps original evidence inspectable", async () => {
+    const user = await createRun();
+    await user.click(screen.getByRole("tab", { name: "Proposals" }));
+    await user.clear(screen.getByLabelText("Proposal text"));
+    await user.type(
+      screen.getByLabelText("Proposal text"),
+      "Keep climate controls visible.",
+    );
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    expect(await screen.findByText("Proposal version 2")).toBeInTheDocument();
+    expect(screen.getByLabelText("Proposal text")).toHaveValue(
+      "Keep climate controls visible.",
+    );
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    expect(screen.getByText(/PM instruction accepted/)).toBeInTheDocument();
   });
 
-  it('reports that added source files need backend analysis',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.click(within(screen.getByRole('navigation',{name:/main navigation/i})).getByRole('button',{name:/data & history/i}));
-    const file=new File(['feedback'], 'feedback.csv', {type:'text/csv'});
-    await user.upload(screen.getByLabelText(/choose files to add/i),file);
-    expect(screen.getByRole('status')).toHaveTextContent(/analysis requires backend integration/i);
-    expect(screen.getAllByText(/feedback\.csv/).length).toBeGreaterThan(0);
-    expect(screen.getByText(/no analysis run/i)).toBeInTheDocument();
-  });
-  it('keeps the summary count scoped to the selected market and period',async()=>{
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.selectOptions(screen.getByRole('combobox',{name:'Market'}),'China');
-    const metric=screen.getByText('Negative-feedback share').closest('.metric')!;
-    expect(metric).toHaveTextContent('39.7%');
-    expect(metric).toHaveTextContent('476 negative records of 1,200 eligible');
-    await user.selectOptions(screen.getByRole('combobox',{name:'Period'}),'2025');
-    expect(metric).toHaveTextContent('0 negative records of 0 eligible');
+  it("renders exact proposal versions and shows per-change limits without implying approval", async () => {
+    const user = await createRun();
+    await user.click(screen.getByRole("button", { name: "Reimagine" }));
+    expect(
+      await screen.findByText(/Render proposal version 1/),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByText(/Digital change: annotation only/),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/Not validated or approved/)).toBeInTheDocument();
   });
 
-  it('ignores malformed saved version history',async()=>{
-    window.localStorage.setItem('fwd-history',JSON.stringify({'REQ-001':[{id:'REQ-001',componentId:'steering',version:1,status:'Draft',title:{invalid:true}}]}));
-    const user=userEvent.setup();
-    render(<App/>);
-    await user.click(within(screen.getByRole('navigation',{name:/main navigation/i})).getByRole('button',{name:/requirements/i}));
-    expect(screen.queryByRole('button',{name:/view version history/i})).not.toBeInTheDocument();
+  it("retains an unsaved proposal when inspecting evidence and returning", async () => {
+    const user = await createRun();
+    await user.click(screen.getByRole("tab", { name: "Proposals" }));
+    await user.clear(screen.getByLabelText("Proposal text"));
+    await user.type(
+      screen.getByLabelText("Proposal text"),
+      "My unsaved proposal",
+    );
+    await user.click(screen.getByRole("button", { name: "View evidence" }));
+    await user.click(screen.getByRole("tab", { name: "Proposals" }));
+    expect(screen.getByLabelText("Proposal text")).toHaveValue(
+      "My unsaved proposal",
+    );
   });
 
+  it("retains stale drafts and requires explicit reconciliation before resubmitting", async () => {
+    const user = await createRun({ scenario: "pm_edit_stale" });
+    await user.click(screen.getByRole("tab", { name: "Proposals" }));
+    await user.clear(screen.getByLabelText("Proposal text"));
+    await user.type(
+      screen.getByLabelText("Proposal text"),
+      "Retain my proposed edit",
+    );
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      /Your draft is retained/,
+    );
+    expect(screen.getByLabelText("Proposal text")).toHaveValue(
+      "Retain my proposed edit",
+    );
+    await user.click(
+      await screen.findByRole("button", {
+        name: "Use current version with my draft",
+      }),
+    );
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    expect(await screen.findByText("Proposal version 3")).toBeInTheDocument();
+  });
+
+  it("continues a guided checkpoint in a panel and records the PM selection", async () => {
+    const user = await createRun({ guided: true });
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    await user.click(
+      screen.getAllByRole("button", { name: "Choose approach" })[0],
+    );
+    await screen.findByText("proposals_ready");
+    expect(
+      screen.queryByRole("button", { name: "Choose approach" }),
+    ).not.toBeInTheDocument();
+    await user.click(screen.getByRole("tab", { name: "History" }));
+    expect(screen.getByText("PM selected variant-digital")).toBeInTheDocument();
+  });
+
+  it("keeps an older render labeled after proposal edits", async () => {
+    const user = await createRun();
+    await user.click(screen.getByRole("button", { name: "Reimagine" }));
+    await screen.findByText("Render proposal version 1");
+    await user.click(screen.getByRole("tab", { name: "Proposals" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Save edit" })).toBeEnabled(),
+    );
+    await user.click(screen.getByRole("button", { name: "Save edit" }));
+    await screen.findByText("Proposal version 2");
+    expect(
+      screen.getByText(/Older render. Current proposal version 2/),
+    ).toBeInTheDocument();
+    expect(screen.getByText("Render proposal version 1")).toBeInTheDocument();
+  });
 });

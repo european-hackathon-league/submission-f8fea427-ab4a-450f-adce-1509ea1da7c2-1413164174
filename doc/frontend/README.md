@@ -1,11 +1,9 @@
 # Frontend handoff
 
-Scope is controlled by [`frontend_plan.md`](../../frontend_plan.md) and [`plan.md`](../../plan.md). This branch consolidates the earlier runnable prototype; the newer scope rebuild remains pending. See [integration scope](SCOPE.md).
+The controlling scope is [frontend_plan.md](../../frontend_plan.md) with the shared contract in [plan.md](../../plan.md). See [scope](SCOPE.md) and the runnable [frontend README](../../frontend/README.md).
 
-Pitch prototype for product and project managers. Current G60 i5 M60 view uses a network-hosted creator model, bundled exterior image fallback, and separate static G60 520i cabin photograph. See [asset coverage](MODEL-COVERAGE.md). All metrics and research are synthetic.
+Branch `frontend` now uses one vehicle workspace with run setup and findings, graph, evidence, proposals and history panels. The earlier pitch destinations and local analysis/export code have been removed. The old pitch plan, epics and UI specification were removed because they prescribed features outside the controlling plan.
 
-Run from repository root: `cd frontend && npm ci && npm run dev`. Verification commands: `npm test`, `npm run build`. [Primary verification](VERIFICATION.md): 45 tests and production build pass; desktop/mobile and core demo workflow reviewed. Detailed matching-trim 3D cabin remains pending asset rights and inspection.
+All default responses remain explicitly synthetic. The real API adapter is configurable but has not been tested against a running backend. The hosted exterior model, preview and separately labeled cabin reference remain; see [model coverage](MODEL-COVERAGE.md) and [asset provenance](../../frontend/src/viewer/README-bmw.md).
 
-Read [epics](EPICS.md), [UI specification](UI-SPEC.md), [3D scope](3D-SPEC.md), [vehicle coverage](MODEL-COVERAGE.md) and [cabin candidate research](research/G60-INTERIOR-ASSETS.md). App owns workflow state; viewer uses shared contracts; fixtures and metrics live in `frontend/src/domain`.
-
-Orchestrator order: validate source/context contracts; confirm derivative-matched assets and component mappings; implement backend ingestion/research; add identity and audit persistence; then complete integrated browser and workflow checks. Do not replace synthetic fixtures with live-looking invented findings.
+Backend source data and other branches are outside this frontend cleanup. See [verification](VERIFICATION.md) for the checks and remaining integration gates.

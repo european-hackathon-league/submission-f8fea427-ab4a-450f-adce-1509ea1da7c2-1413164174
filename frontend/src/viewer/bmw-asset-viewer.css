@@ -24,7 +24,7 @@
 }
 .bmw-asset-viewer__identity { min-width: 0; }
 .bmw-asset-viewer__kicker { display: block; color: #58616b; font-size: 11px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
-.bmw-asset-viewer__identity h2 { margin: 5px 0 2px; font-size: clamp(19px, 2.2vw, 26px); font-weight: 560; letter-spacing: -.035em; line-height: 1.15; }
+.bmw-asset-viewer__identity h2 { margin: 5px 0 2px; font-size: 24px; font-weight: 560; letter-spacing: 0; line-height: 1.15; }
 .bmw-asset-viewer__identity p { margin: 0; color: var(--bmw-muted); font-size: 12px; }
 .bmw-asset-viewer__controls { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
 .bmw-asset-viewer__controls button {
@@ -84,6 +84,7 @@
 .bmw-asset-viewer__legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: -4px 0 10px; color: #5e656c; font-size: 11px; line-height: 1.4; }
 .bmw-asset-viewer__legend span { display: inline-flex; align-items: center; gap: 4px; }
 .bmw-asset-viewer__legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--heat); }
+.bmw-asset-viewer__legend .volume-scale { width: 65px; height: 8px; background: linear-gradient(to right,#e9dfe0,#b62e3c); }
 .bmw-asset-viewer__parts { display: grid; gap: 4px; }
 .bmw-asset-viewer__part { display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 8px 9px; border: 1px solid transparent; border-radius: 0; background: #f6f6f5; color: #24282d; text-align: left; cursor: pointer; }
 .bmw-asset-viewer__part:hover { border-color: #b8bdc2; }
@@ -92,7 +93,7 @@
 .bmw-asset-viewer__part.is-selected .bmw-asset-viewer__part-dot { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1769d2; }
 .bmw-asset-viewer__part-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
 .bmw-asset-viewer__part-copy strong { font-size: 12px; font-weight: 700; }
-.bmw-asset-viewer__part-copy small { color: #6b7177; font-size: 11px; }
+.bmw-asset-viewer__part-copy small { color: #6b7177; font-size: 11px; overflow-wrap: anywhere; }
 .bmw-asset-viewer__part-arrow { color: #6b7177; font-size: 15px; }
 .bmw-asset-viewer__selection { display: grid; gap: 4px; margin-top: auto; padding: 13px 0 0; border-top: 1px solid #e5e6e7; }
 .bmw-asset-viewer__selection-label { color: #767c82; font-size: 10px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }

@@ -1,6 +1,6 @@
 # Vehicle and asset coverage
 
-Code family does not prove exact derivative, trim, model year, equipment, or feedback scope. Challenge package includes F70, G60, and G70 feedback/customer-study/option-list files; G68 customer-study workbook. The current UI does not parse these files. All displayed feedback, research, and comparisons remain synthetic.
+Code family does not prove exact derivative, trim, model year, equipment, or feedback scope. Challenge package includes F70, G60, and G70 feedback/customer-study/option-list files; G68 customer-study workbook. The current UI does not parse these files. Default feedback and research remain synthetic. There is no separate comparison workspace.
 
 | Family | Current asset / coverage | Decision |
 |---|---|---|
@@ -9,6 +9,6 @@ Code family does not prove exact derivative, trim, model year, equipment, or fee
 | G68 · China long-wheelbase 5 Series / i5 | Study workbook only; no asset established for an exact G68 derivative. | Uncovered. Do not reuse G60 asset as exact G68 without validation. |
 | G70 · 7 Series / i7 | Challenge data package; no selected or verified exterior/interior asset in current route. | Uncovered. |
 
-The prototype’s current case label is i5 M60 / G60; it does not show that synthetic measures belong to this vehicle. Severity colors encode synthetic negative-feedback share, not damage or engineering defect. In viewer, color is limited to HTML component list and cabin-photo markers; no verified mesh heat coloring. Creator uploads and licenses are not BMW endorsement. Keep creator/license attribution visible in product.
+The current case label is i5 M60 / G60; it does not show that synthetic measures belong to this vehicle. Colors encode API-supplied negative-record-volume intensity, not damage or engineering defect. In viewer, color is limited to HTML component list and cabin-photo markers; no verified mesh heat coloring. Creator uploads and licenses are not BMW endorsement. Keep creator/license attribution visible in product.
 
 Sources: asset records and citations above; F70 assessment recorded in [research note](research/F70-ASSETS.md). Recheck public listing and license before reuse. Coverage beyond these public checks remains unknown.

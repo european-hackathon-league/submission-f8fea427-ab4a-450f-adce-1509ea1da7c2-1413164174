@@ -8,7 +8,7 @@ The viewer embeds Sketchfab's public viewer through its [documented JavaScript A
 
 `/vehicles/i5-m60-preview.jpg` is the source model's public preview image. Keep its accompanying asset provenance with the primary app assets.
 
-The pitch changes the hosted viewer background to charcoal through the documented `setBackground` API; geometry and materials remain the creator's. Sketchfab's own attribution and controls remain available. Application camera controls are positioned clear of the source information bar.
+The viewer changes the hosted background to charcoal through the documented `setBackground` API; geometry and materials remain the creator's. Sketchfab's own attribution and controls remain available. Application camera controls are positioned clear of the source information bar.
 
 ## Cabin reference
 
@@ -18,4 +18,4 @@ The source i5 M60 model has no verified cabin geometry. The interior view theref
 
 ## Limits
 
-Feedback counts and severity colors come from the app's supplied findings and period. They are illustrative product data, not measurements inferred from the model or photograph. Exterior hotspots are not pinned onto the rotating model. No mapped-body heat or per-part model recoloring is claimed. No CDN textures, HDR files, or generated geometry are used.
+Feedback counts, shares and negative-volume intensity come from the adapter's part aggregates. No local customer counting or scoring is performed. Default values are synthetic, not measurements inferred from the model or photograph. Exterior hotspots are not pinned onto the rotating model. No mapped-body heat or per-part model recoloring is claimed. No CDN textures, HDR files, or generated geometry are used.

@@ -1,7 +1,7 @@
 import {useCallback, useEffect, useMemo, useRef, useState} from 'react';
-import type {ComponentId, Period, VehicleView, VehicleViewerProps} from '../domain/contracts';
-import {heatColor, negativeShare} from '../domain/metrics';
-import {componentForNodeName} from './modelMapping';
+import type {ComponentId, VehicleView, VehicleViewerProps} from '../domain/contracts';
+import {componentForNodeName, componentHeatColor} from './modelMapping';
+import {RotateCcw, RotateCw, ZoomIn, ZoomOut} from 'lucide-react';
 import './bmw-asset-viewer.css';
 
 export const BMW_I5_MODEL_UID = '207fd872d28b4cafa7fefe061ae98e26';
@@ -44,10 +44,6 @@ function loadSketchfabApi():Promise<void>{
   return sketchfabScriptPromise;
 }
 
-export function sampleHeatColor(negative:number,total:number):string{
-  return heatColor(negativeShare({negative,total}));
-}
-
 export function normalizeSketchfabNodeMap(payload:SketchfabNodePayload):SketchfabNode[]{
   const object=payload&&typeof payload==='object'?payload as Record<string,unknown>:null;
   const value=object&&'nodes' in object?object.nodes:payload;
@@ -87,18 +83,15 @@ function reducedMotion():boolean{
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false;
 }
 
-function metricSummary(findings:VehicleViewerProps['findings'],id:ComponentId,period:Period):string{
+function metricSummary(findings:VehicleViewerProps['findings'],id:ComponentId):string{
   const finding=findings.find(item=>item.id===id);
   if(!finding)return 'No sample';
-  const sample=period==='2025'?finding.previous:finding.current;
-  return sample.total>0?`${sample.negative}/${sample.total} negative mentions`:'No sample';
+  const counts=finding.counts;
+  return `${counts.negative_records}/${counts.total_records} negative feedback records${counts.provisional?' / provisional':''}${counts.low_evidence?' / low evidence':''}`;
 }
 
-function severityFor(findings:VehicleViewerProps['findings'],id:ComponentId,period:Period):string{
-  const finding=findings.find(item=>item.id===id);
-  if(!finding)return '#8a909b';
-  const sample=period==='2025'?finding.previous:finding.current;
-  return heatColor(negativeShare(sample));
+function severityFor(findings:VehicleViewerProps['findings'],id:ComponentId):string{
+  return componentHeatColor(findings.find(item=>item.id===id));
 }
 
 function useSketchfabViewer(
@@ -241,7 +234,7 @@ function useSketchfabViewer(
   return {resetCamera,zoom,orbit,pause,resume,sceneReady};
 }
 
-export default function BmwAssetViewer({selectedComponent,onSelectComponent,view,onViewChange,heatmap,period,findings,className,onStatusChange}:VehicleViewerProps){
+export default function BmwAssetViewer({selectedComponent,onSelectComponent,view,onViewChange,heatmap,findings,className,onStatusChange}:VehicleViewerProps){
   const [iframe,setIframe]=useState<HTMLIFrameElement|null>(null);
   const [apiFailed,setApiFailed]=useState(false);
   const [liveMessage,setLiveMessage]=useState('');
@@ -256,8 +249,8 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
   useEffect(()=>{if(view==='interior')pause();else resume();},[view,pause,resume]);
 
   const components=useMemo(()=>view==='exterior'?exteriorComponents:interiorComponents,[view]);
-  const heatLabel=heatmap?`Negative feedback · ${period}`:'Feedback heat off';
-  const currentSample=metricSummary(findings,selectedComponent,period);
+  const heatLabel=heatmap?'Negative feedback records':'Feedback tags off';
+  const currentSample=metricSummary(findings,selectedComponent);
 
   const handleReset=()=>{
     if(resetCamera())setResetMessage('Exterior camera reset.');
@@ -313,10 +306,10 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
           {!sceneReady&&!apiFailed&&<div className="bmw-asset-viewer__loading" role="status"><span className="bmw-asset-viewer__spinner"/>Loading hosted BMW i5 M60 model…</div>}
           {apiFailed&&<div className="bmw-asset-viewer__failure" role="alert"><strong>3D model could not load.</strong><span>Verified preview stays available. Check your connection and try again.</span><button type="button" onClick={retryModel}>Retry 3D model</button></div>}
           <div className="bmw-asset-viewer__camera-controls" role="group" aria-label="3D camera controls">
-            <button type="button" aria-label="Orbit model left" title="Orbit left" onClick={()=>handleOrbit(-1)} disabled={!sceneReady}>↶</button>
-            <button type="button" aria-label="Orbit model right" title="Orbit right" onClick={()=>handleOrbit(1)} disabled={!sceneReady}>↷</button>
-            <button type="button" aria-label="Zoom out" title="Zoom out" onClick={()=>handleZoom(1)} disabled={!sceneReady}>−</button>
-            <button type="button" aria-label="Zoom in" title="Zoom in" onClick={()=>handleZoom(-1)} disabled={!sceneReady}>+</button>
+            <button type="button" aria-label="Orbit model left" title="Orbit left" onClick={()=>handleOrbit(-1)} disabled={!sceneReady}><RotateCcw size={18}/></button>
+            <button type="button" aria-label="Orbit model right" title="Orbit right" onClick={()=>handleOrbit(1)} disabled={!sceneReady}><RotateCw size={18}/></button>
+            <button type="button" aria-label="Zoom out" title="Zoom out" onClick={()=>handleZoom(1)} disabled={!sceneReady}><ZoomOut size={18}/></button>
+            <button type="button" aria-label="Zoom in" title="Zoom in" onClick={()=>handleZoom(-1)} disabled={!sceneReady}><ZoomIn size={18}/></button>
           </div>
           <div className="bmw-asset-viewer__stage-caption"><span>{apiFailed?'Exterior · preview image':'Exterior · interactive 3D'}</span><span>{sceneReady?'Sketchfab model connected':apiFailed?'Preview image':'Connecting'}</span></div>
         </>:<div className="bmw-asset-viewer__photo-wrap">
@@ -326,8 +319,8 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
             {heatmap&&<div className="bmw-asset-viewer__photo-markers" aria-label="Feedback overlay on cabin photograph">
               {([{id:'steering',x:'34%',y:'55%'},{id:'dashboard',x:'60%',y:'45%'},{id:'seats',x:'82%',y:'88%'}] as const).map(({id,x,y})=>{
                 const active=selectedComponent===id;
-                const severity=severityFor(findings,id,period);
-                return <button key={id} type="button" className={`bmw-asset-viewer__photo-marker ${active?'is-selected':''}`} style={{left:x,top:y,'--heat':severity} as React.CSSProperties} aria-label={`${labels[id]} feedback marker · ${metricSummary(findings,id,period)}`} aria-pressed={active} onClick={()=>onSelectComponent(id)}><span/><small>{labels[id]}</small></button>;
+                const severity=severityFor(findings,id);
+                return <button key={id} type="button" className={`bmw-asset-viewer__photo-marker ${active?'is-selected':''}`} style={{left:x,top:y,'--heat':severity} as React.CSSProperties} aria-label={`${labels[id]} feedback marker · ${metricSummary(findings,id)}`} aria-pressed={active} onClick={()=>onSelectComponent(id)}><span/><small>{labels[id]}</small></button>;
               })}
             </div>}
           </div>
@@ -337,19 +330,13 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
 
       <aside className="bmw-asset-viewer__inspector" aria-label="Vehicle component feedback">
         <div className="bmw-asset-viewer__inspector-top"><span>{view==='exterior'?'Exterior components':'Cabin components'}</span><span className="bmw-asset-viewer__heat-label"><i/> {heatLabel}</span></div>
-        <p className="bmw-asset-viewer__instruction">Feedback colors show negative share. {view==='exterior'?'Indicators appear in the component list.':'Markers are synthetic photo overlays.'}</p>
-        {heatmap&&<div className="bmw-asset-viewer__legend" role="img" aria-label="Negative feedback share: teal below 25 percent, amber 25 to 49 percent, red 50 percent or more; gray means no sample.">
-          <span><i style={{'--heat':'#57b6a0'} as React.CSSProperties}/>0–24%</span>
-          <span><i style={{'--heat':'#e8b75a'} as React.CSSProperties}/>25–49%</span>
-          <span><i style={{'--heat':'#e45454'} as React.CSSProperties}/>50%+</span>
-          <span><i style={{'--heat':'#8a909b'} as React.CSSProperties}/>No sample</span>
-        </div>}
+        {heatmap&&<div className="bmw-asset-viewer__legend" aria-label="Negative feedback volume"><span>Negative volume: low to high</span><span className="volume-scale"/><span>Gray: no finding</span></div>}
         <div className="bmw-asset-viewer__parts" role="group" aria-label={`${view} components`}>
           {components.map(id=>{
-            const color=heatmap?severityFor(findings,id,period):'#a7adb4';
+            const color=heatmap?severityFor(findings,id):'#a7adb4';
             return <button key={id} type="button" className={`bmw-asset-viewer__part ${selectedComponent===id?'is-selected':''}`} aria-pressed={selectedComponent===id} onClick={()=>onSelectComponent(id)}>
               <span className="bmw-asset-viewer__part-dot" style={{'--heat':color} as React.CSSProperties}/>
-              <span className="bmw-asset-viewer__part-copy"><strong>{labels[id]}</strong><small>{metricSummary(findings,id,period)}</small></span>
+              <span className="bmw-asset-viewer__part-copy"><strong>{labels[id]}</strong><small>{metricSummary(findings,id)}</small></span>
               <span className="bmw-asset-viewer__part-arrow" aria-hidden="true">↗</span>
             </button>;
           })}

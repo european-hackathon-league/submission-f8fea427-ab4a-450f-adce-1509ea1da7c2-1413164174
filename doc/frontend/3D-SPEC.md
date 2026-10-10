@@ -6,9 +6,9 @@
 
 Interior mode is a static **BMW 520i G60 cabin photograph**, licensed CC BY-SA 4.0 and credited in the view. It is not an i5 M60 cabin and is not 3D. Synthetic component markers overlay the photo.
 
-The viewer accepts selected component, view, period, findings, and heatmap state. Severity is negative-feedback share, not a defect score. Color is shown in the HTML component list and cabin-photo markers; **component-mesh heat recoloring is not verified**. Treat scene selection/hotspots as illustrative unless mapping to named geometry is tested. Attribution stays visible. Asset is creator-uploaded, not official BMW material; BMW does not endorse this prototype.
+The viewer accepts selected component, view, API-supplied part aggregates and feedback-tag visibility. Color uses the supplied negative-record-volume intensity, not locally calculated share or defect scoring. Color is shown in the HTML component list and cabin-photo markers; **component-mesh heat recoloring is not verified**. Treat scene selection/hotspots as illustrative unless mapping to named geometry is tested. Attribution stays visible. Asset is creator-uploaded, not official BMW material; BMW does not endorse this prototype. Stable IDs and supported mappings are published in [scene-catalog-v1.json](../../frontend/public/vehicles/scene-catalog-v1.json).
 
-The earlier procedural study scene has been removed from this pitch branch. Its source remains in the preserved `pitch-before-plan-polish` worktree at checkpoint `aae4732`.
+The application scope follows [frontend_plan.md](../../frontend_plan.md). The application mock returns explicit annotation-only render outcomes; a server-side renderer service and geometry generation remain integration work.
 
 ## Integration gates
 

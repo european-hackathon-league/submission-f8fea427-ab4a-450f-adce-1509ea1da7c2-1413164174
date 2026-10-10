@@ -1,7 +1,7 @@
-# Pitch vehicle viewer
+# Vehicle viewer
 
-`BmwAssetViewer.tsx` is the active viewer. See [asset integration notes](README-bmw.md) for provenance, hosting, fallback and mapping limits.
+The baseline viewer belongs to the single workspace in [frontend_plan.md](../../../frontend_plan.md). The published catalog is [scene-catalog-v1.json](../../public/vehicles/scene-catalog-v1.json); it identifies the matching vehicle/asset, stable part IDs, parent relationships, mesh-name candidates and reference-photo anchors.
 
-The earlier procedural sedan study and its unused rendering dependencies are excluded from this pitch branch. They remain recoverable at checkpoint `aae4732` in the preserved `pitch-before-plan-polish` worktree. Do not present that study as an actual BMW.
+Feedback counts and negative-volume intensity are supplied by the application adapter. The viewer does not calculate customer counts, negative shares or scores. HTML part controls provide the keyboard path for the same selected finding.
 
-Current exterior is an attributed creator-uploaded i5 M60. Cabin mode remains a separately attributed G60 520i photo. Detailed exact-trim 3D interior and verified surface heat mapping require a licensed inspected model; see [cabin research](../../../doc/frontend/research/G60-INTERIOR-ASSETS.md).
+Exterior: attributed hosted i5 M60 model, local preview fallback and camera controls. Interior: separately attributed G60 520i reference photograph. Exterior surface anchors and mesh recoloring are unverified; no generated geometry is claimed. See [provenance](README-bmw.md) for licenses and limitations.

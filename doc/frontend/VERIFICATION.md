@@ -1,13 +1,18 @@
-# Frontend scope verification
+# Frontend verification handoff
 
-10 October 2026. Scope source: `frontend_plan.md` and `plan.md` from `origin/main` at `80e328e`, already present on the frontend branch. This is a scope cleanup with a mock API, not joint backend acceptance.
+10 October 2026. Frontend-owned F1–F6 interactions and recovery paths are implemented and verified against the published application contract. Live-system acceptance remains externally blocked. Controlling scope: [frontend_plan.md](../../frontend_plan.md), [plan.md](../../plan.md), [backlog.md](../../backlog.md). No backend, renderer service, provider, auth infrastructure or deferred comparison/pitch scope was added.
 
-- Automated workflow and adapter tests cover autonomous defaults, Deep Dive configuration, partial and rejected uploads, unavailable assets, frozen settings, feedback-record counts, source locators and focus return, version-bound edits, unsaved/stale draft retention, guided continuation, partial research/rendering, old render labels, command idempotency, duplicate file contents and real-adapter error/header behavior.
-- Production TypeScript/Vite build checked.
-- Browser reviewed at 1440x1000 and 390x844. No page-level horizontal overflow; reviewed mobile controls had no text overflow. Local exterior preview and cabin image loaded. The hosted exterior model rendered and its camera controls became available.
-- Browser workflow: partial upload, autonomous Deep Dive run, typed graph, supporting/opposing observations, exact source dialog, PM edit to proposal version 2, annotation-only Reimagine and export of that exact version.
-- Downloaded mock export inspected: `synthetic: true`, `proposal_set_version: 2`, `variant_ids: ["variant-digital"]`, `source_version_ids: ["synthetic-source-v1"]`.
+| Package | Passing tests at package gate | Detailed evidence |
+|---|---:|---|
+| F1 | 79 / 9 files | [API/setup/recovery](F1-VERIFICATION.md) |
+| F2 | 142 / 14 files | [Workspace/graph/evidence](F2-VERIFICATION.md) |
+| F3 | 210 / 18 files | [Research/conflicts](F3-VERIFICATION.md) |
+| F4 | 309 / 26 files | [Editing/history/export](F4-VERIFICATION.md) |
+| F5 | 345 / 29 files | [Scene/render assets](F5-VERIFICATION.md) |
+| F6 | 387 / 34 files | [HTTP integration/browser/clean checkout](F6-VERIFICATION.md) |
 
-The default mock does not analyze uploaded contents. Research gaps and unsupported geometry remain visible. The browser does not call a rendering provider, score requirements, sum part counts into a global count, or reconstruct real exports. F70, G68 and G70 are unavailable rather than relabeled G60 models.
+Every package passed relevant tests, typecheck, production build, diff checks, applicable native browser checks and separate sub-agent review before dependent implementation. Available GitGuardian PR checks passed for F1–F5; F6 records its check after opening. There is no configured frontend CI workflow. PRs remain open and stacked; no merges authorized or performed.
 
-Remaining integration gates: published backend schemas and shared fixtures; real upload-to-finding flow; authorized original-file access; SSE replay and graph pagination; immutable proposal-history browsing; server-side renderer contract; real external research/generation; joint ten-scenario smoke tests. Full acceptance in `frontend_plan.md` is not claimed. Asset geometry, exact-trim cabin and mesh mapping remain limited as documented in `MODEL-COVERAGE.md`.
+The [requirement ledger](ACCEPTANCE.md) maps every frontend requirement and all ten shared scenarios to code, tests and dependencies. F6 verifies actual HTTP/SSE using the real adapter, not fetch stubs, plus the complete real-mode UI chain and native desktop/mobile browser failure/recovery. Clean checkout installation/test/build/start uses documented commands without secrets.
+
+Frontend fixtures do not analyze uploads, research externally, generate geometry or certify approval/validation. No backend listener was reachable on documented localhost port; current read-only backend handlers remain 501. Missing research dates, variant limits, immutable historical count/research content and preservation validation are disclosed. Exact assets/mesh mappings remain unavailable or unverified as recorded in [model coverage](MODEL-COVERAGE.md). See [F6 external acceptance](F6-VERIFICATION.md#separate-review-and-external-acceptance) for exact affected requirements.

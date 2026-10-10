@@ -22,6 +22,15 @@ from app.ingestion import publish_batch
 from app.wire import CellLocator, Scope
 
 
+def test_runtime_pdf_fallback_preserves_successful_parse_cache_identity():
+    from app.ingestion import cache_identity
+
+    binding = {"parser_revision": "synthetic", "pdf_batch_pages": 2}
+    assert cache_identity("workspace", "sha", binding, "1:2", "") == cache_identity(
+        "workspace", "sha", binding | {"pdf_single_page_fallback": True}, "1:2", ""
+    )
+
+
 def frozen_run(client, namespace=None, data=None):
     namespace = namespace or str(uuid4())
     if data is None:

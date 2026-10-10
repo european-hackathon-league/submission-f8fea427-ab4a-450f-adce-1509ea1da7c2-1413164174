@@ -2,6 +2,7 @@ import asyncio
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
+import pytest
 from fixtures.excel import FEEDBACK_HEADERS, feedback_row, workbook
 from sqlalchemy import select
 from temporalio.client import Client
@@ -14,16 +15,24 @@ from app.dispatch import dispatch_once
 from app.workflows import AnalysisWorkflow
 
 
-def test_pdf_checkpoints_bound_cpu_work_and_preserve_every_page(client, monkeypatch):
+@pytest.mark.parametrize("pair_exhausted", [False, True])
+def test_pdf_checkpoints_bound_cpu_work_and_preserve_every_page(
+    client, monkeypatch, pair_exhausted
+):
     from test_storage import text_pdf
 
-    from app.ingest_types import ParsedPassage, ParseResult
+    from app.ingest_types import CoverageIssue, ParsedPassage, ParseResult
     from app.ingestion import ingest_source
     from app.wire import PDFLocator
 
     uploaded = client.post(
         "/api/v1/uploads",
-        files={"files": ("synthetic-report.pdf", text_pdf(7))},
+        files={
+            "files": (
+                "synthetic-report.pdf",
+                text_pdf(7) + f"\n% fixture {uuid4()}\n".encode(),
+            )
+        },
         headers={"Idempotency-Key": str(uuid4())},
     ).json()
     run_id = client.post(
@@ -46,6 +55,17 @@ def test_pdf_checkpoints_bound_cpu_work_and_preserve_every_page(client, monkeypa
     def parse(data, filename, **options):
         first, last = options["page_range"]
         assert last - first + 1 <= 2
+        if pair_exhausted and last > first:
+            return ParseResult(
+                kind="unknown",
+                parser_revision=revision,
+                status="failed",
+                coverage=[
+                    CoverageIssue(
+                        code="pdf_parser_limit", message="Synthetic CPU limit"
+                    )
+                ],
+            )
         calls.append((first, last))
         return ParseResult(
             kind="strategy",

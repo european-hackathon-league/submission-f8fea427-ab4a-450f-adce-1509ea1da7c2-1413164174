@@ -2,6 +2,7 @@
 
 import hashlib
 import json
+from collections import deque
 from io import BytesIO
 from typing import Any
 from uuid import NAMESPACE_URL, uuid5
@@ -74,6 +75,7 @@ def parser_binding(source: Source) -> dict[str, Any]:
         "pdf_timeout_seconds": settings.pdf_timeout_seconds,
         "pdf_memory_mb": settings.pdf_memory_mb,
         "pdf_batch_pages": 2,
+        "pdf_single_page_fallback": True,
     }
 
 
@@ -107,7 +109,13 @@ def cache_identity(
     policy = {
         key: value
         for key, value in binding.items()
-        if key not in {"dataset_namespace", "namespace_warnings", "workflow_revision"}
+        if key
+        not in {
+            "dataset_namespace",
+            "namespace_warnings",
+            "workflow_revision",
+            "pdf_single_page_fallback",
+        }
     }
     policy.update(batch=batch, context_hash=context_hash)
     return stable_id([workspace, sha256, policy]), policy
@@ -437,7 +445,9 @@ def ingest_source(args: list[str]) -> str:
         else:
             batches = [(0, 0)]
     context: list[ParsedPassage] = []
-    for first, last in batches:
+    pending_batches = deque(batches)
+    while pending_batches:
+        first, last = pending_batches.popleft()
         if activity.in_activity():
             activity.heartbeat(version_id, first)
         batch = f"{first}:{last}" if first else "all"
@@ -473,6 +483,16 @@ def ingest_source(args: list[str]) -> str:
                     context_passages=context,
                 )
             )
+        if (
+            first < last
+            and binding.get("pdf_single_page_fallback", False)
+            and result.status == "failed"
+            and any(issue.code == "pdf_parser_limit" for issue in result.coverage)
+        ):
+            middle = (first + last) // 2
+            pending_batches.appendleft((middle + 1, last))
+            pending_batches.appendleft((first, middle))
+            continue
         for record in result.records:
             record.dataset_namespace = binding["dataset_namespace"]
         publish_batch(

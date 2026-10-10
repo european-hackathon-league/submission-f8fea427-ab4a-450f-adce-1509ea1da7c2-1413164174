@@ -1,0 +1,62 @@
+{
+  "sourcePage": "https://www.bmw.de/de/neufahrzeuge.html",
+  "retrieved": "2026-10-10",
+  "assets": [
+    {
+      "id": "3",
+      "name": "BMW 320 Limousine",
+      "url": "https://prod.cosy.bmw.cloud/bmwweb/cosySec?COSY-EU-100-7331S%25NrnF94fX5jHS9oXEHe%25P6waKM4VtuMwMRrzmSkNh5Z8zVA0ogRwlNF4Hv5AJ0Kc%252g854WxfjvUpcP81D2GOxbUEqjhJ89GsLzm6UiprJkD7Gw6ZuAwrptYRSFU%2567m5VKvxYCygNWTimlTv0YkCyX324mplTQdjcyH73azDxTBAdnkq83MxzOALUdtzkIFJG4IQABKupciIFeWS6xH1KMPVY8VGWhbNmUFjPo90yGYkbHi4TCY09%25wc3lmmiftxdXAhw178zQIftECUkaRb7slGAn5uCrXpFOtllZQ6KIOvXRaYWDF4Q5nmPnitagOybOcGnvIT9jgCO2B3iDvMIjeEeKIfl6gX9UHlZyh3NA%250MA8Kt4zQ53RoIBeayVt6refTkqSbfFe0H2gXmv7GqapGTQLTKs8VNP05P6wiDbH8OjnWzO1VJ00KEfIhH%25kTAus0gmVmlD3AfzBy2od4ewlTQLx19mRiPoxiS2K7S0HswTFBOkSR36672mnVt0YgMIfSKcPrneSlJeicbz6gpnjTrBzcMfCV81ekFKdnua2lKWzL1AHRu",
+      "bytes": 38960,
+      "type": "image/webp"
+    },
+    {
+      "id": "5",
+      "name": "BMW 520i Limousine",
+      "url": "https://prod.cosy.bmw.cloud/bmwweb/cosySec?COSY-EU-100-7331S%25NrnF94fX5jHS9oXEHe%25P6waKM4VtuMwJsLzchUip8DxTatdnkq8qZdzOALUx%25skIFJG8OTABKupUP8FeWS6liaKMPVYXGHWhbNmQF2Po90yanmbHi4TPY19%25wc3bKeiftxd9W%25w178ziFvtECUkwo77slGAtebCrXpF7LflZQ6KCrrXRaYWzREQ5nmPkjLagOybADDnvIT9FQsO2B3io8RIjedwHJ8BDMzt%25uGeqhk7f6vMLoAC1YmhJHFlE1Wou%25KXsg1HSfWQfum%25V1Pa1SNfNEbn4Ad10tjCdaLz2aKOHkXscC4D5gvrt3H9NvJ7Q6TeJnvzqUxEw8%25P6rbP7sY7OVK3dBzcBiNeReqKRGZIXRu3mzzOSJ5jqLQ7ayVJxZnw1pCaJXgtUDlkvEw7sYFuMw4hBDFhTUO%25TzqVo7ngRQT4C99%25UwZ3Hzix25JTOABNZvT1mvhAeX9xbZG7NgXA2Jf3KuvQnOlZyrU1OIXYuaq4y",
+      "bytes": 35424,
+      "type": "image/webp"
+    },
+    {
+      "id": "7",
+      "name": "BMW 740 xDrive Limousine",
+      "url": "https://prod.cosy.bmw.cloud/bmwweb/cosySec?COSY-EU-100-7331S%25NrnF94fX5jHS9oXEHe%25P6waKM4VtuMwMRMblSkNh5h9XVA0ogRwlNF4Hv5xj0Kc%252gj84WxfjTpUcP81D3B6xbUEqdeB89GsLzcqUiprJkxFGw6ZuUTrptYRSGLl67m5Vp4IYCygN6cimlTv0YiHyX324mJTTQdjcyuj3azDxTFZdnkq8Nq4zOALU03RkIFJGbYQABKup9zFFeWS6i%253KMPVYwfKWhbNmtwfPo90ysoAbHi4TfWY9%25wc3hXjiftxdoADw178zHGqtECUkBoL7slGAeSJCrXMXTCBb419kVObH8aGDmIqQmSTKL6ifG%25nClXw8jK4oXBUYR2zByXqOs19xEWNRw0NUi5UThSjDdqfdc8MnzOS7rt367ejgqqTMBCaOIYUmvh01R4xbZGmB6l8snpLNojUi5uekx%25AdnuA2sTW2qOhFUyl7Y2%25G44WsxtjKqc1QCB2TJdotX2bgXAJz6410trUol6JQBPjSeXYyTptvwsbT365emO%25v",
+      "bytes": 39346,
+      "type": "image/webp"
+    },
+    {
+      "id": "i3",
+      "name": "BMW i3 50 xDrive Limousine",
+      "url": "https://prod.cosy.bmw.cloud/bmwweb/cosySec?COSY-EU-100-7331S%25NrnF94fX5jHS9oXEHe%25P6waKM4VtuMwMRrzmSkNh5Z8zVA0ogRwlNF4Hv5xR0Kc%252g8G4WxfjvUncP81D2MLxbUEqdYp89GsLzjtUiprJkisGw6ZuA8HptYRSFgc67m5VKtYYCygN6z7mlTv0YGCyX324motTQdjcyB43azDxTQAdnkq83azzOALUdtekIFJGz7kABKupcBaFeWS6xwBKMPVY8%25EWhbNmUNpPo90yGKObHi4TpWq9%25wc36yFiftxdXycw178zQTTtECUkaKH7slGAnS%25CrXpFOgilZQ6KIvVXRaYWBCQQ5nmPeBjagOybLWxnvIT9ItCO2B3iB86Ijedwq2XBDMztLjoeqhrhPeEQm2awpfQ53Hz4K1coKGPCxAnvzg%25eMhO30CmRhEdFJNiEWhcfD2aTjl6JOY6dnudPZG049cv9mh44ifGBqIbABs0SccPrEeHf1FdKVZg2TVTQLzKEAM3D%25kxh95dnuUswTgt9%25UtNDPlNcfZ7dWMBFNgzmmlDTI0Ccy2oeENP89RIhNQSht8iAm2YIqdRMA8oEX0GshFWPkIVODQPbAusKfgV",
+      "bytes": 39140,
+      "type": "image/webp"
+    },
+    {
+      "id": "i5",
+      "name": "BMW i5 eDrive40 Limousine",
+      "url": "https://prod.cosy.bmw.cloud/bmwweb/cosySec?COSY-EU-100-7331S%25NrnF94fX5jHS9oXEHe%25P6waKM4VtuMwMRrzmSkNh5Z8zVA0ogRwlNF4Hv5xR0Kc%252yG84WxfjTg9cP81D3VGxbUEqdb189GsLzkkUiprJkR0Gw6ZuUTmptYRSGxP67m5Vp8tYCygN6CYmlTv0YxeyX324m8ZTQdjcybX3azDxTBAdnkq83MbzOALUdNskIFJGzPxABKupkbAFeWS6ABbKMPVYFesWhbNmKQ%25Po90yWaJbHi4TPnb9%25wc3b7FiftxdYQ%25w178zmFltECUkyRE7slGATwVCrXpFOPflZQ6KIvwXRaYWB2NQ5nmPej4agOybMxrnvIT9hMdO2B3ioVcIjedwHsNBDMzt%25rdeqhk7NfvMLoAC0wvhJHFl422ou%25KXcmHHSfWQxlT%25V1Pa8%25TfNEbnUrX10s9Os5hE4riIrMoscZwBZkWrxRteRhyZ857M5obRUgChg8F5Gvlov30gp2XHYGsv6jQ%25mpq2YD0De2VrtGZH9urxlLQAISFqIbe1KnRUQ8J2jD5lk1tcDVXOyzoVBDFu6GZCpEiy5wiXRTXe4bkAhFUhZOoWoubvYgMnvNk3FFe0V2LuSOXId4wGyrCrmQIVnjl6JaKDB4XRTPNHC8%25hJP%25z6eEzFu4fXBjvOz8QttE6Cgk1F7Gq2VzeWhcgDzr3D%25WontGwgYXcjnWqVskbNDOBeagd56reMnTNIu8d",
+      "bytes": 34692,
+      "type": "image/webp"
+    },
+    {
+      "id": "i7",
+      "name": "BMW i7 50 xDrive Limousine",
+      "url": "https://prod.cosy.bmw.cloud/bmwweb/cosySec?COSY-EU-100-7331S%25NrnF94fX5jHS9oXEHe%25P6waKM4VtuMwMRrvSSkNh5ZiCVA0ogRv3NF4HvmFo0Kc%252yqb4WxfjTN2cP81D30zxbUEqdrV89GsLzZjUiprJkSaGw6ZuUTrptYRSGLl67m5Vp4IYCygN6cimlTv0YiHyX324mItTQdjcyB33azDxTecdnkq83VzzOALUdNLkIFJGzPgABKupkbvFeWS6ABbKMPVYFeHWhbNmKMVPo90yWafbHi4Tp4Y9%25wc36PLiftxdXAhw178zQ9ttECUka5P7slGAng7CrXpFOnglZQ6K57kXRaYWgZwQ5nmPvRIagO%25OkaotUZ7WcMtE6BmudhSId4k9VTCrmseanOl6J9U1OoY32LKozOSM5Z7pRix2l8xYCjYkf4JuFSrFG6B0KM4QgXATQHJDSSk%25oaBMh3Ydqf8Z2lptvmdoTn65eyVOH%25YCj0HWpsPFe0PL5kiLSMfbYznQ3LsmUUi5pXJ9SGZIaoLkNF1XOLtDOPNKTUZ8XgY1nTNIowJ4HO3zkyXql5tkATjHdMsq",
+      "bytes": 38614,
+      "type": "image/webp"
+    },
+    {
+      "id": "m3",
+      "name": "BMW M3 Limousine",
+      "url": "https://prod.cosy.bmw.cloud/bmwweb/cosySec?COSY-EU-100-7331S%25NrnF94fX5jHS9oXEHe%25P6waKM4VtuMwMRMXsSkNh5hJlVA0ogo%25ZNF4HvHm30Kc%252gKd4Wxfjv6KcP81D2WAxbUEqjp289GsLD6BUiprJkyYGw6ZuAqCptYRSFxy67m5VKnhYCygNW2QmlTv0Pj%25yX324mplTQdjcyQt3azDxTa6dnkq83pgzOALUdwLkIFJGzEfABKupksaFeWS6AX0KMPVYF0VWhbNmKwkPo90yWaIbHi4TpHe9%25wc36XMiftxdYQ%25w178zmFltECUkyRU7slGAT5ICrXpF3ghlZQ6KdvHXRaYWzCVQ5nmPklmagOybAXEnvIT9htZO2B3io1vIjedwHJQBDMzt%25uUeqhk7fSpMLoAC1Y2hJHFlEmyou%25KXsEPHSfWQrUY%25V1PaZ2GfNEbnRrX10s9OG5TE4riIpaiscZwB6SSrxRteYAZZ857MmlbRUgChyXE5GvlovqEgp2XH21sv6jQ%25jbt2YDafDzPjmqn1qsFDyLOELrlqTJIsJywL3u8uHLcgXmvE70gpnVIPh4bShtHZ9e2YI6NLJujnWZXGucOMzK1coub0TmvayRCzjlCO2kOHUtWPfbYf0jsd10tq3D%25eqxWAbbH8cLV04MOhFUcmzoagdIhceJnTNBJvN2O2kwxEa6sfNwsKTHRKb0UrOoJqMK6IXXRTaDWZbQmSLcKHifGDuKgAusi1eXmlD3OGJeiSc5WtxuMoHBDFjTgH%25ekxh06F",
+      "bytes": 34742,
+      "type": "image/webp"
+    },
+    {
+      "id": "m5",
+      "name": "BMW M5 Limousine",
+      "url": "https://prod.cosy.bmw.cloud/bmwweb/cosySec?COSY-EU-100-7331S%25NrnF94fX5jHS9oXEHe%25P6waKM4VtuMwMRMLCSkNh5hYhVA0ogo%25ZNF4Hv5F30Kc%252gpF4WxfjvGOcP81D2lnxbUEqjp289GsLD6sUiprJkyYGw6ZuAcmptYRSFU%2567m5VKvoYCygN6U7mlTv0YlEyX324m8MTQdjcyUR3azDxTePdnkq83tuzOALUdNskIFJGzSrABKupkb8FeWS6A9FKMPVYFe9WhbNmKMrPo90yWaJbHi4TPnb9%25wc3b7FiftxdYQ%25w178zmFltECUkyRE7slGAT5hCrXpF3tNlZQ6Kd1SXRaYWB9EQ5nmPej7agOybMD4nvIT9hqxO2B3ioURIjedwHu5BDMzt%25HAeqhk7f4UMLoAC1RchJHFl4tFou%25KXcjjHSfWQxy0%25V1Pa89kfNEbnUih10s9OGZQE4riIrgoscZwBZhHrxRteRAPZ857M5mkRUgChgH35Gvlov%25igp2XH2GWv6jQ%25jzc2YI0e9HxiNHCf5whDyem4uSVqIb5a6V8BoAPs8%25VicdTjO3gXAqQXBDFBfpCb9EiyElNpcscCJzL1hJUbKiifG8u0cxoBHWp7TLxO2keH8hSId4MwVR5BDF7UrOmZE47ZPdfgPicpRB%25SJoPmeaagdOLb5inTNu8PftE6LVP2KVZtshaTQLzB6ShtN8vbCUVo%25fMLWqd2f1hFUHcmW",
+      "bytes": 32792,
+      "type": "image/webp"
+    }
+  ]
+}

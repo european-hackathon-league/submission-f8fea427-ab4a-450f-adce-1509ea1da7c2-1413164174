@@ -47,9 +47,11 @@ import type {
   Workspace,
 } from "./api/contracts";
 import type { ComponentId, VehicleView } from "./domain/contracts";
+import { models } from "./collection/journeyData.js";
 import sceneCatalog from "../public/vehicles/scene-catalog-v1.json";
 import "./ui/workspace.css";
 
+const CollectionViewer = lazy(() => import("./collection/VehicleViewer.jsx"));
 const VehicleViewer = lazy(() => import("./viewer/BmwAssetViewer"));
 const tabs = [
   { title: "Findings", icon: BookOpen },
@@ -99,7 +101,17 @@ type ProposalDraft = {
   dirty: boolean;
 };
 
-export default function App({ api: suppliedApi }: { api?: Api }) {
+type CollectionModel = { id: string; name: string; family: string; trim: string };
+function collectionVehicleId(model?: CollectionModel | null) {
+  if (!model) return "g60-i5-m60";
+  if (model.id === "G60-i5-M60-xDrive") return "g60-i5-m60";
+  return model.family === "G60" ? model.id.toLowerCase() : model.family.toLowerCase();
+}
+export default function App({ api: suppliedApi, initialModel, onBack }: {
+  api?: Api;
+  initialModel?: CollectionModel | null;
+  onBack?: () => void;
+}) {
   const [connectedApi, setConnectedApi] = useState<Api | null>(
     suppliedApi ??
       (import.meta.env.VITE_API_MODE === "real" ? null : createApi()),
@@ -108,6 +120,7 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
     return (
       <>
         <AcceptanceEnvironment />
+        {onBack && <button onClick={onBack}>Back to the BMW journey</button>}
         <ApiAccess
           baseUrl={import.meta.env.VITE_API_BASE_URL || "/api/v1"}
           onConnect={(base, headers, sessionNamespace) =>
@@ -124,6 +137,8 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
       <WorkspaceApp
         key={connectedApi.sessionNamespace ?? connectedApi.mode}
         api={connectedApi}
+        initialModel={initialModel}
+        onBack={onBack}
         onDisconnect={
           connectedApi.mode === "real" && !suppliedApi
             ? () => setConnectedApi(null)
@@ -137,8 +152,12 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
 function WorkspaceApp({
   api: suppliedApi,
   onDisconnect,
+  initialModel,
+  onBack,
 }: {
   api: Api;
+  initialModel?: CollectionModel | null;
+  onBack?: () => void;
   onDisconnect?: () => void;
 }) {
   const [api, setApi] = useState(() => suppliedApi ?? createApi());
@@ -155,7 +174,8 @@ function WorkspaceApp({
   const [catalogReady, setCatalogReady] = useState(false);
   const [vehicleError, setVehicleError] = useState("");
   const [vehicleRetry, setVehicleRetry] = useState(0);
-  const [vehicleId, setVehicleId] = useState("g60-i5-m60");
+  const [vehicleId, setVehicleId] = useState(() => collectionVehicleId(initialModel));
+  const [collectionViewerOpen, setCollectionViewerOpen] = useState(false);
   const [deepDive, setDeepDive] = useState(false);
   const [mode, setMode] = useState<"autonomous" | "guided">("autonomous");
   const [uploads, setUploads] = useState<UploadRow[]>([]);
@@ -246,6 +266,10 @@ function WorkspaceApp({
   const configurationAvailable =
     !!vehicle?.baseline_asset_id && !!vehicle.part_catalog_version;
   const setupLocked = !!runId || !!pendingRun;
+  useEffect(() => {
+    if (initialModel && !setupLocked) setVehicleId(collectionVehicleId(initialModel));
+  }, [initialModel, setupLocked]);
+  const previewModel = models.find(model => collectionVehicleId(model) === (savedConfig?.vehicle_id ?? vehicleId));
   const finding =
     selectedFindingId === null
       ? undefined
@@ -303,7 +327,7 @@ function WorkspaceApp({
           setVehicles(result);
           setCatalogReady(true);
           setVehicleId((current) =>
-            result.some((v) => v.vehicle_id === current)
+            (initialModel || result.some((v) => v.vehicle_id === current))
               ? current
               : (result[0]?.vehicle_id ?? current),
           );
@@ -586,6 +610,9 @@ function WorkspaceApp({
           <strong className="wordmark">FWD</strong>
           <span>Vehicle requirements</span>
         </div>
+        {onBack && <button onClick={onBack}>Back to the BMW journey</button>}
+        {previewModel && <button onClick={() => setCollectionViewerOpen(true)}>Explore model in 360°</button>}
+        {initialModel && <span className="collection-context">Collection: {initialModel.name}</span>}
         {onDisconnect && (
           <button
             onClick={() => {
@@ -600,6 +627,9 @@ function WorkspaceApp({
           {api.mode === "mock" ? "Synthetic workspace" : "Connected workspace"}
         </span>
       </header>
+      {collectionViewerOpen && previewModel && <Suspense fallback={<p role="status">Preparing model viewer…</p>}>
+        <CollectionViewer initial={previewModel.id} onClose={() => setCollectionViewerOpen(false)} />
+      </Suspense>}
       <main id="workspace">
         <section className="run-setup" aria-label="Run setup">
           <div className="section-title">
@@ -668,6 +698,9 @@ function WorkspaceApp({
                   disabled={setupLocked || busy}
                   onChange={(e) => setVehicleId(e.target.value)}
                 >
+                  {initialModel && vehicles.length > 0 && !vehicles.some(v => v.vehicle_id === vehicleId) && (
+                    <option value={vehicleId}>{initialModel.name} · Analysis unavailable</option>
+                  )}
                   {vehicles.length ? (
                     vehicles.map((v) => (
                       <option key={v.vehicle_id} value={v.vehicle_id}>

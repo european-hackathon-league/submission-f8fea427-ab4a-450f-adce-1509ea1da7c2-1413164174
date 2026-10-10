@@ -2,6 +2,14 @@
 
 Scope follows [frontend_plan.md](../frontend_plan.md), [plan.md](../plan.md) and [backlog.md](../backlog.md). Requirements and package evidence live in [acceptance ledger](../doc/frontend/ACCEPTANCE.md). One vehicle workspace contains setup, graph, findings, evidence, proposals, Reimagine and history; deferred pitch/comparison dashboards remain excluded.
 
+## Collection and model browsing
+
+The default entry shows the BMW journey and 24-model collection imported selectively from PR #10. `#workspace` opens the existing requirements workshop directly. Collection selections carry into run setup, and returning to the journey preserves the mounted workshop's uploads and edits. A saved run keeps its original vehicle configuration until **New run**.
+
+**Explore model in 360°** opens the PR's exterior sequence and interior panorama viewer from the workshop as well. These are representative family configurations, not verified exact-trim geometry or feedback mappings. Only catalog vehicles with baseline and part-catalog identifiers can start an analysis; currently the synthetic catalog enables the i5 M60. Other collection trims remain browsable without substituting that baseline.
+
+`src/collection/` retains the PR's JavaScript views, motion helpers and scoped styles. The PR's workspace, global stylesheet and application shell are excluded. Local assets include the 36 sampled spin frames per family, iX preview sequence, cabin panoramas and source manifests; unused high-resolution sequences are excluded. The cabin renderer loads Three.js lazily and requires WebGL.
+
 ## Run and verify
 
 ```sh

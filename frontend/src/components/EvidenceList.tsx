@@ -41,7 +41,7 @@ export default function EvidenceList({ api, runId, ids, title, onOpen }: {
           <p className="muted">{item.scope} / {item.locator.label}</p>
           <p className="muted">Source version: {item.source_version_id}. Applicability: {item.wire?.applicability ?? "unknown"}.</p>
           {item.limitations && <p className="muted">Limitations: {item.limitations}</p>}
-          <button onClick={() => onOpen(item)}><BookOpen size={14} />Open source {item.evidence_id}</button>
+          <button onClick={event => { event.currentTarget.focus(); onOpen(item); }}><BookOpen size={14} />Open source {item.evidence_id}</button>
         </>}
       </article>;
     })}

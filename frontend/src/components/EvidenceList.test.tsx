@@ -1,7 +1,9 @@
-import {cleanup,render,screen,waitFor} from "@testing-library/react";
+import {cleanup,render,screen,waitFor,fireEvent} from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import {afterEach,expect,it,vi} from "vitest";
 import EvidenceList from "./EvidenceList";
+import SourceDialog from "./SourceDialog";
+import {useState} from "react";
 import {evidence} from "../api/fixtures";
 import type {Api,Evidence} from "../api/contracts";
 afterEach(cleanup);
@@ -31,4 +33,11 @@ it("rejects mismatched evidence IDs without showing another source",async()=>{
  render(<EvidenceList api={api} runId="r" ids={["expected"]} title="Sources" onOpen={()=>{}}/>);
  expect(await screen.findByRole("alert")).toHaveTextContent(/identity/i);
  expect(screen.queryByText(evidence[0].excerpt)).not.toBeInTheDocument();
+});
+
+it("restores source opener focus when pointer click does not focus button",async()=>{
+ const api={mode:"mock",request:async()=>evidence[0]} as unknown as Api;
+ function Sources(){const [item,setItem]=useState<Evidence|null>(null);return <><EvidenceList api={api} runId="r" ids={[evidence[0].evidence_id]} title="Sources" onOpen={setItem}/>{item&&<SourceDialog api={api} evidence={item} onClose={()=>setItem(null)}/>}</>;}
+ render(<Sources/>);const opener=await screen.findByRole("button",{name:`Open source ${evidence[0].evidence_id}`});
+ expect(opener).not.toHaveFocus();fireEvent.click(opener);fireEvent.click(screen.getByRole("button",{name:"Close source"}));expect(opener).toHaveFocus();
 });

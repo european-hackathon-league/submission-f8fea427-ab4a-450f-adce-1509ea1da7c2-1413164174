@@ -61,3 +61,16 @@ it("aborts protected source load and discards late body after dialog closes",asy
  expect(screen.getByRole("status")).toHaveTextContent(/Loading authorized/);unmount();expect(signal.aborted).toBe(true);finish(new Blob(["late"]));
  await waitFor(()=>expect(create).not.toHaveBeenCalled());
 });
+
+it("opens published web locator as public citation when original source link is unavailable",()=>{
+ const read=vi.fn();const api={mode:"real",readSource:read} as unknown as Api;
+ const item=normalize.evidence({...evidence[0].wire!,source_kind:"external",source_url:null,locator:{type:"web",url:"https://citations.example/review",passage_start:12,passage_end:30}});
+ render(<SourceDialog api={api} evidence={item} onClose={()=>{}}/>);
+ expect(screen.getByRole("link",{name:"Open cited page"})).toHaveAttribute("href","https://citations.example/review");
+ expect(screen.queryByRole("link",{name:"Open original source"})).not.toBeInTheDocument();expect(read).not.toHaveBeenCalled();
+});
+it("does not open unsafe URL from a published web locator",()=>{
+ const item=normalize.evidence({...evidence[0].wire!,source_url:null,locator:{type:"web",url:"javascript:alert(1)",passage_start:0,passage_end:1}});
+ render(<SourceDialog api={{mode:"real"} as Api} evidence={item} onClose={()=>{}}/>);
+ expect(screen.queryByRole("link",{name:"Open cited page"})).not.toBeInTheDocument();
+});

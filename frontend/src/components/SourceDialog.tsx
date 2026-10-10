@@ -14,6 +14,8 @@ export default function SourceDialog({ api, evidence, onClose }: { api: Api; evi
   const [attempt, setAttempt] = useState(0);
   const [result, setResult] = useState<{ identity: string; url?: string; error?: string }>({ identity: "" });
   const sourceUrl = authorizedLink(evidence.source_url);
+  const locator = evidence.wire?.locator;
+  const citedPage = locator && "url" in locator ? authorizedLink(locator.url) : null;
   const protectedSource = !!sourceUrl && !!api.canReadSource?.(sourceUrl);
   const identity = JSON.stringify([evidence.evidence_id, evidence.source_version_id, sourceUrl]);
   useEffect(() => {
@@ -52,6 +54,7 @@ export default function SourceDialog({ api, evidence, onClose }: { api: Api; evi
       <dt>Applicability</dt><dd>{evidence.wire?.applicability ?? "unknown"}</dd>
     </dl>
     <blockquote>{evidence.excerpt}</blockquote>
+    {citedPage && <p><a href={citedPage} target="_blank" rel="noreferrer">Open cited page</a></p>}
     <p>{evidence.limitations || "No limitations supplied."}</p>
     {protectedSource && !active?.url && !active?.error && <p role="status">Loading authorized original source…</p>}
     {active?.error && <><p role="alert">{active.error}</p><button onClick={() => setAttempt(old => old + 1)}>Retry original source</button></>}

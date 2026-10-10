@@ -12,6 +12,23 @@ const interiorComponents:ComponentId[]=['steering','dashboard','seats'];
 const modelAttribution='2023 BMW i5 M60 by Nazh Design';
 
 type CameraState={position:number[];target:number[]};
+const cameraStorageKey='vehicle-camera:'+BMW_I5_MODEL_UID;
+function validCamera(value:unknown):value is CameraState{
+  if(!value||typeof value!=='object')return false;
+  const camera=value as CameraState;
+  return [camera.position,camera.target].every(vector=>Array.isArray(vector)&&vector.length===3&&vector.every(coordinate=>typeof coordinate==='number'&&Number.isFinite(coordinate)))&&
+    camera.position.some((coordinate,index)=>coordinate!==camera.target[index]);
+}
+function readCamera():CameraState|null{
+  try{
+    const value:unknown=JSON.parse(sessionStorage.getItem(cameraStorageKey)??'null');
+    return validCamera(value)?value:null;
+  }catch{return null;}
+}
+function rememberCamera(camera:CameraState){
+  if(!validCamera(camera))return;
+  try{sessionStorage.setItem(cameraStorageKey,JSON.stringify(camera));}catch{/* Camera navigation remains usable when browser storage is unavailable. */}
+}
 type SketchfabNode={instanceID:number;name:string};
 type SketchfabNodePayload=unknown;
 type SketchfabApi={
@@ -112,6 +129,14 @@ function useSketchfabViewer(
     let disposed=false;
     let viewerIsReady=false;
     let lastAspect=elementAspect(iframe);
+    const savedCamera=readCamera();
+    const captureCamera=()=>{
+      if(disposed||!viewerIsReady)return;
+      apiRef.current?.getCameraLookAt((error,camera)=>{
+        if(!error&&!disposed)rememberCamera(camera);
+      });
+    };
+    window.addEventListener('pagehide',captureCamera);
     const adjustToAspect=(nextAspect:number)=>{
       if(disposed||!Number.isFinite(nextAspect)||nextAspect<=0)return;
       if(!viewerIsReady){lastAspect=nextAspect;return;}
@@ -154,8 +179,12 @@ function useSketchfabViewer(
             setSceneReady(true);
             callbacksRef.current.onReady();
             api.getCameraLookAt((error,camera)=>{
-              if(error||disposed)return;
+              if(error||disposed||!validCamera(camera))return;
               initialCameraRef.current=camera;
+              if(savedCamera){
+                api.setCameraLookAt(savedCamera.position,savedCamera.target,0);
+                return;
+              }
               const aspect=elementAspect(iframe)||lastAspect;
               if(aspect>0){
                 lastAspect=aspect;
@@ -163,6 +192,7 @@ function useSketchfabViewer(
                 if(cameraAspectScale(aspect)!==1)api.setCameraLookAt(framed.position,framed.target,reducedMotion()?0:.2);
               }
             });
+            api.addEventListener('camerastop',captureCamera);
             api.getNodeMap((error,payload)=>{
               if(error||disposed)return;
               const nodes=normalizeSketchfabNodeMap(payload);
@@ -187,6 +217,7 @@ function useSketchfabViewer(
       window.clearTimeout(loadTimeout);
       resizeObserver?.disconnect();
       window.removeEventListener('resize',resizeHandler);
+      window.removeEventListener('pagehide',captureCamera);
       apiRef.current?.stop();
       apiRef.current=null;
     };
@@ -246,7 +277,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
     if(view==='exterior'&&exteriorComponents.includes(component))onSelectComponent(component);
   });
 
-  useEffect(()=>{if(view==='interior')pause();else resume();},[view,pause,resume]);
+  useEffect(()=>{if(view==='interior')pause();else resume();},[view,pause,resume,sceneReady]);
 
   const components=useMemo(()=>view==='exterior'?exteriorComponents:interiorComponents,[view]);
   const heatLabel=heatmap?'Negative feedback records':'Feedback tags off';
@@ -292,7 +323,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
 
     <div className="bmw-asset-viewer__layout" data-view={view}>
       <div className="bmw-asset-viewer__stage">
-        {view==='exterior'?<>
+        <div hidden={view!=='exterior'}>
           <img className="bmw-asset-viewer__preview" src="/vehicles/i5-m60-preview.jpg" alt="BMW i5 M60 three-quarter exterior preview"/>
           {!apiFailed&&<iframe
             key={retryVersion}
@@ -312,7 +343,8 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
             <button type="button" aria-label="Zoom in" title="Zoom in" onClick={()=>handleZoom(-1)} disabled={!sceneReady}><ZoomIn size={18}/></button>
           </div>
           <div className="bmw-asset-viewer__stage-caption"><span>{apiFailed?'Exterior · preview image':'Exterior · interactive 3D'}</span><span>{sceneReady?'Sketchfab model connected':apiFailed?'Preview image':'Connecting'}</span></div>
-        </>:<div className="bmw-asset-viewer__photo-wrap">
+        </div>
+        {view==='interior'&&<div className="bmw-asset-viewer__photo-wrap">
           <div className="bmw-asset-viewer__photo-canvas">
             <img className="bmw-asset-viewer__interior-photo" src="/vehicles/g60-interior.jpg" alt="BMW 5 Series G60 cabin reference photo, photographed by Ethan Llamas"/>
             <div className="bmw-asset-viewer__photo-badge">G60 520i cabin reference · photograph</div>

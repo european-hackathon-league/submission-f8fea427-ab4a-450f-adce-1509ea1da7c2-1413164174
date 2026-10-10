@@ -1,6 +1,6 @@
 # Backend execution plan
 
-Build the backend in **four epics and sixteen sequential story PRs**. Each story contains small, independently understandable commits. Merge each verified story into `backend` before starting the next story. The frontend and renderer implementation remain with the other team.
+Build the backend in **four scope epics and six sequential story PRs**. The sixteen BE-01 through BE-16 items below are implementation work packages, grouped into the six delivery stories below. Each story contains small, independently understandable commits. Merge each verified story into `backend` before starting the next story. The frontend and renderer implementation remain with the other team.
 
 This is an implementation backlog, not a claim that the backend exists. On 2026-10-10 the repository contains plans and input documents, with no application code, dependency manifest, API, database migrations, or tests. The local `backend` branch and remote-tracking `origin/backend` exist. Verify the remote state before publishing story branches.
 
@@ -25,7 +25,7 @@ Initial production topology: API + activity/workflow workers + application Postg
 
 ## Workflow and agent design review 2026 10 10
 
-The recommended design is a durable application workflow containing bounded AI tasks and a tool-using research loop. The following decisions refine execution inside the existing product stages; they do not change public endpoints, frontend ownership, or the four-epic/sixteen-story delivery sequence. They are architecture recommendations for this corpus, not claims of measured performance before implementation.
+The recommended design is a durable application workflow containing bounded AI tasks and a tool-using research loop. The following decisions refine execution inside the existing product stages; they do not change public endpoints, frontend ownership, or the four-epic/six-story delivery sequence. They are architecture recommendations for this corpus, not claims of measured performance before implementation.
 
 ### Ownership and execution
 
@@ -73,11 +73,11 @@ Every asynchronous result carries its base proposal version and generation ID. P
 
 Begin with one configurable application model and direct typed provider calls. Introduce cheaper-model routing, extra critique passes, hybrid search, or specialist agents only when the same reference tasks demonstrate a quality/cost/latency gain. Record the resolved model and policy per artifact. Distinguish provider retries from semantic repair; uncertain requests can incur duplicate external cost even when database effects are idempotent. Track that uncertainty and cap attempts. Workflow history, UI replay events and product audit serve different purposes; do not turn the entire application into an event-sourcing framework.
 
-### Story gates added by this review
+### Work-package gates added by this review
 
-These are mandatory acceptance additions to the existing stories, implemented within their existing commit slices.
+These are mandatory acceptance additions to the BE work packages, implemented within their existing commit slices and grouped delivery story.
 
-| Story | Additional acceptance evidence |
+| Work package | Additional acceptance evidence |
 |---|---|
 | BE-04 | Independent tasks overlap under bounded concurrency; joins publish coherent generations; recovery reuses committed artifacts. |
 | BE-05–BE-07 | Reused parsing preserves source lineage and scoped identity; bounded parsing failures report coverage; PDF reference cases begin evaluation early. |
@@ -147,7 +147,7 @@ Package versions below were read from the project's PyPI JSON metadata on 2026-1
 
 BE-01 must resolve this starting set on the actual Linux deployment architecture, check Python and binary-wheel support including Docling's transitive ML dependencies, run package import/API/database and workflow-service connectivity smoke checks, and record any version deviations with their reason. Full workflow behavior is verified in BE-04. Build the shared lockfile once and use frozen sync in CI. Avoid beta/RC/nightly dependencies by default; inspect project maturity rather than trusting version syntax alone. Pin runtime/container digests, workflow SDK/server compatibility, parser model revisions, and action SHAs. A newer patch may replace a reviewed version only after compatibility and regression checks. Verify dependency advisories and licenses in the normal dependency review; this source review is not a security certification.
 
-The review changes technology choices and acceptance details inside the existing **four epics and sixteen story PRs**. It does not add a separate infrastructure epic or authorize provisioning paid services.
+The review changes technology choices and acceptance details inside the existing **four scope epics and six story PRs**. It does not add a separate infrastructure epic or authorize provisioning paid services.
 
 ## Input findings that change the implementation
 
@@ -169,15 +169,32 @@ The original full plan says organizer data and extracted private content should 
 ## Delivery rules for the orchestrator
 
 1. Read this document, `plan.md`, `backend_plan.md`, and any applicable `AGENTS.md`. Work only in `backend/`, backend-owned `contracts/`, and specifically necessary documentation/CI files. Do not change `frontend/`, renderer implementation, scene geometry, or unrelated working-tree changes.
-2. Complete one story at a time in the order below. Branch from the latest merged `backend`, using `be/BE-01-contracts`, etc. A story is the PR boundary; an epic is a milestone, not a giant PR. Do not open sixteen overlapping branches in advance.
+2. Complete delivery stories S1 through S6 in order using the grouping below. Branch from the latest merged `backend`, using `be/S1-foundation`, etc. A delivery story is the PR boundary; BE IDs identify internal work packages and retain their acceptance criteria. Epics describe scope, not PR boundaries. Do not create a PR per BE work package or open overlapping story branches in advance.
 3. Use the listed commit slices. Each slice gets its own coherent commit with its relevant check; combine code and its regression test when separating them would leave a broken commit. Do not create a PR per helper, file, or test.
-4. Use commit subjects such as `feat(backend): BE-05 normalize feedback annotations`. Use PR titles such as `[BE-05] Normalize feedback without inflating counts`. Every PR targets `backend`, never `main`. Include the story ID, resulting behavior, validation evidence, migrations, contract changes, and remaining limitations.
+4. Use commit subjects such as `feat(backend): BE-05 normalize feedback annotations`. Use PR titles such as `[S2] Ingest customer and product evidence`. Every PR targets `backend`, never `main`. Include the delivery story ID and covered BE work-package IDs, resulting behavior, validation evidence, migrations, contract changes, and remaining limitations.
 5. Preserve these small commits using a merge commit rather than squash, provided repository policy permits it. If policy requires squash, report that it conflicts with preserving individual commits; do not silently change the requested workflow. Do not force-push or bypass protections.
 6. Run checks, review the complete diff, and resolve findings before merge. Merge only a verified head with passing required checks and applicable repository reviews. Confirm the PR is merged and refresh `backend` before advancing. Register created/worked-on PRs with the thread's PR-linking tool when available.
-7. Maintain `backend/delivery_status.json`, starting in BE-01, with each story's status, branch, PR URL, tested commit, merge SHA, and blocker. PR/merge metadata may be reconciled on the next branch; repository/PR state is authoritative after a crash. Never mark a story done solely because an agent reports success.
+7. Maintain `backend/delivery_status.json`, starting in BE-01, with each S1-S6 story's status, covered BE work packages, branch, PR URL, tested commit, test commands/results, merge SHA, and blocker. PR/merge metadata may be reconciled on the next branch; repository/PR state is authoritative after a crash. Never mark a story done solely because an agent reports success.
 8. On resume, inspect the ledger, Git state, and existing PRs before creating more work. Reuse the existing story branch/PR. If blocked by credentials, assets, or deployment access, finish independent implementation and record the exact outstanding live gate. Do not present a stub or fixture as a live integration.
 
-All sixteen stories start **not started**. This planning task does not launch the implementation, create sixteen issues, or open implementation PRs.
+All six delivery stories and all sixteen work packages start **not started**. This planning task does not launch the implementation, create delivery issues, or open implementation PRs.
+
+## Six delivery stories and PR boundaries
+
+The six-story grouping supersedes earlier one-PR-per-BE-item instructions. All sixteen work-package acceptance criteria, architecture gates, and commit slices remain required. Keep their dependency order within each story. This reduces PR/CI/review overhead without promising that a stronger model eliminates implementation or validation time. Four scope epics remain useful for tracking; a delivery story may cross an epic boundary.
+
+| Delivery story / PR | Work packages | Result | Tests generated and run in this PR |
+|---|---|---|---|
+| S1 - Foundation and durable execution | BE-01-BE-04 | Runnable API, contracts, auth, storage, database, workflows and replayable events | Contract fixtures, migrations, access isolation, upload limits, command idempotency, outbox crash recovery, workflow replay and SSE reconnect. |
+| S2 - Source ingestion | BE-05-BE-07 | Feedback, studies, sales, equipment and strategy evidence with exact provenance | Annotation/identity counts, equal-text distinct respondents, overlapping cohorts, study units/denominators, sales zeros, PDF table/legend/locator references, unsupported and malformed input. |
+| S3 - Findings and applicable baselines | BE-08-BE-09 | Traceable observations, findings, part counts, scoped baselines and customer needs | Group membership across batches, opposing evidence, citation support, deterministic counts, market/date mismatches, unknown baselines and malformed model outputs; initial private quality evaluation. |
+| S4 - Research and proposals | BE-10-BE-12 | Bounded research, conflict variants, guided continuation and scored immutable proposals | Research budgets/recovery/partial results, unsafe retrieval, counterevidence, checkpoint idempotency, deterministic scoring and coherent/stale-generation publication. |
+| S5 - PM control and downstream delivery | BE-13-BE-15 | Versioned edits/decisions, external renderer orchestration and JSON/XLSX exports | All six edit operations, stale edits and approvals, affected-only recomputation, late render/AI results, partial rendering, exact-version exports and formula injection. |
+| S6 - Full acceptance and handoff | BE-16 | Verified complete backend, deployable artifact and frontend handoff | All ten contract scenarios through endpoints, cumulative regressions, crash/concurrency/replay cases, private real-data evaluation and configured live-integration smoke checks. |
+
+For every story: add tests alongside each behavior, demonstrate the relevant failure first when practical, implement, run the focused tests, then run the cumulative backend suite and contract/lint/type checks on the complete PR head. Fix failures before merging. Use real PostgreSQL and Temporal test environments for their behavior; use deterministic provider/renderer fakes in CI and label bounded live checks separately. Do not postpone S1-S5 tests to S6 or weaken acceptance assertions to obtain green CI. Test code belongs in the same PR as the implementation and may share its small commit.
+
+Merge each verified story into `backend` before beginning the next. Preserve coherent commits with merge commits where repository policy permits. S1 is the largest foundation slice: implement and verify its four work packages incrementally rather than producing an untested foundation in one pass. If repository limits demonstrably require an extra PR, record the reason; do not silently drop scope to preserve the count.
 
 ## Epic 1  Backend foundation and shared contracts
 
@@ -351,7 +368,7 @@ Suggested commands after BE-01 establishes them: `uv run ruff check .`, `uv run 
 
 - Before BE-02 live auth verification: supply the identity issuer, audience, and workspace membership convention agreed with frontend. Local development remains available through the guarded mode.
 - Before BE-04 hosted workflow verification: supply the Temporal endpoint, namespace, service authentication, and required retention/data-handling settings. Local development and replay testing proceed without purchasing a service. Do not substitute a development Temporal server for production; if Cloud is unsuitable, document and verify the self-hosted operational deployment before claiming readiness.
-- Before BE-08 live inference: supply the deployment-approved API endpoint/model and credentials, with the provider's applicable data handling configuration. Keep credentials in environment/secrets storage. Do not use the coding-agent subscription as an assumed application API entitlement.
+- Before BE-08 live inference: the user has provided an API key in the repository-root `.env`; its existence and Git-ignore status were verified, not the key value or API access. Load it locally through the application configuration loader, preserve inherited environment overrides, and determine the configured provider/endpoint/model without printing credentials. Verify access with a bounded smoke test. Keep `.env` untracked, supply only placeholders in `.env.example`, and never include secrets in logs, artifacts, commits, PRs, or agent prompts. A separate worktree must explicitly load the original checkout's ignored `.env` through a local configuration path; do not assume Git copied it. API entitlement and other service credentials still require their own verification.
 - Before BE-10 live research: verify that the chosen endpoint/model supports the research tools and configure budgets. Tool unavailability is a visible research outcome, not permission to fabricate results.
 - Before BE-14 real rendering: obtain the frontend team's versioned vehicle/part catalog, available assets, renderer URL, and service authentication. Synthetic IDs must be visibly synthetic until replaced.
 - Before deployment: select hosting region, private storage, backup/restore and retention settings, and HTTPS/identity configuration. Container delivery can complete before a hosting account is selected; a production-readiness claim cannot.
@@ -359,4 +376,35 @@ Suggested commands after BE-01 establishes them: `uv run ruff check .`, `uv run 
 
 ## Orchestrator starting brief
 
-> Implement the sixteen stories in `backend_execution_plan.md` sequentially, beginning with BE-01. Preserve the product and wire contract in `plan.md` and the scope in `backend_plan.md`. Build only backend-owned code and shared contracts. Use the user's selected coding model after resolving its exact orchestration ID. Branch each story from the latest merged `backend`; make one commit per coherent small slice, one PR per story, and preserve commits when merging into `backend` subject to repository policy. Verify behavior and review the diff before merging. Update the delivery ledger and check remote PR state on resume. Never count annotation rows as independent feedback, infer absent market evidence, fabricate source support or PM approval, overwrite prior versions, or present mocks as working live integrations. Finish independent work when an external dependency is absent, and identify the precise remaining gate. Do not build the frontend or renderer, expand deferred scope, merge into `main`, or deploy infrastructure as part of this brief.
+Copy the following prompt into the implementation orchestrator. This planning update does not itself start implementation.
+
+```text
+Build the application backend to completion in this repository. Follow the six delivery stories S1-S6 in backend_execution_plan.md, including all sixteen BE work packages and the workflow/agent-design review. Read plan.md, backend_plan.md, frontend_plan.md for ownership boundaries, and applicable AGENTS.md before implementing. Preserve the agreed wire contract. Build backend-owned code, contracts, tests, CI and necessary docs; the frontend and renderer implementation belong to another team.
+
+Use the requested Codex GPT-6.1 Soul/Sol implementation model. Resolve its exact provider/model ID from the live orchestration catalog, including custom models; do not guess from the display name or silently substitute. If implementation is delegated, use one implementation worker at a time with the exact story scope, acceptance criteria and workspace; retain its task ID and verify its actual Git/test results. A worker's success message is not acceptance evidence. Do not create unrelated top-level conversations.
+
+Delivery order, one PR each:
+S1: BE-01-04 - foundation, contracts, auth, uploads, durable workflows/SSE.
+S2: BE-05-07 - Excel/PDF ingestion and provenance.
+S3: BE-08-09 - findings, counts, evidence validation and baselines.
+S4: BE-10-12 - bounded research, conflicts/variants and scored proposals.
+S5: BE-13-15 - PM edits/decisions, renderer integration and exports.
+S6: BE-16 - full acceptance, recovery, real-data evaluation and handoff.
+
+The API key is already in the repository-root .env. Load it locally through configuration without printing or sharing its value. Keep .env ignored and untracked; only placeholders go into .env.example. Never put secrets in logs, tests, recordings, commits, PRs or delegated prompts. If using a worktree, explicitly configure a local path to the original checkout's .env without committing it. Verify configured endpoint/model access with a small bounded smoke test; do not assume this key also supplies identity, storage, Temporal or renderer credentials. Keep ordinary CI deterministic and credential-free.
+
+For EACH story, repeat this complete loop:
+1. Inspect Git status, delivery_status.json and existing PRs. Preserve unrelated work. Fetch/refresh backend and create or resume the story branch from the latest merged backend. Do not duplicate an existing PR.
+2. Implement its BE work packages in dependency order. Make each coherent small slice its own commit, including its relevant tests. Keep all acceptance criteria; fewer PRs does not mean less scope.
+3. Generate meaningful tests for each new behavior as it is built, including error, authorization, idempotency, version and recovery cases where applicable. Demonstrate the intended failing test first when practical. Use synthetic CI fixtures, PostgreSQL integration tests, Temporal recovery/replay tests, and deterministic AI/renderer fakes. Maintain early evidence-quality evaluation cases. Do not defer tests until S6 or merely test that a mock returns its configured value.
+4. Run focused tests after each slice. Before PR readiness, run the cumulative backend suite, lint, type checks, migrations and generated-contract checks using the commands actually established in S1. Fix failures and review the complete diff for correctness, regression risk, scope and secret exposure. Repeat relevant checks after fixes; bind results to the final PR head.
+5. Push the branch and create one PR targeting backend with implementation AND tests. Include story/work-package IDs, resulting behavior, exact validation commands/results, migration/contract impact, and precise outstanding live-integration gates. Register the PR with the current thread when the PR-linking tool is available. Never claim a test ran if it did not.
+6. Resolve CI/review findings and merge only the verified head after required checks and repository reviews pass. Preserve small commits with a merge commit when allowed. Do not bypass protection, force-push, or silently squash against the requested commit history. Where a native PR watcher is available, use it for outstanding checks instead of a polling loop, and continue when notified.
+7. Verify the merge, refresh backend, update/reconcile backend/delivery_status.json with story and work-package status, PR URL, tested SHA, test results and merge SHA, then proceed to the next story without asking routine permission. Git/PR state is authoritative on resume.
+
+Use typed AI tasks within durable workflows and a bounded tool-using Deep Dive loop. Preserve evidence identity, opposing evidence, source applicability, reproducible counts/scores and coherent versioned publication. Late AI/research/render results must never overwrite newer PM edits. Reuse unaffected artifacts. Agents cannot fabricate evidence or perform PM approvals.
+
+Use the existing .env for bounded live API verification and keep supplied data/private derivatives out of new commits. Distinguish passing fake-based tests from live integration evidence. Finish independent implementation when an external dependency is unavailable; record the exact blocked gate. Do not mark the whole backend production-ready while mandatory live checks remain unresolved. Do not provision paid infrastructure, deploy, or merge backend into main under this instruction.
+
+Continue through all six stories. Stop only for a genuine dependency or required repository approval that prevents further authorized work. Finish with all PR URLs/merge SHAs, verified test results, backend startup instructions, frontend integration details, and any remaining external gates.
+```

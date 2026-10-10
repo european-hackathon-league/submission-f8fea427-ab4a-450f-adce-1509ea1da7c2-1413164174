@@ -9,7 +9,7 @@ Current state: local pitch prototype; all feedback and research fixtures are syn
 | FE-03 Insights and comparison | Synthetic component metrics; Europe has 2025/26 comparison, China/US have 2026 snapshots only. Market populations are unmatched. | Connect source denominators, coverage, and comparability metadata. | FE-01, source data |
 | FE-04 Evidence and research | Prepared synthetic quotes, explicit stance labels, hypotheses, gaps, and three draft concepts. No live research job. | Add source locators and asynchronous research status/results. | FE-03, evidence contract |
 | FE-05 Decisions and data | Rationale-required decisions; prior versions and decisions in browser storage; filtered CSV and print; upload retains file names only for this session. | Add authenticated server audit, import/parsing, and cross-user persistence. | FE-04, backend/auth |
-| FE-06 Release checks | Responsive and keyboard behavior implemented; visual/browser verification remains pending. | Run tests/build and verify desktop/mobile, failure fallback, print, reduced motion, and full demo path. | FE-01–05 |
+| FE-06 Release checks | 32 tests and production build pass; desktop/mobile, hosted exterior controls, dialog keyboard and decision persistence reviewed. | Verify licensed cabin/mesh mapping, browser offline/reduced motion, print and target-device performance. See verification record. | FE-01–05 |
 
 ## Later orchestrator priorities
 
@@ -19,4 +19,4 @@ Current state: local pitch prototype; all feedback and research fixtures are syn
 4. Add identity, server persistence, research-job states, and auditable approvals. Browser-local decisions are demo state only.
 5. Complete integrated tests and browser review before describing workflow as production-ready.
 
-See [UI specification](UI-SPEC.md), [3D specification](3D-SPEC.md), and [asset coverage](MODEL-COVERAGE.md). Styling stays outside viewer internals.
+See [UI specification](UI-SPEC.md), [3D specification](3D-SPEC.md), [asset coverage](MODEL-COVERAGE.md) and [verification](VERIFICATION.md). Styling stays outside viewer internals.

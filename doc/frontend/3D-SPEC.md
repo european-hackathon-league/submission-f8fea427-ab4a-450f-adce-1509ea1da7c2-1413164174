@@ -16,4 +16,4 @@ Before using a different derivative, confirm source/license and exact model iden
 
 Keep the network-independent photo and HTML component list usable if hosted content or WebGL fails. Preserve keyboard alternatives, focus states, reduced-motion behavior, reset/zoom/orbit controls, and text/sample equivalents. Self-hosted GLB is a later option only after an authorized download and asset review.
 
-See [MODEL-COVERAGE.md](MODEL-COVERAGE.md) for asset evidence, exclusions, and uncovered families. Browser verification is still pending.
+See [MODEL-COVERAGE.md](MODEL-COVERAGE.md) for family coverage and [cabin research](research/G60-INTERIOR-ASSETS.md) for the exact i5 M60 replacement candidate. ARKVIZ has the strongest inspected cabin previews, but its standard license does not clear commercial browser delivery or conversion. Use the [Blender brief](BLENDER-ASSET-BRIEF.md) if acquisition fails. Current browser/test results and remaining gates are in [VERIFICATION.md](VERIFICATION.md).

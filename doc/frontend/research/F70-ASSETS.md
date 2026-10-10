@@ -4,7 +4,7 @@ Checked 2026-10-10. Scope: 2024+ BMW 1 Series F70, including 116, 120, 123 xDriv
 
 ## Finding
 
-No candidate currently meets bar for production or trim-specific requirement evidence. One public Sketchfab record is downloadable under CC BY 4.0 and identifies itself as a 2025 F70, but it is tagged `ai-generated` and `hunyuan3d`; neither the model record nor its metadata verifies shape accuracy, full interior, or a specific production trim. Treat it as a provisional generic F70 visual only, pending visual inspection and geometry review.
+No candidate currently meets the requested accuracy bar. One public Sketchfab record is downloadable under CC BY 4.0 and identifies itself as a 2025 F70, but it is tagged `ai-generated` and `hunyuan3d`. Primary visual review found distorted exterior details; no full interior or exact production trim was verified. Reject it for the accurate-car pitch.
 
 ## Candidate: provisional only
 
@@ -18,8 +18,8 @@ No candidate currently meets bar for production or trim-specific requirement evi
 - Formats reported in public API archives: GLB (49.1 MB), glTF archive (41.1 MB), USDZ (14.3 MB), and source archive (77.3 MB). GLB/glTF report 499,999 faces, 325,142 vertices, 3 textures, max texture resolution 4096. USDZ/source topology and texture counts are not reported. Counts differ from the model-level API values (499,999 faces / 249,962 vertices); use archive metrics as export-specific metadata, not a validated mesh audit.
 - Model description claims a 2025 fourth-generation BMW 1 Series/F70 and describes M-Sport styling. It does not identify an exact trim or say it represents a production M135 xDrive. Tags include `m135`, `f70`, `curved-display`, `digital-cockpit`, `ai-generated`, and `hunyuan3d`; tags are not proof that those details exist in the mesh.
 - Interior evidence: insufficient. Description mentions digital-first interior; tags mention curved display/digital cockpit. No API field proves cabin completeness or fidelity.
-- Thumbnail: API exposes 1920×1080 preview at [thumbnail URL](https://media.sketchfab.com/models/aca5bc34dd014aff89eef647124b485d/thumbnails/7f1b85cee88f4f489495e9621f756004/0f929cc248134ecaa86f71b108cc8366.jpeg). Primary inspected the thumbnail: grille/logo/headlamp details are visibly distorted. This is direct visual evidence against using it as an accurate F70 visual.
-- Fit decision: **reject as accurate pitch asset or trim-specific evidence source**. Candidate is downloadable with attribution after sign-in, but AI-generated provenance, distorted visible details, and absent interior/geometry validation make it unsuitable for engineering or accurate design decisions.
+- Thumbnail: API exposes a 1920×1080 [preview](https://media.sketchfab.com/models/aca5bc34dd014aff89eef647124b485d/thumbnails/7f1b85cee88f4f489495e9621f756004/0f929cc248134ecaa86f71b108cc8366.jpeg). Primary reviewer inspected it directly after the delegated catalog search. Grille, logo, lamps and surfaces have visibly distorted details. No detailed cabin can be validated from this view.
+- Fit decision: **reject for the accurate-car pitch**. Downloadable with attribution after sign-in, but AI-generated provenance, distorted exterior and missing interior/trim validation fail the requested quality bar.
 
 ## Excluded result: preview only
 
@@ -47,6 +47,6 @@ Search surfaced commercial 2025 1 Series listings, including [Superhive model by
 
 ## Search coverage and limits
 
-Checked Sketchfab Data API exact terms: `BMW F70`, `BMW F70 116`, `BMW F70 120`, `BMW F70 123 xDrive`, `BMW F70 M135 xDrive`, `BMW F70 118d`, `BMW F70 120d`, `BMW F70 interior`, `BMW 1 Series 2025 F70`, `BMW 1 series F70`, `F70 BMW hatchback`, and `BMW M135 xDrive 2025`; trim searches used `downloadable=true`. Broader web searches covered GitHub, Sketchfab, and marketplace listings. Sketchfab viewer pages returned 403 through available preview tools; primary could inspect the exposed thumbnail. No protected files or downloads were attempted.
+Checked Sketchfab Data API exact terms: `BMW F70`, `BMW F70 116`, `BMW F70 120`, `BMW F70 123 xDrive`, `BMW F70 M135 xDrive`, `BMW F70 118d`, `BMW F70 120d`, `BMW F70 interior`, `BMW 1 Series 2025 F70`, `BMW 1 series F70`, `F70 BMW hatchback`, and `BMW M135 xDrive 2025`; trim searches used `downloadable=true`. Broader web searches covered GitHub, Sketchfab, and marketplace listings. Sketchfab viewer pages returned 403 through available preview tools, so no protected files or downloads were attempted.
 
-This is a public-catalog search, not proof that no asset exists elsewhere or in private/licensed manufacturer libraries. Recheck exact models and licenses before integration; request author confirmation for AI-generated model provenance and BMW design/trademark rights if asset becomes a product dependency.
+This is a public-catalog search, not proof that no asset exists elsewhere or in private/licensed manufacturer libraries. Recheck exact models, provenance and licenses before integration.

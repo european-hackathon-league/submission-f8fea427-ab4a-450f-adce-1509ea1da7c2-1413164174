@@ -300,3 +300,53 @@ it("uses canonical cohort_ids when regrouping variants", async () => {
     changed_fields: { cohort_ids: ["cohort-eu"] },
   });
 });
+
+it("bounds interrupted requests while replaying the original command key", async () => {
+  vi.useFakeTimers();
+  const keys: string[] = [];
+  vi.stubGlobal("fetch", (_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+    keys.push(new Headers(init.headers).get("Idempotency-Key")!);
+    init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")), { once: true });
+  }));
+  try {
+    const pending = createRealApi().request("/runs", { source_ids: ["s"] }, "same-command");
+    const assertion = expect(pending).rejects.toMatchObject({ code: "request_timeout", retryable: true });
+    await vi.advanceTimersByTimeAsync(60_001);
+    await assertion;
+    expect(keys).toEqual(["same-command", "same-command"]);
+  } finally { vi.useRealTimers(); }
+});
+
+it("rejects unsupported snapshot contract versions before displaying resources", async () => {
+  vi.stubGlobal("fetch", async () => Response.json({ ...data.Snapshot, contract_version: "2" }));
+  await expect(createRealApi().request("/runs/run_demo")).rejects.toThrow(/contract version/i);
+});
+it("bounds SSE header establishment and rejects a stalled connection", async () => {
+  vi.useFakeTimers();
+  vi.stubGlobal("fetch", (_url: string, init: RequestInit) => new Promise<Response>((_resolve, reject) => {
+    init.signal?.addEventListener("abort", () => reject(init.signal?.reason), { once: true });
+  }));
+  try {
+    const pending = createRealApi().events!("run_demo", 0, null, new AbortController().signal);
+    const assertion = expect(pending).rejects.toMatchObject({ code: "event_connection_timeout", retryable: true });
+    await vi.advanceTimersByTimeAsync(30_000);
+    await assertion;
+  } finally { vi.useRealTimers(); }
+});
+it("clears SSE establishment timeout after headers and keeps parent cancellation connected", async () => {
+  vi.useFakeTimers();
+  let requestSignal: AbortSignal | undefined;
+  vi.stubGlobal("fetch", async (_url: string, init: RequestInit) => {
+    requestSignal = init.signal as AbortSignal;
+    return new Response("data: ready\n\n", { headers: { "Content-Type": "text/event-stream" } });
+  });
+  try {
+    const parent = new AbortController();
+    const response = await createRealApi().events!("run_demo", 0, null, parent.signal);
+    expect(response.ok).toBe(true);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(requestSignal?.aborted).toBe(false);
+    parent.abort();
+    expect(requestSignal?.aborted).toBe(true);
+  } finally { vi.useRealTimers(); }
+});

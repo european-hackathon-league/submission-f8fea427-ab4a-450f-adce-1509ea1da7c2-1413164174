@@ -325,19 +325,22 @@ export function createRealApi(
             : JSON.stringify(body),
     };
     for (let attempt = 0; attempt < 2; attempt++) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 30_000);
       try {
-        const response = await fetch(`${base}${path}`, init);
+        const response = await fetch(`${base}${path}`, { ...init, signal: controller.signal });
         await checkResponse(response);
         return await response.json();
       } catch (error) {
         if (
           attempt === 0 &&
-          error instanceof TypeError &&
+          (error instanceof TypeError || controller.signal.aborted) &&
           (body === undefined || key)
         )
           continue;
+        if (controller.signal.aborted) throw new ApiError("request_timeout", "Request timed out. Retry the same command; its result may already exist.", null, null, true);
         throw error;
-      }
+      } finally { clearTimeout(timeout); }
     }
     throw new ApiError("request_failed", "Request interrupted.");
   };
@@ -346,18 +349,36 @@ export function createRealApi(
     sourceUrl: (sourceId) =>
       `${base}/sources/${encodeURIComponent(sourceId)}/content`,
     async events(runId, sequence, lastEventId, signal) {
-      const response = await fetch(
-        `${base}/runs/${encodeURIComponent(runId)}/events?follow=true${lastEventId ? "" : `&after_sequence=${sequence}`}`,
-        {
-          credentials: "include",
-          signal,
-          headers: await headers({
-            Accept: "text/event-stream",
-            ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}),
-          }),
-        },
-      );
-      return response;
+      const establishment = new AbortController();
+      const timeout = setTimeout(() => establishment.abort(), 30_000);
+      // Keep parent cancellation attached to the response body after headers arrive.
+      // Native composition releases its internal subscriptions with signal lifetime.
+      const requestSignal = AbortSignal.any([signal, establishment.signal]);
+      try {
+        return await fetch(
+          `${base}/runs/${encodeURIComponent(runId)}/events?follow=true${lastEventId ? "" : `&after_sequence=${sequence}`}`,
+          {
+            credentials: "include",
+            signal: requestSignal,
+            headers: await headers({
+              Accept: "text/event-stream",
+              ...(lastEventId ? { "Last-Event-ID": lastEventId } : {}),
+            }),
+          },
+        );
+      } catch (error) {
+        if (establishment.signal.aborted && !signal.aborted) {
+          throw new ApiError(
+            "event_connection_timeout",
+            "Event connection timed out. Reconnect from the last coherent snapshot.",
+            null, null, true,
+          );
+        }
+        throw error;
+      } finally {
+        // This deadline bounds headers only; healthy long streams remain open.
+        clearTimeout(timeout);
+      }
     },
   });
 }

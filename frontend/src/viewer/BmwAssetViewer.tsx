@@ -13,6 +13,7 @@ const modelAttribution='2023 BMW i5 M60 by Nazh Design';
 
 type CameraState={position:number[];target:number[]};
 type SketchfabNode={instanceID:number;name:string};
+type SketchfabNodePayload=unknown;
 type SketchfabApi={
   start:(callback?:()=>void)=>void;
   stop:(callback?:()=>void)=>void;
@@ -20,8 +21,7 @@ type SketchfabApi={
   getCameraLookAt:(callback:(error:unknown,camera:CameraState)=>void)=>void;
   setCameraLookAt:(position:number[],target:number[],duration?:number,callback?:(error:unknown)=>void)=>void;
   recenterCamera:(callback?:(error:unknown)=>void)=>void;
-  getNodeMap:(callback:(error:unknown,nodes:SketchfabNode[])=>void)=>void;
-  getMaterialList:(callback:(error:unknown,materials:unknown[])=>void)=>void;
+  getNodeMap:(callback:(error:unknown,nodes:SketchfabNodePayload)=>void)=>void;
 };
 type SketchfabClient={init:(uid:string,options:{autostart:number;camera:number;autospin:number;dnt:number;success:(api:SketchfabApi)=>void;error:()=>void})=>void};
 type SketchfabConstructor=new (version:string,iframe:HTMLIFrameElement)=>SketchfabClient;
@@ -47,6 +47,24 @@ export function sampleHeatColor(negative:number,total:number):string{
   return heatColor(negativeShare({negative,total}));
 }
 
+export function normalizeSketchfabNodeMap(payload:SketchfabNodePayload):SketchfabNode[]{
+  const object=payload&&typeof payload==='object'?payload as Record<string,unknown>:null;
+  const value=object&&'nodes' in object?object.nodes:payload;
+  const entries:Array<[string,unknown]>=Array.isArray(value)?value.map((node,index)=>[String(index),node]):value&&typeof value==='object'?Object.entries(value):[];
+  return entries.flatMap(([key,value])=>{
+    if(!value||typeof value!=='object')return [];
+    const node=value as Record<string,unknown>;
+    if(typeof node.name!=='string')return [];
+    const rawId=node.instanceID??key;
+    const instanceID=typeof rawId==='number'?rawId:typeof rawId==='string'?Number(rawId):NaN;
+    return Number.isFinite(instanceID)?[{instanceID,name:node.name}]:[];
+  });
+}
+
+function reducedMotion():boolean{
+  return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false;
+}
+
 function metricSummary(findings:VehicleViewerProps['findings'],id:ComponentId,period:Period):string{
   const finding=findings.find(item=>item.id===id);
   if(!finding)return 'No sample';
@@ -66,13 +84,12 @@ function useSketchfabViewer(
   onReady:()=>void,
   onFailure:()=>void,
   onPick:(component:ComponentId)=>void,
-  onSceneInfo:(summary:string)=>void,
 ){
   const apiRef=useRef<SketchfabApi|null>(null);
   const initialCameraRef=useRef<CameraState|null>(null);
   const [sceneReady,setSceneReady]=useState(false);
-  const callbacksRef=useRef({onReady,onFailure,onPick,onSceneInfo});
-  callbacksRef.current={onReady,onFailure,onPick,onSceneInfo};
+  const callbacksRef=useRef({onReady,onFailure,onPick});
+  callbacksRef.current={onReady,onFailure,onPick};
 
   useEffect(()=>{
     if(!iframe)return;
@@ -99,19 +116,18 @@ function useSketchfabViewer(
             setSceneReady(true);
             callbacksRef.current.onReady();
             api.getCameraLookAt((error,camera)=>{if(!error&&!disposed)initialCameraRef.current=camera;});
-            api.getNodeMap((error,nodes)=>{
+            api.getNodeMap((error,payload)=>{
               if(error||disposed)return;
-              const mapped=nodes.filter(node=>componentForNodeName(node.name));
-              callbacksRef.current.onSceneInfo(`${nodes.length} named scene nodes · ${mapped.length} component mappings`);
-              const nodeById=new Map(mapped.map(node=>[node.instanceID,node.name]));
+              const nodes=normalizeSketchfabNodeMap(payload);
+              const mapped=nodes.flatMap(node=>{
+                const component=componentForNodeName(node.name);
+                return component?[[node.instanceID,component] as const]:[];
+              });
+              const componentById=new Map(mapped);
               api.addEventListener('click',info=>{
-                const nodeName=info?.instanceID?nodeById.get(info.instanceID):undefined;
-                const component=nodeName?componentForNodeName(nodeName):null;
+                const component=info?.instanceID===undefined?undefined:componentById.get(Number(info.instanceID));
                 if(component)callbacksRef.current.onPick(component);
               },{pick:'fast'});
-            });
-            api.getMaterialList((error,materials)=>{
-              if(!error&&!disposed)callbacksRef.current.onSceneInfo(`${materials.length} shared model materials · component heat shown in controls`);
             });
           });
         },
@@ -131,26 +147,50 @@ function useSketchfabViewer(
     const api=apiRef.current;
     if(!api)return false;
     const camera=initialCameraRef.current;
-    if(camera)api.setCameraLookAt(camera.position,camera.target,.45);
+    if(camera)api.setCameraLookAt(camera.position,camera.target,reducedMotion()?0:.45);
     else api.recenterCamera();
+    return true;
+  },[]);
+
+  const zoom=useCallback((direction:-1|1)=>{
+    const api=apiRef.current;
+    if(!api)return false;
+    api.getCameraLookAt((error,camera)=>{
+      if(error)return;
+      const factor=direction < 0 ? 0.8 : 1.25;
+      const position=camera.position.map((coordinate,index)=>camera.target[index]+(coordinate-camera.target[index])*factor);
+      api.setCameraLookAt(position,camera.target,reducedMotion()?0:.22);
+    });
+    return true;
+  },[]);
+
+  const orbit=useCallback((direction:-1|1)=>{
+    const api=apiRef.current;
+    if(!api)return false;
+    api.getCameraLookAt((error,camera)=>{
+      if(error)return;
+      const [x,y,z]=camera.position.map((coordinate,index)=>coordinate-camera.target[index]);
+      const angle=direction*Math.PI/12;
+      const position=[camera.target[0]+x*Math.cos(angle)-z*Math.sin(angle),camera.target[1]+y,camera.target[2]+x*Math.sin(angle)+z*Math.cos(angle)];
+      api.setCameraLookAt(position,camera.target,reducedMotion()?0:.22);
+    });
     return true;
   },[]);
 
   const pause=useCallback(()=>apiRef.current?.stop(),[]);
   const resume=useCallback(()=>apiRef.current?.start(),[]);
-  return {resetCamera,pause,resume,sceneReady};
+  return {resetCamera,zoom,orbit,pause,resume,sceneReady};
 }
 
 export default function BmwAssetViewer({selectedComponent,onSelectComponent,view,onViewChange,heatmap,period,findings,className,onStatusChange}:VehicleViewerProps){
   const [iframe,setIframe]=useState<HTMLIFrameElement|null>(null);
   const [apiFailed,setApiFailed]=useState(false);
-  const [sceneSummary,setSceneSummary]=useState('Connecting to hosted 3D model…');
   const [liveMessage,setLiveMessage]=useState('');
   const [resetMessage,setResetMessage]=useState('');
+  const [retryVersion,setRetryVersion]=useState(0);
   const reportReady=useCallback(()=>{setApiFailed(false);setLiveMessage('3D model ready. Drag to orbit; use Sketchfab viewer keyboard controls.');onStatusChange?.('ready');},[onStatusChange]);
   const reportFailure=useCallback(()=>{setApiFailed(true);setLiveMessage('3D model unavailable. Showing verified preview image.');onStatusChange?.('fallback');},[onStatusChange]);
-  const onSceneInfo=useCallback((summary:string)=>setSceneSummary(summary),[]);
-  const {resetCamera,pause,resume,sceneReady}=useSketchfabViewer(iframe,reportReady,reportFailure,onSelectComponent,onSceneInfo);
+  const {resetCamera,zoom,orbit,pause,resume,sceneReady}=useSketchfabViewer(iframe,reportReady,reportFailure,onSelectComponent);
 
   useEffect(()=>{if(view==='interior')pause();else resume();},[view,pause,resume]);
 
@@ -163,12 +203,25 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
     else setResetMessage('Camera controls available after the 3D model loads.');
   };
 
+  const retryModel=()=>{
+    setApiFailed(false);
+    setRetryVersion(version=>version+1);
+    setLiveMessage('Retrying hosted 3D model.');
+  };
+
+  const handleZoom=(direction:-1|1)=>{
+    if(!zoom(direction))setResetMessage('Camera controls available after the 3D model loads.');
+  };
+
+  const handleOrbit=(direction:-1|1)=>{
+    if(!orbit(direction))setResetMessage('Camera controls available after the 3D model loads.');
+  };
+
   return <section className={`bmw-asset-viewer ${className??''}`} aria-label="BMW i5 M60 vehicle viewer">
     <header className="bmw-asset-viewer__header">
       <div className="bmw-asset-viewer__identity">
-        <span className="bmw-asset-viewer__kicker">BMW i5 M60 · 2023 model</span>
-        <h2>Exterior &amp; cabin reference</h2>
-        <p>Real vehicle asset · component feedback overlay</p>
+        <h2>BMW i5 M60</h2>
+        <p>Exterior · 2023 model · cabin photo reference</p>
       </div>
       <div className="bmw-asset-viewer__controls" role="group" aria-label="Vehicle view">
         <button type="button" aria-pressed={view==='exterior'} onClick={()=>onViewChange('exterior')}>Exterior 3D</button>
@@ -182,6 +235,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
         {view==='exterior'?<>
           <img className="bmw-asset-viewer__preview" src="/vehicles/i5-m60-preview.jpg" alt="BMW i5 M60 three-quarter exterior preview"/>
           {!apiFailed&&<iframe
+            key={retryVersion}
             ref={setIframe}
             className={`bmw-asset-viewer__frame ${sceneReady?'is-ready':''}`}
             title="Interactive 3D model of the 2023 BMW i5 M60"
@@ -190,7 +244,13 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
             aria-label="Interactive BMW i5 M60 exterior model. Drag to orbit and use controls to zoom."
           />}
           {!sceneReady&&!apiFailed&&<div className="bmw-asset-viewer__loading" role="status"><span className="bmw-asset-viewer__spinner"/>Loading hosted BMW i5 M60 model…</div>}
-          {apiFailed&&<div className="bmw-asset-viewer__failure" role="alert"><strong>3D model could not load.</strong><span>Verified model preview remains available. Check network access, then reload page.</span></div>}
+          {apiFailed&&<div className="bmw-asset-viewer__failure" role="alert"><strong>3D model could not load.</strong><span>Verified preview stays available. Check your connection and try again.</span><button type="button" onClick={retryModel}>Retry 3D model</button></div>}
+          <div className="bmw-asset-viewer__camera-controls" role="group" aria-label="3D camera controls">
+            <button type="button" aria-label="Orbit model left" title="Orbit left" onClick={()=>handleOrbit(-1)} disabled={!sceneReady}>↶</button>
+            <button type="button" aria-label="Orbit model right" title="Orbit right" onClick={()=>handleOrbit(1)} disabled={!sceneReady}>↷</button>
+            <button type="button" aria-label="Zoom out" title="Zoom out" onClick={()=>handleZoom(1)} disabled={!sceneReady}>−</button>
+            <button type="button" aria-label="Zoom in" title="Zoom in" onClick={()=>handleZoom(-1)} disabled={!sceneReady}>+</button>
+          </div>
           <div className="bmw-asset-viewer__stage-caption"><span>Exterior · interactive 3D</span><span>{sceneReady?'Sketchfab model connected':apiFailed?'Preview image':'Connecting'}</span></div>
         </>:<div className="bmw-asset-viewer__photo-wrap">
           <img className="bmw-asset-viewer__interior-photo" src="/vehicles/g60-interior.jpg" alt="BMW 5 Series G60 cabin reference photo, photographed by Ethan Llamas"/>
@@ -208,19 +268,25 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
 
       <aside className="bmw-asset-viewer__inspector" aria-label="Vehicle component feedback">
         <div className="bmw-asset-viewer__inspector-top"><span>{view==='exterior'?'Exterior components':'Cabin components'}</span><span className="bmw-asset-viewer__heat-label"><i/> {heatLabel}</span></div>
-        <p className="bmw-asset-viewer__instruction">Choose component to inspect feedback. Heat appears in labels and markers; model materials stay unchanged.</p>
+        <p className="bmw-asset-viewer__instruction">Feedback colors indicate negative share. Colors appear in this list and cabin photo only.</p>
+        {heatmap&&<div className="bmw-asset-viewer__legend" role="img" aria-label="Negative feedback share: teal below 25 percent, amber 25 to 49 percent, red 50 percent or more; gray means no sample.">
+          <span><i style={{'--heat':'#57b6a0'} as React.CSSProperties}/>0–24%</span>
+          <span><i style={{'--heat':'#e8b75a'} as React.CSSProperties}/>25–49%</span>
+          <span><i style={{'--heat':'#e45454'} as React.CSSProperties}/>50%+</span>
+          <span><i style={{'--heat':'#8a909b'} as React.CSSProperties}/>No sample</span>
+        </div>}
         <div className="bmw-asset-viewer__parts" role="group" aria-label={`${view} components`}>
           {components.map(id=>{
             const color=heatmap?severityFor(findings,id,period):'#a7adb4';
             return <button key={id} type="button" className={`bmw-asset-viewer__part ${selectedComponent===id?'is-selected':''}`} aria-pressed={selectedComponent===id} onClick={()=>onSelectComponent(id)}>
-              <span className="bmw-asset-viewer__part-dot" style={{'--heat':selectedComponent===id?'#1c69d4':color} as React.CSSProperties}/>
+              <span className="bmw-asset-viewer__part-dot" style={{'--heat':color} as React.CSSProperties}/>
               <span className="bmw-asset-viewer__part-copy"><strong>{labels[id]}</strong><small>{metricSummary(findings,id,period)}</small></span>
               <span className="bmw-asset-viewer__part-arrow" aria-hidden="true">↗</span>
             </button>;
           })}
         </div>
         <div className="bmw-asset-viewer__selection" aria-live="polite"><span className="bmw-asset-viewer__selection-label">Selected component</span><strong>{labels[selectedComponent]}</strong><span>{currentSample}</span></div>
-        {view==='exterior'?<p className="bmw-asset-viewer__scene-info">{sceneSummary}</p>:<p className="bmw-asset-viewer__photo-note">Detailed 3D cabin not verified in source asset. This authentic photo is a separate G60 520i cabin reference.</p>}
+        {view==='interior'&&<p className="bmw-asset-viewer__photo-note">Detailed 3D cabin not verified in source asset. This is a separate G60 520i cabin reference.</p>}
       </aside>
     </div>
 

@@ -1,22 +1,34 @@
-import {cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
+import {act,cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import BmwAssetViewer, {BMW_I5_MODEL_UID} from './BmwAssetViewer';
+import BmwAssetViewer, {BMW_I5_MODEL_UID,normalizeSketchfabNodeMap} from './BmwAssetViewer';
 import {findings} from '../domain/fixtures';
 
 type InitOptions={success:(api:any)=>void;error:()=>void};
 
 afterEach(()=>cleanup());
 
+describe('normalizeSketchfabNodeMap',()=>{
+  it('accepts documented flattened nodes and object-wrapped node maps',()=>{
+    expect(normalizeSketchfabNodeMap([{instanceID:7,name:'Headlamps'}])).toEqual([{instanceID:7,name:'Headlamps'}]);
+    expect(normalizeSketchfabNodeMap({nodes:{'8':{name:'Dashboard'}}})).toEqual([{instanceID:8,name:'Dashboard'}]);
+    expect(normalizeSketchfabNodeMap({bad:{name:'No instance id'}})).toEqual([]);
+  });
+});
+
 describe('BmwAssetViewer', () => {
   it('shows real-asset attribution and keeps parent-controlled component selection usable', () => {
     const onSelectComponent=vi.fn();
-    render(<BmwAssetViewer selectedComponent="body" onSelectComponent={onSelectComponent} view="exterior" onViewChange={vi.fn()} heatmap period="2026" findings={findings}/>);
+    const props={onSelectComponent,view:'exterior' as const,onViewChange:vi.fn(),heatmap:true,period:'2026' as const,findings,className:'bmw-asset-viewer--compact'};
+    const {rerender}=render(<BmwAssetViewer {...props} selectedComponent="body"/>);
 
+    expect(screen.getByRole('region',{name:'BMW i5 M60 vehicle viewer'})).toHaveClass('bmw-asset-viewer--compact');
     expect(screen.getByRole('link',{name:/Nazh Design/})).toHaveAttribute('href',expect.stringContaining('sketchfab.com'));
     expect(screen.getByRole('link',{name:/CC BY 4.0/})).toHaveAttribute('href','https://creativecommons.org/licenses/by/4.0/');
     expect(screen.getByRole('button',{name:/Headlamps/}).querySelector('.bmw-asset-viewer__part-dot')).toHaveStyle({'--heat':'#57b6a0'});
     fireEvent.click(screen.getByRole('button',{name:/Headlamps/}));
     expect(onSelectComponent).toHaveBeenCalledWith('lighting');
+    rerender(<BmwAssetViewer {...props} selectedComponent="lighting"/>);
+    expect(screen.getByRole('button',{name:/Headlamps/})).toHaveAttribute('aria-pressed','true');
   });
 
   it('uses a licensed real G60 cabin photograph instead of claiming an unverified 3D interior', () => {
@@ -37,8 +49,7 @@ describe('BmwAssetViewer', () => {
       start:vi.fn(),stop:vi.fn(),
       addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
-      getNodeMap:(callback:(error:unknown,nodes:any[])=>void)=>callback(null,[{instanceID:77,name:'headlamps'}]),
-      getMaterialList:(callback:(error:unknown,materials:any[])=>void)=>callback(null,[{},{}]),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,{nodes:{front:{instanceID:77,name:'headlamps'}}}),
       setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
     };
     const init=vi.fn();
@@ -48,7 +59,7 @@ describe('BmwAssetViewer', () => {
 
     await waitFor(()=>expect(init).toHaveBeenCalledWith(BMW_I5_MODEL_UID,expect.objectContaining({autospin:0,dnt:1})));
     expect(events.viewerready).toBeTypeOf('function');
-    events.viewerready();
+    act(()=>events.viewerready());
     await waitFor(()=>expect(onStatusChange).toHaveBeenCalledWith('ready'));
     events.click({instanceID:77});
     expect(onSelectComponent).toHaveBeenCalledWith('lighting');
@@ -59,7 +70,7 @@ describe('BmwAssetViewer', () => {
     const api={
       start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
-      getNodeMap:(callback:(error:unknown,nodes:any[])=>void)=>callback(null,[]),getMaterialList:(callback:(error:unknown,materials:any[])=>void)=>callback(null,[]),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),
       setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
     };
     const init=vi.fn((_uid:string,options:InitOptions)=>options.success(api));
@@ -85,5 +96,45 @@ describe('BmwAssetViewer', () => {
     expect(screen.getByRole('alert')).toHaveTextContent(/3D model could not load/i);
     expect(screen.getByRole('img',{name:/BMW i5 M60 three-quarter exterior preview/i})).toBeInTheDocument();
     expect(onStatusChange).toHaveBeenCalledWith('fallback');
+  });
+
+  it('offers retry after a failed API initialization and starts the model again',async()=>{
+    const events:Record<string,(value?:any)=>void>={};
+    const api={
+      start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
+      getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+    };
+    const init=vi.fn((_uid:string,options:InitOptions)=>init.mock.calls.length===1?options.error():options.success(api));
+    class SketchfabMock { init=init; }
+    Object.assign(window,{Sketchfab:SketchfabMock});
+    render(<BmwAssetViewer selectedComponent="body" onSelectComponent={vi.fn()} view="exterior" onViewChange={vi.fn()} heatmap={false} period="2026" findings={findings}/>);
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Retry 3D model'})).toBeInTheDocument());
+    fireEvent.click(screen.getByRole('button',{name:'Retry 3D model'}));
+    await waitFor(()=>expect(init).toHaveBeenCalledTimes(2));
+    act(()=>events.viewerready());
+    expect(api.start).toHaveBeenCalled();
+  });
+
+  it('provides semantic orbit and zoom controls and honors reduced motion on reset',async()=>{
+    Object.defineProperty(window,'matchMedia',{configurable:true,value:vi.fn(()=>({matches:true}))});
+    const events:Record<string,(value?:any)=>void>={};
+    const api={
+      start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
+      getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+    };
+    class SketchfabMock { init(_uid:string,options:InitOptions){options.success(api);} }
+    Object.assign(window,{Sketchfab:SketchfabMock});
+    render(<BmwAssetViewer selectedComponent="body" onSelectComponent={vi.fn()} view="exterior" onViewChange={vi.fn()} heatmap={false} period="2026" findings={findings}/>);
+    await waitFor(()=>expect(api.start).toHaveBeenCalled());
+    act(()=>events.viewerready());
+    await waitFor(()=>expect(screen.getByRole('button',{name:'Zoom in'})).toBeEnabled());
+    fireEvent.click(screen.getByRole('button',{name:'Zoom in'}));
+    expect(api.setCameraLookAt).toHaveBeenCalledWith([1.6,1.6,3.2],[0,0,0],0);
+    fireEvent.click(screen.getByRole('button',{name:'Orbit model left'}));
+    expect(api.setCameraLookAt).toHaveBeenLastCalledWith(expect.any(Array),[0,0,0],0);
+    fireEvent.click(screen.getByRole('button',{name:'Reset view'}));
+    expect(api.setCameraLookAt).toHaveBeenLastCalledWith([2,2,4],[0,0,0],0);
   });
 });

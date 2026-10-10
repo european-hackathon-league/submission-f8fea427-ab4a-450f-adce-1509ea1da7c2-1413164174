@@ -56,6 +56,12 @@
 @keyframes bmw-asset-spin { to { transform: rotate(360deg); } }
 .bmw-asset-viewer__failure { position: absolute; z-index: 3; inset: auto 16px 45px; display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-left: 3px solid #b34e45; background: rgba(255,255,255,.96); color: #24282d; font-size: 12px; }
 .bmw-asset-viewer__failure span { color: #555c63; line-height: 1.45; }
+.bmw-asset-viewer__failure button { align-self: flex-start; min-height: 44px; margin-top: 6px; padding: 0 13px; border: 1px solid #343a40; border-radius: 0; background: #20252b; color: #fff; font-size: 12px; font-weight: 650; cursor: pointer; }
+.bmw-asset-viewer__failure button:hover { background: #363d44; }
+.bmw-asset-viewer__camera-controls { position: absolute; z-index: 5; top: 12px; left: 12px; display: flex; gap: 5px; }
+.bmw-asset-viewer__camera-controls button { width: 44px; height: 44px; border: 1px solid rgba(28,32,36,.36); border-radius: 0; background: rgba(255,255,255,.95); color: #20252b; font-size: 21px; line-height: 1; cursor: pointer; }
+.bmw-asset-viewer__camera-controls button:hover:not(:disabled) { background: #eaf1f8; border-color: #4d6b8a; }
+.bmw-asset-viewer__camera-controls button:disabled { color: #73787d; opacity: .68; cursor: not-allowed; }
 .bmw-asset-viewer__stage-caption { position: absolute; z-index: 4; left: 0; right: 0; bottom: 0; display: flex; justify-content: space-between; gap: 12px; padding: 11px 15px; background: linear-gradient(transparent,rgba(12,15,18,.76)); color: #fff; font-size: 11px; font-weight: 650; letter-spacing: .02em; text-shadow: 0 1px 2px #000; }
 
 .bmw-asset-viewer__photo-wrap { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; overflow: hidden; background: #e7e8e7; }
@@ -73,11 +79,15 @@
 .bmw-asset-viewer__heat-label { display: inline-flex; align-items: center; gap: 6px; color: #656b72; font-size: 11px; font-weight: 500; }
 .bmw-asset-viewer__heat-label i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #d5574c; }
 .bmw-asset-viewer__instruction { margin: 11px 0; color: #676d73; font-size: 11px; line-height: 1.45; }
+.bmw-asset-viewer__legend { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin: -4px 0 10px; color: #5e656c; font-size: 11px; line-height: 1.4; }
+.bmw-asset-viewer__legend span { display: inline-flex; align-items: center; gap: 4px; }
+.bmw-asset-viewer__legend i { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--heat); }
 .bmw-asset-viewer__parts { display: grid; gap: 4px; }
 .bmw-asset-viewer__part { display: flex; align-items: center; gap: 10px; min-height: 54px; padding: 8px 9px; border: 1px solid transparent; border-radius: 0; background: #f6f6f5; color: #24282d; text-align: left; cursor: pointer; }
 .bmw-asset-viewer__part:hover { border-color: #b8bdc2; }
 .bmw-asset-viewer__part.is-selected { border-color: #31363c; background: #fff; }
 .bmw-asset-viewer__part-dot { width: 11px; height: 11px; flex: 0 0 auto; border-radius: 50%; background: var(--heat); box-shadow: 0 0 0 2px #fff, 0 0 0 3px #d2d5d8; }
+.bmw-asset-viewer__part.is-selected .bmw-asset-viewer__part-dot { box-shadow: 0 0 0 2px #fff, 0 0 0 4px #1769d2; }
 .bmw-asset-viewer__part-copy { display: flex; flex: 1; min-width: 0; flex-direction: column; gap: 3px; }
 .bmw-asset-viewer__part-copy strong { font-size: 12px; font-weight: 700; }
 .bmw-asset-viewer__part-copy small { color: #6b7177; font-size: 11px; }
@@ -96,6 +106,22 @@
 .bmw-asset-viewer__credits a:last-of-type, .bmw-asset-viewer__provenance > a { font-weight: 700; }
 .bmw-asset-viewer__sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; clip-path: inset(50%); }
 
+.bmw-asset-viewer--compact .bmw-asset-viewer__header { align-items: center; padding: 12px 16px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__identity h2 { margin: 0; font-size: 21px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__identity p { margin-top: 3px; font-size: 11px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__controls button { min-height: 44px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__layout { grid-template-columns: minmax(0,1fr); min-height: 0; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__stage { height: 360px; min-height: 360px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__inspector { padding: 12px 16px; border-top: 1px solid var(--bmw-line); border-left: 0; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__inspector-top { flex-direction: row; align-items: center; justify-content: space-between; padding-bottom: 9px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__instruction { margin: 8px 0; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__parts { grid-template-columns: repeat(3,minmax(0,1fr)); gap: 7px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__part { min-height: 56px; padding: 8px 10px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__selection { grid-template-columns: auto auto minmax(0,1fr); align-items: center; gap: 6px 10px; margin-top: 10px; padding-top: 10px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__selection-label { grid-column: 1; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__selection strong { grid-column: 2; font-size: 13px; }
+.bmw-asset-viewer--compact .bmw-asset-viewer__selection > span:last-child { grid-column: 3; }
+
 @media (max-width: 860px) {
   .bmw-asset-viewer__header { align-items: flex-start; flex-direction: column; }
   .bmw-asset-viewer__controls { width: 100%; }
@@ -109,6 +135,13 @@
   .bmw-asset-viewer__parts { grid-template-columns: repeat(auto-fit,minmax(145px,1fr)); }
   .bmw-asset-viewer__selection { margin-top: 14px; }
   .bmw-asset-viewer__photo-marker > span { width: 24px; height: 24px; }
+  .bmw-asset-viewer--compact .bmw-asset-viewer__header { align-items: flex-start; }
+  .bmw-asset-viewer--compact .bmw-asset-viewer__stage { height: min(68vw,360px); min-height: 240px; }
+  .bmw-asset-viewer--compact .bmw-asset-viewer__parts { grid-template-columns: repeat(auto-fit,minmax(125px,1fr)); }
+  .bmw-asset-viewer--compact .bmw-asset-viewer__selection { grid-template-columns: 1fr auto; }
+  .bmw-asset-viewer--compact .bmw-asset-viewer__selection-label { grid-column: 1; }
+  .bmw-asset-viewer--compact .bmw-asset-viewer__selection strong { grid-column: 2; grid-row: 1; }
+  .bmw-asset-viewer--compact .bmw-asset-viewer__selection > span:last-child { grid-column: 1 / -1; }
 }
 @media (max-width: 380px) {
   .bmw-asset-viewer__header { padding: 13px; }

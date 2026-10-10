@@ -22,6 +22,7 @@ export type Send = <T>(
   path: string,
   body?: unknown,
   key?: string,
+  signal?: AbortSignal,
 ) => Promise<T>;
 async function readPages<T>(
   send: Send,
@@ -290,7 +291,12 @@ function boundary(
   return {
     ...extras,
     mode,
-    async request<T>(path: string, body?: unknown, key?: string) {
+    async request<T>(
+      path: string,
+      body?: unknown,
+      key?: string,
+      signal?: AbortSignal,
+    ) {
       if (body !== undefined && !key)
         throw new ApiError(
           "missing_idempotency_key",
@@ -299,7 +305,7 @@ function boundary(
       return project(
         path,
         body,
-        await send(path, requestBody(path, body), key),
+        await send(path, requestBody(path, body), key, signal),
       ) as T;
     },
     async vehicles() {
@@ -344,7 +350,8 @@ function boundary(
             before.current_proposal_set_version !==
               after.current_proposal_set_version ||
             (p &&
-              p.proposal_set_version !== before.current_proposal_set_version)
+              (p.run_id !== runId ||
+                p.proposal_set_version !== before.current_proposal_set_version))
           )
             continue;
           const snapshot = normalize.snapshot(before);
@@ -460,6 +467,7 @@ export function createRealApi(
     path: string,
     body?: unknown,
     key?: string,
+    signal?: AbortSignal,
   ): Promise<T> => {
     const multipart = body instanceof FormData;
     const init: RequestInit = {
@@ -478,17 +486,21 @@ export function createRealApi(
             ? body
             : JSON.stringify(body),
     };
+    signal?.throwIfAborted();
     for (let attempt = 0; attempt < 2; attempt++) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30_000);
       try {
         const response = await fetch(`${base}${path}`, {
           ...init,
-          signal: controller.signal,
+          signal: signal
+            ? AbortSignal.any([signal, controller.signal])
+            : controller.signal,
         });
         await checkResponse(response);
         return await response.json();
       } catch (error) {
+        if (signal?.aborted) throw signal.reason;
         if (
           attempt === 0 &&
           (error instanceof TypeError || controller.signal.aborted) &&
@@ -520,6 +532,18 @@ export function createRealApi(
   };
   return boundary("real", send, {
     sessionNamespace: options.sessionNamespace ?? base,
+    linkUrl(value) {
+      try {
+        const url = new URL(value, apiUrl.origin);
+        return ["http:", "https:"].includes(url.protocol) &&
+          !url.username &&
+          !url.password
+          ? url.href
+          : null;
+      } catch {
+        return null;
+      }
+    },
     sourceUrl: (sourceId) =>
       `${base}/sources/${encodeURIComponent(sourceId)}/content`,
     canReadSource: (url) => sourceAddress(url) !== null,

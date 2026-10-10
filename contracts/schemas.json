@@ -1,4 +1,213 @@
 {
+  "Conflicts": {
+    "$defs": {
+      "Checkpoint": {
+        "additionalProperties": false,
+        "properties": {
+          "allowed_actions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Allowed Actions",
+            "type": "array"
+          },
+          "checkpoint_id": {
+            "title": "Checkpoint Id",
+            "type": "string"
+          },
+          "conflict_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflict Ids",
+            "type": "array"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          },
+          "wait_state": {
+            "enum": [
+              "waiting",
+              "continued"
+            ],
+            "title": "Wait State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "checkpoint_id",
+          "version",
+          "conflict_ids",
+          "allowed_actions",
+          "wait_state"
+        ],
+        "title": "Checkpoint",
+        "type": "object"
+      },
+      "Conflict": {
+        "additionalProperties": false,
+        "properties": {
+          "alternatives": {
+            "items": {
+              "$ref": "#/$defs/Scope"
+            },
+            "title": "Alternatives",
+            "type": "array"
+          },
+          "conflict_id": {
+            "title": "Conflict Id",
+            "type": "string"
+          },
+          "finding_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Finding Ids",
+            "type": "array"
+          },
+          "rationale": {
+            "title": "Rationale",
+            "type": "string"
+          },
+          "resolution_status": {
+            "enum": [
+              "unresolved",
+              "resolved"
+            ],
+            "title": "Resolution Status",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "conflict_id",
+          "version",
+          "finding_ids",
+          "alternatives",
+          "rationale",
+          "resolution_status"
+        ],
+        "title": "Conflict",
+        "type": "object"
+      },
+      "Scope": {
+        "additionalProperties": false,
+        "properties": {
+          "cohort_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cohort Ids",
+            "type": "array"
+          },
+          "equipment": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Equipment",
+            "type": "array"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "software": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Software"
+          },
+          "vehicle_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Vehicle Ids",
+            "type": "array"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Year"
+          }
+        },
+        "title": "Scope",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "checkpoints": {
+        "items": {
+          "$ref": "#/$defs/Checkpoint"
+        },
+        "title": "Checkpoints",
+        "type": "array"
+      },
+      "conflicts": {
+        "items": {
+          "$ref": "#/$defs/Conflict"
+        },
+        "title": "Conflicts",
+        "type": "array"
+      }
+    },
+    "required": [
+      "conflicts",
+      "checkpoints"
+    ],
+    "title": "Conflicts",
+    "type": "object"
+  },
+  "Continuation": {
+    "additionalProperties": false,
+    "properties": {
+      "checkpoint_version": {
+        "minimum": 1,
+        "title": "Checkpoint Version",
+        "type": "integer"
+      },
+      "cohort_assignments": {
+        "additionalProperties": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "title": "Cohort Assignments",
+        "type": "object"
+      },
+      "resolution": {
+        "title": "Resolution",
+        "type": "string"
+      }
+    },
+    "required": [
+      "checkpoint_version",
+      "resolution"
+    ],
+    "title": "Continuation",
+    "type": "object"
+  },
   "Error": {
     "additionalProperties": false,
     "properties": {
@@ -140,6 +349,137 @@
       "resource"
     ],
     "title": "Event",
+    "type": "object"
+  },
+  "EventPage": {
+    "$defs": {
+      "Event": {
+        "additionalProperties": false,
+        "properties": {
+          "contract_version": {
+            "const": "1",
+            "default": "1",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "event_id": {
+            "title": "Event Id",
+            "type": "string"
+          },
+          "occurred_at": {
+            "format": "date-time",
+            "title": "Occurred At",
+            "type": "string"
+          },
+          "proposal_set_version": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Proposal Set Version"
+          },
+          "resource": {
+            "$ref": "#/$defs/Resource"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "sequence": {
+            "minimum": 1,
+            "title": "Sequence",
+            "type": "integer"
+          },
+          "type": {
+            "enum": [
+              "analysis.updated",
+              "findings.updated",
+              "graph.updated",
+              "part_counts.updated",
+              "research.updated",
+              "conflicts.updated",
+              "checkpoint.created",
+              "proposals.ready",
+              "render.updated",
+              "export.updated",
+              "audit.appended"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "event_id",
+          "sequence",
+          "run_id",
+          "type",
+          "occurred_at",
+          "resource"
+        ],
+        "title": "Event",
+        "type": "object"
+      },
+      "Resource": {
+        "additionalProperties": false,
+        "properties": {
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "revision": {
+            "title": "Revision",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "type",
+          "id",
+          "revision"
+        ],
+        "title": "Resource",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/$defs/Event"
+        },
+        "title": "Items",
+        "type": "array"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Next Cursor"
+      },
+      "revision": {
+        "default": 1,
+        "title": "Revision",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "items"
+    ],
+    "title": "Page[Event]",
     "type": "object"
   },
   "EvidenceList": {
@@ -457,6 +797,64 @@
     "title": "Page[Evidence]",
     "type": "object"
   },
+  "ExportResult": {
+    "additionalProperties": false,
+    "properties": {
+      "download_url": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Download Url"
+      },
+      "export_id": {
+        "title": "Export Id",
+        "type": "string"
+      },
+      "manifest": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "integer"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            }
+          ]
+        },
+        "title": "Manifest",
+        "type": "object"
+      },
+      "status": {
+        "enum": [
+          "queued",
+          "processing",
+          "ready",
+          "failed"
+        ],
+        "title": "Status",
+        "type": "string"
+      }
+    },
+    "required": [
+      "export_id",
+      "status",
+      "manifest"
+    ],
+    "title": "ExportResult",
+    "type": "object"
+  },
   "FindingsPage": {
     "$defs": {
       "Counts": {
@@ -672,6 +1070,78 @@
       "part_aggregates"
     ],
     "title": "FindingsPage",
+    "type": "object"
+  },
+  "Instruction": {
+    "additionalProperties": false,
+    "properties": {
+      "base_proposal_set_version": {
+        "minimum": 1,
+        "title": "Base Proposal Set Version",
+        "type": "integer"
+      },
+      "changed_fields": {
+        "additionalProperties": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "items": {
+                "type": "string"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "title": "Changed Fields",
+        "type": "object"
+      },
+      "intent": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Intent"
+      },
+      "operation": {
+        "enum": [
+          "edit_change",
+          "remove_change",
+          "add_change",
+          "edit_target",
+          "regroup_variants",
+          "request_more_variants"
+        ],
+        "title": "Operation",
+        "type": "string"
+      },
+      "target_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Target Ids",
+        "type": "array"
+      }
+    },
+    "required": [
+      "operation",
+      "base_proposal_set_version",
+      "target_ids",
+      "changed_fields"
+    ],
+    "title": "Instruction",
     "type": "object"
   },
   "Proposals": {
@@ -1441,6 +1911,226 @@
     "title": "RenderResult",
     "type": "object"
   },
+  "ResearchPage": {
+    "$defs": {
+      "Claim": {
+        "additionalProperties": false,
+        "properties": {
+          "claim_id": {
+            "title": "Claim Id",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "limitations": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Limitations",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "fact",
+              "opinion",
+              "inference"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "claim_id",
+          "type",
+          "text",
+          "evidence_ids",
+          "limitations"
+        ],
+        "title": "Claim",
+        "type": "object"
+      },
+      "Research": {
+        "additionalProperties": false,
+        "properties": {
+          "candidate_approaches": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Candidate Approaches",
+            "type": "array"
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/$defs/Claim"
+            },
+            "title": "Claims",
+            "type": "array"
+          },
+          "competitor_scope": {
+            "$ref": "#/$defs/Scope"
+          },
+          "counterevidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Counterevidence Ids",
+            "type": "array"
+          },
+          "finding_id": {
+            "title": "Finding Id",
+            "type": "string"
+          },
+          "gaps": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Gaps",
+            "type": "array"
+          },
+          "recommendation": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Recommendation"
+          },
+          "research_id": {
+            "title": "Research Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "queued",
+              "searching",
+              "checking",
+              "ready",
+              "partial",
+              "unavailable"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "research_id",
+          "finding_id",
+          "status",
+          "competitor_scope",
+          "claims",
+          "counterevidence_ids",
+          "candidate_approaches",
+          "recommendation",
+          "gaps"
+        ],
+        "title": "Research",
+        "type": "object"
+      },
+      "Scope": {
+        "additionalProperties": false,
+        "properties": {
+          "cohort_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cohort Ids",
+            "type": "array"
+          },
+          "equipment": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Equipment",
+            "type": "array"
+          },
+          "markets": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Markets",
+            "type": "array"
+          },
+          "software": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Software"
+          },
+          "vehicle_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Vehicle Ids",
+            "type": "array"
+          },
+          "year": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Year"
+          }
+        },
+        "title": "Scope",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "items": {
+        "items": {
+          "$ref": "#/$defs/Research"
+        },
+        "title": "Items",
+        "type": "array"
+      },
+      "next_cursor": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Next Cursor"
+      },
+      "revision": {
+        "default": 1,
+        "title": "Revision",
+        "type": "integer"
+      }
+    },
+    "required": [
+      "items"
+    ],
+    "title": "Page[Research]",
+    "type": "object"
+  },
   "Snapshot": {
     "$defs": {
       "DeepDive": {
@@ -1593,6 +2283,75 @@
       "resource_links"
     ],
     "title": "Snapshot",
+    "type": "object"
+  },
+  "Uploads": {
+    "$defs": {
+      "UploadResult": {
+        "additionalProperties": false,
+        "properties": {
+          "detected_type": {
+            "enum": [
+              "xlsx",
+              "pdf",
+              "unsupported"
+            ],
+            "title": "Detected Type",
+            "type": "string"
+          },
+          "filename": {
+            "title": "Filename",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          },
+          "source_id": {
+            "title": "Source Id",
+            "type": "string"
+          },
+          "status": {
+            "enum": [
+              "ready",
+              "rejected"
+            ],
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source_id",
+          "filename",
+          "detected_type",
+          "status"
+        ],
+        "title": "UploadResult",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "sources": {
+        "items": {
+          "$ref": "#/$defs/UploadResult"
+        },
+        "title": "Sources",
+        "type": "array"
+      }
+    },
+    "required": [
+      "sources"
+    ],
+    "title": "Uploads",
     "type": "object"
   }
 }

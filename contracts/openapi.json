@@ -2921,19 +2921,30 @@
             }
           },
           {
-            "in": "header",
-            "name": "last-event-id",
+            "in": "query",
+            "name": "follow",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Follow",
+              "type": "boolean"
+            }
+          },
+          {
+            "in": "query",
+            "name": "after_sequence",
             "required": false,
             "schema": {
               "anyOf": [
                 {
-                  "type": "string"
+                  "minimum": 0,
+                  "type": "integer"
                 },
                 {
                   "type": "null"
                 }
               ],
-              "title": "Last-Event-Id"
+              "title": "After Sequence"
             }
           },
           {
@@ -2967,15 +2978,46 @@
               ],
               "title": "X-Workspace-Id"
             }
+          },
+          {
+            "in": "header",
+            "name": "last-event-id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Last-Event-Id"
+            }
           }
         ],
         "responses": {
           "200": {
             "content": {
-              "application/json": {
-                "schema": {}
-              },
               "text/event-stream": {
+                "itemSchema": {
+                  "properties": {
+                    "data": {
+                      "type": "string"
+                    },
+                    "event": {
+                      "type": "string"
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "retry": {
+                      "minimum": 0,
+                      "type": "integer"
+                    }
+                  },
+                  "type": "object"
+                },
                 "schema": {
                   "type": "string"
                 }
@@ -2985,7 +3027,7 @@
           },
           "401": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
@@ -2995,7 +3037,7 @@
           },
           "403": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
@@ -3005,7 +3047,7 @@
           },
           "404": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
@@ -3015,7 +3057,7 @@
           },
           "409": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
@@ -3025,7 +3067,7 @@
           },
           "410": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
@@ -3035,7 +3077,7 @@
           },
           "422": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }
@@ -3045,7 +3087,7 @@
           },
           "501": {
             "content": {
-              "application/json": {
+              "text/event-stream": {
                 "schema": {
                   "$ref": "#/components/schemas/Error"
                 }

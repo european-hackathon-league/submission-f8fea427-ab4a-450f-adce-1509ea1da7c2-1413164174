@@ -56,6 +56,37 @@
             "source_kind": "feedback",
             "source_url": null,
             "source_version_id": "source_version_demo"
+          },
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_external",
+            "excerpt": "Synthetic competitor offers adjustable seat bolsters.",
+            "limitations": [
+              "Synthetic fixture; no real competitor claim"
+            ],
+            "locator": {
+              "passage_end": 49,
+              "passage_start": 0,
+              "type": "web",
+              "url": "https://research.example/synthetic"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "external",
+            "source_url": null,
+            "source_version_id": "web_version_demo"
           }
         ],
         "next_cursor": null,
@@ -168,11 +199,14 @@
         ],
         "config_version": 1,
         "gaps": [
-          "Synthetic example"
+          "Synthetic example",
+          "Synthetic retrieval budget exhausted before counterevidence"
         ],
         "generation_id": "generation_demo",
         "proposal_set_version": 1,
-        "research_ids": [],
+        "research_ids": [
+          "research_demo"
+        ],
         "run_id": "run_demo",
         "scoring_policy_version": "default_35_25_20_20_v1",
         "source_version_ids": [
@@ -245,6 +279,52 @@
         "variant_ids": [
           "variant_demo"
         ]
+      },
+      "ResearchPage": {
+        "items": [
+          {
+            "candidate_approaches": [
+              "Evaluate adjustable bolsters"
+            ],
+            "claims": [
+              {
+                "claim_id": "claim_demo",
+                "evidence_ids": [
+                  "evidence_external"
+                ],
+                "limitations": [
+                  "Synthetic fixture; no real competitor claim"
+                ],
+                "text": "Synthetic competitor offers adjustable seat bolsters.",
+                "type": "fact"
+              }
+            ],
+            "competitor_scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "counterevidence_ids": [],
+            "finding_id": "finding_demo",
+            "gaps": [
+              "Synthetic retrieval budget exhausted before counterevidence"
+            ],
+            "recommendation": null,
+            "research_id": "research_demo",
+            "status": "partial"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
       },
       "Snapshot": {
         "analysis_status": "proposals_ready",
@@ -341,6 +421,37 @@
             "source_kind": "feedback",
             "source_url": null,
             "source_version_id": "source_version_demo"
+          },
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_external",
+            "excerpt": "Synthetic competitor offers adjustable seat bolsters.",
+            "limitations": [
+              "Synthetic fixture; no real competitor claim"
+            ],
+            "locator": {
+              "passage_end": 49,
+              "passage_start": 0,
+              "type": "web",
+              "url": "https://research.example/synthetic"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "external",
+            "source_url": null,
+            "source_version_id": "web_version_demo"
           }
         ],
         "next_cursor": null,
@@ -457,7 +568,9 @@
         ],
         "generation_id": "generation_demo",
         "proposal_set_version": 1,
-        "research_ids": [],
+        "research_ids": [
+          "research_demo"
+        ],
         "run_id": "run_demo",
         "scoring_policy_version": "default_35_25_20_20_v1",
         "source_version_ids": [
@@ -530,6 +643,50 @@
         "variant_ids": [
           "variant_demo"
         ]
+      },
+      "ResearchPage": {
+        "items": [
+          {
+            "candidate_approaches": [
+              "Evaluate adjustable bolsters"
+            ],
+            "claims": [
+              {
+                "claim_id": "claim_demo",
+                "evidence_ids": [
+                  "evidence_external"
+                ],
+                "limitations": [
+                  "Synthetic fixture; no real competitor claim"
+                ],
+                "text": "Synthetic competitor offers adjustable seat bolsters.",
+                "type": "fact"
+              }
+            ],
+            "competitor_scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "counterevidence_ids": [],
+            "finding_id": "finding_demo",
+            "gaps": [],
+            "recommendation": "Evaluate in a scoped customer study",
+            "research_id": "research_demo",
+            "status": "ready"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
       },
       "Snapshot": {
         "analysis_status": "proposals_ready",
@@ -746,7 +903,8 @@
         "run_id": "run_demo",
         "scoring_policy_version": "default_35_25_20_20_v1",
         "source_version_ids": [
-          "source_version_demo"
+          "source_version_demo",
+          "source_version_duplicate"
         ],
         "unresolved_conflict_ids": [],
         "variants": [
@@ -834,7 +992,8 @@
           "part_catalog_version": "catalog_demo_v1",
           "participation_mode": "autonomous",
           "source_ids": [
-            "source_demo"
+            "source_demo",
+            "source_duplicate"
           ],
           "vehicle_id": "vehicle_demo"
         },
@@ -850,6 +1009,24 @@
         "warnings": [
           "Synthetic data"
         ]
+      },
+      "Uploads": {
+        "sources": [
+          {
+            "detected_type": "xlsx",
+            "filename": "feedback.xlsx",
+            "reason": null,
+            "source_id": "source_demo",
+            "status": "ready"
+          },
+          {
+            "detected_type": "xlsx",
+            "filename": "feedback-copy.xlsx",
+            "reason": null,
+            "source_id": "source_duplicate",
+            "status": "ready"
+          }
+        ]
       }
     },
     "synthetic": true
@@ -857,6 +1034,74 @@
   "guided_conflict": {
     "description": "guided_conflict",
     "payloads": {
+      "Conflicts": {
+        "checkpoints": [
+          {
+            "allowed_actions": [
+              "regroup_variants"
+            ],
+            "checkpoint_id": "checkpoint_demo",
+            "conflict_ids": [
+              "conflict_demo"
+            ],
+            "version": 1,
+            "wait_state": "waiting"
+          }
+        ],
+        "conflicts": [
+          {
+            "alternatives": [
+              {
+                "cohort_ids": [
+                  "cohort_us"
+                ],
+                "equipment": [],
+                "markets": [
+                  "US"
+                ],
+                "software": null,
+                "vehicle_ids": [
+                  "vehicle_demo"
+                ],
+                "year": null
+              },
+              {
+                "cohort_ids": [
+                  "cohort_de"
+                ],
+                "equipment": [],
+                "markets": [
+                  "DE"
+                ],
+                "software": null,
+                "vehicle_ids": [
+                  "vehicle_demo"
+                ],
+                "year": null
+              }
+            ],
+            "conflict_id": "conflict_demo",
+            "finding_ids": [
+              "finding_demo"
+            ],
+            "rationale": "Preserve opposing customer cohort needs",
+            "resolution_status": "unresolved",
+            "version": 1
+          }
+        ]
+      },
+      "Continuation": {
+        "checkpoint_version": 1,
+        "cohort_assignments": {
+          "variant_de": [
+            "cohort_de"
+          ],
+          "variant_us": [
+            "cohort_us"
+          ]
+        },
+        "resolution": "regroup_variants"
+      },
       "Error": {
         "code": "example_error",
         "current_version": null,
@@ -868,15 +1113,15 @@
         "contract_version": "1",
         "event_id": "event_demo_1",
         "occurred_at": "2026-10-10T00:00:00Z",
-        "proposal_set_version": 1,
+        "proposal_set_version": null,
         "resource": {
-          "id": "run_demo",
+          "id": "checkpoint_demo",
           "revision": 1,
-          "type": "proposals"
+          "type": "checkpoint"
         },
         "run_id": "run_demo",
         "sequence": 1,
-        "type": "proposals.ready"
+        "type": "checkpoint.created"
       },
       "EvidenceList": {
         "items": [
@@ -911,6 +1156,38 @@
             "source_kind": "feedback",
             "source_url": null,
             "source_version_id": "source_version_demo"
+          },
+          {
+            "applicability": "applicable",
+            "evidence_id": "evidence_opposing",
+            "excerpt": "Synthetic: preserve the firm supportive seat.",
+            "limitations": [],
+            "locator": {
+              "cells": [
+                "A3",
+                "G3"
+              ],
+              "row": 3,
+              "sheet": "Feedback_Explorer",
+              "type": "cell"
+            },
+            "scope": {
+              "cohort_ids": [
+                "cohort_de"
+              ],
+              "equipment": [],
+              "markets": [
+                "DE"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "source_kind": "feedback",
+            "source_url": null,
+            "source_version_id": "source_version_demo"
           }
         ],
         "next_cursor": null,
@@ -919,31 +1196,36 @@
       "FindingsPage": {
         "counts": {
           "negative_records": 1,
-          "negative_share": 1.0,
+          "negative_share": 0.5,
           "record_ids": [
-            "record_demo"
+            "record_demo",
+            "record_opposing"
           ],
-          "total_records": 1
+          "total_records": 2
         },
         "items": [
           {
             "cohort_ids": [
-              "cohort_us"
+              "cohort_us",
+              "cohort_de"
             ],
             "counts": {
               "negative_records": 1,
-              "negative_share": 1.0,
+              "negative_share": 0.5,
               "record_ids": [
-                "record_demo"
+                "record_demo",
+                "record_opposing"
               ],
-              "total_records": 1
+              "total_records": 2
             },
             "coverage": [
               "Synthetic fixture; no population inference"
             ],
             "customer_need": "Remain comfortable on long journeys",
             "finding_id": "finding_demo",
-            "opposing_evidence_ids": [],
+            "opposing_evidence_ids": [
+              "evidence_opposing"
+            ],
             "part_ids": [
               "part_seat"
             ],
@@ -984,7 +1266,9 @@
             ],
             "horizon": 2030,
             "metric": "discomfort rating",
-            "opposing_evidence_ids": [],
+            "opposing_evidence_ids": [
+              "evidence_opposing"
+            ],
             "origin": "ai",
             "outcome": "Improve long-journey seat comfort",
             "part_ids": [
@@ -1033,7 +1317,9 @@
         "source_version_ids": [
           "source_version_demo"
         ],
-        "unresolved_conflict_ids": [],
+        "unresolved_conflict_ids": [
+          "conflict_demo"
+        ],
         "variants": [
           {
             "assumptions": [],
@@ -1122,14 +1408,14 @@
           "vehicle_id": "vehicle_demo"
         },
         "contract_version": "1",
-        "current_proposal_set_version": 1,
+        "current_proposal_set_version": null,
         "last_event_sequence": 1,
         "resource_links": {
           "proposals": "/api/v1/runs/run_demo/proposals"
         },
         "revision": 1,
         "run_id": "run_demo",
-        "stage": "proposal",
+        "stage": "conflict",
         "warnings": [
           "Synthetic data"
         ]
@@ -1151,10 +1437,10 @@
         "contract_version": "1",
         "event_id": "event_demo_1",
         "occurred_at": "2026-10-10T00:00:00Z",
-        "proposal_set_version": 1,
+        "proposal_set_version": 2,
         "resource": {
           "id": "run_demo",
-          "revision": 1,
+          "revision": 2,
           "type": "proposals"
         },
         "run_id": "run_demo",
@@ -1242,6 +1528,17 @@
         "part_aggregates": [],
         "revision": 1
       },
+      "Instruction": {
+        "base_proposal_set_version": 1,
+        "changed_fields": {
+          "after": "Synthetic PM revision"
+        },
+        "intent": null,
+        "operation": "edit_change",
+        "target_ids": [
+          "change_demo"
+        ]
+      },
       "Proposals": {
         "changes": [
           {
@@ -1309,7 +1606,7 @@
           "Synthetic example"
         ],
         "generation_id": "generation_demo",
-        "proposal_set_version": 1,
+        "proposal_set_version": 2,
         "research_ids": [],
         "run_id": "run_demo",
         "scoring_policy_version": "default_35_25_20_20_v1",
@@ -1407,12 +1704,12 @@
           "vehicle_id": "vehicle_demo"
         },
         "contract_version": "1",
-        "current_proposal_set_version": 1,
+        "current_proposal_set_version": 2,
         "last_event_sequence": 1,
         "resource_links": {
           "proposals": "/api/v1/runs/run_demo/proposals"
         },
-        "revision": 1,
+        "revision": 2,
         "run_id": "run_demo",
         "stage": "proposal",
         "warnings": [
@@ -1426,15 +1723,15 @@
     "description": "reconnect",
     "payloads": {
       "Error": {
-        "code": "example_error",
+        "code": "cursor_expired",
         "current_version": null,
         "field_errors": [],
-        "message": "Synthetic error example",
+        "message": "Replay cursor expired; fetch snapshot",
         "retryable": false
       },
       "Event": {
         "contract_version": "1",
-        "event_id": "event_demo_1",
+        "event_id": "event_demo_17",
         "occurred_at": "2026-10-10T00:00:00Z",
         "proposal_set_version": 1,
         "resource": {
@@ -1443,8 +1740,28 @@
           "type": "proposals"
         },
         "run_id": "run_demo",
-        "sequence": 1,
+        "sequence": 17,
         "type": "proposals.ready"
+      },
+      "EventPage": {
+        "items": [
+          {
+            "contract_version": "1",
+            "event_id": "event_demo_17",
+            "occurred_at": "2026-10-10T00:00:00Z",
+            "proposal_set_version": 1,
+            "resource": {
+              "id": "run_demo",
+              "revision": 1,
+              "type": "proposals"
+            },
+            "run_id": "run_demo",
+            "sequence": 17,
+            "type": "proposals.ready"
+          }
+        ],
+        "next_cursor": null,
+        "revision": 1
       },
       "EvidenceList": {
         "items": [
@@ -1693,7 +2010,7 @@
         },
         "contract_version": "1",
         "current_proposal_set_version": 1,
-        "last_event_sequence": 1,
+        "last_event_sequence": 17,
         "resource_links": {
           "proposals": "/api/v1/runs/run_demo/proposals"
         },
@@ -1721,10 +2038,10 @@
         "contract_version": "1",
         "event_id": "event_demo_1",
         "occurred_at": "2026-10-10T00:00:00Z",
-        "proposal_set_version": 1,
+        "proposal_set_version": 2,
         "resource": {
           "id": "run_demo",
-          "revision": 1,
+          "revision": 2,
           "type": "proposals"
         },
         "run_id": "run_demo",
@@ -1879,7 +2196,7 @@
           "Synthetic example"
         ],
         "generation_id": "generation_demo",
-        "proposal_set_version": 1,
+        "proposal_set_version": 2,
         "research_ids": [],
         "run_id": "run_demo",
         "scoring_policy_version": "default_35_25_20_20_v1",
@@ -1977,12 +2294,12 @@
           "vehicle_id": "vehicle_demo"
         },
         "contract_version": "1",
-        "current_proposal_set_version": 1,
+        "current_proposal_set_version": 2,
         "last_event_sequence": 1,
         "resource_links": {
           "proposals": "/api/v1/runs/run_demo/proposals"
         },
-        "revision": 1,
+        "revision": 2,
         "run_id": "run_demo",
         "stage": "proposal",
         "warnings": [
@@ -2157,6 +2474,61 @@
             "unit": "rating",
             "validation_method": "Scoped customer study",
             "version": 1
+          },
+          {
+            "after": "Evaluate seat comfort improvements",
+            "before": null,
+            "change_id": "change_unsupported",
+            "conditions": [
+              "long journeys"
+            ],
+            "decision_state": "proposed",
+            "evidence_strength": "low",
+            "factors": {
+              "breadth": null,
+              "future_relevance": null,
+              "gap": null,
+              "impact": 3.0,
+              "rationales": {
+                "impact": "Synthetic assessment; other factors unknown"
+              }
+            },
+            "finding_ids": [],
+            "horizon": 2030,
+            "metric": "discomfort rating",
+            "opposing_evidence_ids": [],
+            "origin": "pm",
+            "outcome": "Explore a PM concept without a scene mapping",
+            "part_ids": [
+              "part_unmapped"
+            ],
+            "requirement_id": "requirement_unsupported",
+            "scope": {
+              "cohort_ids": [
+                "cohort_us"
+              ],
+              "equipment": [],
+              "markets": [
+                "US"
+              ],
+              "software": null,
+              "vehicle_ids": [
+                "vehicle_demo"
+              ],
+              "year": null
+            },
+            "score": null,
+            "scoring_policy_version": "default_35_25_20_20_v1",
+            "supporting_evidence_ids": [],
+            "target": null,
+            "target_basis": null,
+            "target_maturity": "needs_validation",
+            "uncertainty": [
+              "PM idea; no customer evidence or scene mapping"
+            ],
+            "unit": "rating",
+            "validation_method": "Scoped customer study",
+            "version": 1
           }
         ],
         "config_version": 1,
@@ -2176,14 +2548,16 @@
           {
             "assumptions": [],
             "change_ids": [
-              "change_demo"
+              "change_demo",
+              "change_unsupported"
             ],
             "cohort_ids": [
               "cohort_us"
             ],
             "related_variant_ids": [],
             "requirement_ids": [
-              "requirement_demo"
+              "requirement_demo",
+              "requirement_unsupported"
             ],
             "title": "Synthetic alternative",
             "variant_id": "variant_demo"
@@ -2206,6 +2580,16 @@
             ],
             "proposed_outcome": "Improve long-journey seat comfort",
             "visual_instruction": "Annotate synthetic concept"
+          },
+          {
+            "change_id": "change_unsupported",
+            "evidence_ids": [],
+            "part_ids": [
+              "part_unmapped"
+            ],
+            "preserve_constraints": [],
+            "proposed_outcome": "Explore a PM concept without a scene mapping",
+            "visual_instruction": "Unsupported concept"
           }
         ],
         "contract_version": "1",
@@ -2218,16 +2602,30 @@
         ]
       },
       "RenderResult": {
-        "assets": [],
+        "assets": [
+          {
+            "asset_id": "asset_concept",
+            "media_type": "image/png",
+            "url": "/api/v1/runs/run_demo/renders/render_demo/assets/asset_concept"
+          }
+        ],
         "baseline_asset_id": "asset_demo_v1",
         "failure_reason": null,
         "job_id": null,
         "outcomes": [
           {
-            "asset_ids": [],
+            "asset_ids": [
+              "asset_concept"
+            ],
             "change_id": "change_demo",
+            "outcome": "rendered",
+            "reason": null
+          },
+          {
+            "asset_ids": [],
+            "change_id": "change_unsupported",
             "outcome": "unsupported",
-            "reason": "Synthetic geometry unsupported"
+            "reason": "No semantic scene mapping"
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
@@ -2558,6 +2956,24 @@
         "warnings": [
           "Synthetic data"
         ]
+      },
+      "Uploads": {
+        "sources": [
+          {
+            "detected_type": "xlsx",
+            "filename": "feedback.xlsx",
+            "reason": null,
+            "source_id": "source_demo",
+            "status": "ready"
+          },
+          {
+            "detected_type": "pdf",
+            "filename": "damaged.pdf",
+            "reason": "corrupt_file",
+            "source_id": "source_bad",
+            "status": "rejected"
+          }
+        ]
       }
     },
     "synthetic": true
@@ -2623,6 +3039,24 @@
         ],
         "next_cursor": null,
         "revision": 1
+      },
+      "ExportResult": {
+        "download_url": "/api/v1/runs/run_demo/exports/export_demo/download",
+        "export_id": "export_demo",
+        "manifest": {
+          "audit_cutoff": 1,
+          "format": "json",
+          "proposal_set_version": 1,
+          "research_ids": [],
+          "scoring_policy_version": "default_35_25_20_20_v1",
+          "source_version_ids": [
+            "source_version_demo"
+          ],
+          "variant_ids": [
+            "variant_demo"
+          ]
+        },
+        "status": "ready"
       },
       "FindingsPage": {
         "counts": {

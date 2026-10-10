@@ -31,3 +31,37 @@ def test_committed_contract_has_no_drift():
     root = Path(__file__).resolve().parents[2] / "contracts"
     for name, value in artifacts().items():
         assert json.loads((root / name).read_text()) == value
+
+
+def test_scenarios_exercise_their_named_contract_behaviors():
+    fixtures = artifacts()["scenarios.json"]
+    success = fixtures["deep_dive_success"]["payloads"]
+    assert success["ResearchPage"]["items"][0]["status"] == "ready"
+    assert success["FindingsPage"]["counts"]["total_records"] == 1
+    assert any(
+        item["source_kind"] == "external" for item in success["EvidenceList"]["items"]
+    )
+    partial = fixtures["deep_dive_partial"]["payloads"]
+    assert partial["ResearchPage"]["items"][0]["status"] == "partial"
+    assert partial["ResearchPage"]["items"][0]["gaps"]
+    assert {
+        item["outcome"]
+        for item in fixtures["render_partial"]["payloads"]["RenderResult"]["outcomes"]
+    } == {"rendered", "unsupported"}
+    assert (
+        fixtures["guided_conflict"]["payloads"]["Conflicts"]["checkpoints"][0][
+            "wait_state"
+        ]
+        == "waiting"
+    )
+    exported = fixtures["versioned_export"]["payloads"]
+    assert exported["ExportResult"]["status"] == "ready"
+    assert (
+        exported["ExportResult"]["manifest"]["proposal_set_version"]
+        == exported["Proposals"]["proposal_set_version"]
+    )
+    stale = fixtures["pm_edit_stale"]["payloads"]
+    assert (
+        stale["Instruction"]["base_proposal_set_version"]
+        < stale["Error"]["current_version"]
+    )

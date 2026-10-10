@@ -2,7 +2,7 @@ import json
 import logging
 import time
 from collections.abc import Awaitable, Callable
-from typing import Annotated, NoReturn
+from typing import Annotated, Any, NoReturn
 from uuid import uuid4
 
 from fastapi import (
@@ -19,15 +19,22 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from sqlalchemy import select
+from sqlalchemy.orm import Session as DBSession
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
 from app import wire as w
-from app.auth import Actor, actor
+from app.auth import Actor, actor, reject
+from app.commands import audit, command, new_id
 from app.config import Settings
+from app.db import Session, Source, SourceVersion
+from app.limits import BodyLimit
+from app.storage import digest, inspect_upload, storage
 from app.telemetry import configure, latency, requests, tracer
 
 app = FastAPI(title="Vehicle requirements backend", version="1")
+app.add_middleware(BodyLimit)
 configure(Settings())
 app.add_middleware(
     CORSMiddleware,
@@ -139,9 +146,95 @@ def vehicles(limit: Limit = 50, cursor: str | None = None) -> NoReturn:
 
 @router.post("/uploads", response_model=w.Uploads)
 def uploads(
-    idempotency_key: Key, files: Annotated[list[UploadFile], File()]
-) -> NoReturn:
-    pending()
+    idempotency_key: Key, files: Annotated[list[UploadFile], File()], identity: Auth
+) -> w.Uploads:
+    settings = Settings()
+    if len(files) > 20:
+        reject("upload_limit", "At most twenty files per upload", 413)
+    content = [(upload.filename or "unnamed", upload.file.read()) for upload in files]
+    body = {
+        "files": [
+            {"filename": filename, "sha256": digest(data)} for filename, data in content
+        ]
+    }
+    objects = storage(settings)
+    written: list[str] = []
+
+    def effect(session: DBSession, command_id: str) -> dict[str, Any]:
+        results = []
+        for filename, data in content:
+            source_id = new_id()
+            kind, reason = inspect_upload(filename, data, settings)
+            source = Source(
+                id=source_id,
+                workspace_id=identity.workspace_id,
+                filename=filename,
+                detected_type=kind,
+                status="rejected" if reason else "ready",
+                reason=reason,
+            )
+            session.add(source)
+            session.flush()
+            if reason is None:
+                version_id = new_id()
+                key = f"{identity.workspace_id}/{version_id}"
+                objects.put(key, data)
+                written.append(key)
+                session.add(
+                    SourceVersion(
+                        id=version_id,
+                        source_id=source_id,
+                        sha256=digest(data),
+                        object_key=key,
+                        byte_size=len(data),
+                    )
+                )
+            audit(session, identity, "source.upload", source_id)
+            results.append(
+                w.UploadResult.model_validate(
+                    {
+                        "source_id": source_id,
+                        "filename": filename,
+                        "detected_type": kind,
+                        "status": source.status,
+                        "reason": reason,
+                    }
+                ).model_dump()
+            )
+        return {"sources": results}
+
+    try:
+        return w.Uploads.model_validate(
+            command(identity, "uploads", idempotency_key, body, effect)
+        )
+    except Exception:
+        for key in written:
+            objects.delete(key)
+        raise
+
+
+@router.get("/sources/{source_id}/content", response_class=Response)
+def source_content(source_id: str, identity: Auth) -> Response:
+    with Session.begin() as session:
+        source = session.scalar(
+            select(Source).where(
+                Source.id == source_id, Source.workspace_id == identity.workspace_id
+            )
+        )
+        if source is None or source.status != "ready":
+            reject("not_found", "Source not found", 404)
+        version = session.scalar(
+            select(SourceVersion).where(SourceVersion.source_id == source.id)
+        )
+        if version is None:
+            reject("not_found", "Source version not found", 404)
+        data = storage(Settings()).read(version.object_key)
+        audit(session, identity, "source.read", source.id)
+        return Response(
+            data,
+            media_type="application/octet-stream",
+            headers={"Cache-Control": "no-store"},
+        )
 
 
 @router.post("/runs", response_model=w.RunAccepted, status_code=202)

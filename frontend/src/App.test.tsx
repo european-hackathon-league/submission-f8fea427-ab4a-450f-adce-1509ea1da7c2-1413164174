@@ -147,7 +147,7 @@ describe("frontend plan workspace", () => {
       await screen.findByText(/Render proposal version 1/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Annotation only/),
+      await screen.findByText(/Annotation only/, {}, { timeout: 7000 }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Rendering does not mean validated or approved/)).toBeInTheDocument();
   }, 12000);
@@ -519,4 +519,23 @@ it("retains an explicitly selected missing variant across reload without binding
   await user.selectOptions(screen.getByRole("combobox", { name: /^Variant$/ }), "variant-digital");
   expect(await screen.findByRole("button", { name: "Save edit" })).toBeEnabled();
   expect(screen.getByLabelText("Proposal text")).not.toHaveValue("Retain physical variant draft");
+});
+
+it("preserves initially defaulted finding and variant identities when backend resources reorder", async () => {
+  const base = createMockApi(); let reordered = false;
+  const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id);
+    if (reordered) { w.proposals.variants.reverse(); w.findings.reverse(); w.snapshot.revision++; }
+    return w;
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Create run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("tab", { name: "Proposals" }));
+  expect(screen.getByRole("combobox", { name: /^Variant$/ })).toHaveValue("variant-digital");
+  reordered = true; await user.click(screen.getByRole("button", { name: "Reimagine" }));
+  await waitFor(() => expect(within(screen.getByRole("combobox", { name: /^Variant$/ })).getAllByRole("option")[0]).toHaveValue("variant-physical"));
+  expect(screen.getByRole("combobox", { name: /^Variant$/ })).toHaveValue("variant-digital");
+  await user.click(screen.getByRole("tab", { name: "Findings" }));
+  expect(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ })).toHaveAttribute("aria-pressed", "true");
 });

@@ -124,6 +124,10 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   const variant =
     variantId ? workspace?.proposals.variants.find((v) => v.variant_id === variantId) : workspace?.proposals.variants[0];
   const activeVariantId = variant?.variant_id ?? variantId;
+  useEffect(() => {
+    if (!variantId && workspace?.proposals.variants[0]) setVariantId(workspace.proposals.variants[0].variant_id);
+    if (selectedFindingId === "" && workspace?.findings[0]) setSelectedFindingId(workspace.findings[0].finding_id);
+  }, [workspace, variantId, selectedFindingId]);
   const readySourceIds = [
     ...new Set(
       uploads.filter((u) => u.status === "ready").map((u) => u.source_id!),

@@ -1,3 +1,4 @@
+import pytest
 from fixtures.excel import workbook
 
 from app.excel import parse_excel
@@ -157,3 +158,58 @@ def test_invalid_participant_count_retains_valid_fraction_and_original_count():
     assert result.metrics[0].raw_cells["C2"] == 3.5
     assert "unknown_sample_size" in result.metrics[0].limitations
     assert any(issue.code == "invalid_sample_size" for issue in result.coverage)
+
+
+def test_study_uncached_formulas_retain_provenance_and_explicit_coverage():
+    result = parse_excel(
+        workbook(
+            {
+                "CN_EU_2025": [
+                    [],
+                    [None, "China"],
+                    ["Synthetic comfort", "Model G68"],
+                    ["Mean", "=1+1"],
+                ],
+                "US_2025": [
+                    ["Synthetic topic", None, "Model G60"],
+                    ["Sample total", "Synthetic topic", 1],
+                    ["Satisfied", "Synthetic topic", "=1/2"],
+                ],
+            }
+        ),
+        dataset_namespace="study",
+    )
+    assert result.status == "partial"
+    assert len(result.metrics) == 2
+    assert all(metric.value is None for metric in result.metrics)
+    assert all(
+        "missing_formula_cache" in metric.limitations for metric in result.metrics
+    )
+    assert result.metrics[0].raw_cells["B4"] == "=1+1"
+    assert result.metrics[1].raw_cells["C3"] == "=1/2"
+    assert sum(issue.code == "missing_formula_cache" for issue in result.coverage) == 2
+
+
+@pytest.mark.parametrize(
+    "total, anomalous", [(0.98, False), (1.02, False), (0.979, True)]
+)
+def test_fraction_total_rounding_tolerance_includes_two_percentage_points(
+    total, anomalous
+):
+    result = parse_excel(
+        workbook(
+            {
+                "US_2025": [
+                    ["Synthetic topic", None, "Model G60"],
+                    ["Sample total", "Synthetic topic", 1],
+                    ["Satisfied", "Synthetic topic", 0.5],
+                    ["Dissatisfied", "Synthetic topic", total - 0.5],
+                ]
+            }
+        ),
+        dataset_namespace="study",
+    )
+    assert (
+        any(issue.code == "fraction_total_anomaly" for issue in result.coverage)
+        == anomalous
+    )

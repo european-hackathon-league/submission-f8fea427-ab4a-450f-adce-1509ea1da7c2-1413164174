@@ -21,7 +21,7 @@ from app.ingest_types import (
 )
 from app.wire import CellLocator, Scope
 
-REVISION = "excel-v4"
+REVISION = "excel-v5"
 HEADERS = {
     "id": "id",
     "source": "source",
@@ -314,6 +314,9 @@ def parse_excel(
                 dataset_namespace,
                 aliases,
             )
+            for sheet in book:
+                if sheet.title != "Feedback_Explorer":
+                    issue(result, "mapping_required", locator(sheet.title, 1, [1]))
         elif any(name.startswith(("CN_EU", "US_")) for name in book.sheetnames):
             result.kind = "study"
             for sheet in book:
@@ -364,6 +367,7 @@ def context_metric(
     metric: str,
     value: float | None,
     scope: Scope,
+    cached_value: Any,
     proportion_base: float | None = None,
     limitations: list[str] | None = None,
     denominator: float | None = None,
@@ -376,6 +380,11 @@ def context_metric(
         raw_cells[address] = (
             raw if raw is None or isinstance(raw, (str, int, float, bool)) else str(raw)
         )
+    limitations = list(limitations or [])
+    if cached_value is None and text(raw_cells[cells[0]]).startswith("="):
+        row, column = references[0]
+        issue(result, "missing_formula_cache", locator(sheet, row, [column]))
+        limitations.append("missing_formula_cache")
     item = ContextMetric(
         source_kind=source_kind,
         topic=topic,
@@ -396,7 +405,7 @@ def context_metric(
                 else []
             ),
             *(["unknown_mean_scale"] if metric == "mean" else []),
-            *(limitations or []),
+            *limitations,
         ],
     )
     result.metrics.append(item)
@@ -501,6 +510,7 @@ def mean_study(
                 "mean",
                 value,
                 scope,
+                row[column],
                 denominator=count,
             )
 
@@ -537,7 +547,7 @@ def fraction_study(
         for items in groups.values():
             if (
                 any(item.value is None for item in items)
-                or abs(sum(item.value or 0 for item in items) - 1) > 0.02
+                or round(abs(sum(item.value or 0 for item in items) - 1), 12) > 0.02
             ):
                 issue(result, "fraction_total_anomaly", items[0].locator)
                 for item in items:
@@ -615,6 +625,7 @@ def fraction_study(
                 "fraction",
                 value,
                 scope,
+                row[column],
                 base,
                 limitations,
                 denominator=count,
@@ -677,13 +688,6 @@ def sales(sheet: Any, raw_sheet: Any, reference_year: int, result: ParseResult) 
             location = locator(sheet.title, index, [column + 1])
             value = number(row[column], result, location)
             limitations = []
-            if (
-                raw_rows[index - 1][column] is not None
-                and text(raw_rows[index - 1][column]).startswith("=")
-                and row[column] is None
-            ):
-                issue(result, "missing_formula_cache", location)
-                limitations.append("missing_formula_cache")
             if value is not None and value < 0:
                 issue(result, "negative_sales_value", location)
                 limitations.append("negative_sales_value")
@@ -706,6 +710,7 @@ def sales(sheet: Any, raw_sheet: Any, reference_year: int, result: ParseResult) 
                 "sales_volume",
                 value,
                 scope,
+                row[column],
                 limitations=limitations,
                 source_kind="sales",
             )

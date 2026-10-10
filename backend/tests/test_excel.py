@@ -102,3 +102,21 @@ def test_empty_feedback_sheet_reports_mapping_coverage():
     assert result.status == "unsupported"
     assert result.records == []
     assert result.coverage[0].code == "mapping_required"
+
+
+def test_feedback_preserves_valid_records_and_reports_unparsed_worksheets():
+    result = parse_excel(
+        workbook(
+            {
+                "Feedback_Explorer": [FEEDBACK_HEADERS, feedback_row()],
+                "Changed layout": [["Unknown facts"], ["Synthetic data"]],
+            }
+        ),
+        dataset_namespace="dataset",
+    )
+    assert len(result.records) == 1
+    assert result.status == "partial"
+    assert any(
+        issue.code == "mapping_required" and issue.locator.sheet == "Changed layout"
+        for issue in result.coverage
+    )

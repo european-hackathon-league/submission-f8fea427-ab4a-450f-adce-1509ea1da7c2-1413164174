@@ -1,4 +1,6 @@
-from fixtures.excel import workbook
+import re
+
+from fixtures.excel import workbook, worksheet_xml
 
 from app.excel import parse_excel
 
@@ -99,3 +101,17 @@ def test_fractional_vehicle_counts_and_conflicting_market_metadata_are_gaps():
         "noninteger_sales_value",
         "conflicting_country_mapping",
     }
+
+
+def test_invalid_cached_formula_value_is_not_reported_as_missing_formula_cache():
+    data = worksheet_xml(
+        workbook(
+            {"G60": [["market", "market_code", "Sales 2025"], ["USA", "US", "=-1"]]}
+        ),
+        lambda xml: re.sub(r"<v(?:\s*/>|></v>)", "<v>-1</v>", xml),
+    )
+    result = parse_excel(data, dataset_namespace="sales")
+    assert result.metrics[0].value is None
+    assert result.metrics[0].raw_cells["C2"] == "=-1"
+    assert "negative_sales_value" in result.metrics[0].limitations
+    assert not any(issue.code == "missing_formula_cache" for issue in result.coverage)

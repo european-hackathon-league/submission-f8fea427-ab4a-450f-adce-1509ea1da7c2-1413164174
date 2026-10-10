@@ -1,0 +1,12 @@
+services:
+  api:
+    environment:
+      APP_ENV_FILE: /run/secrets/app_env
+    secrets: [app_env]
+  worker:
+    environment:
+      APP_ENV_FILE: /run/secrets/app_env
+    secrets: [app_env]
+secrets:
+  app_env:
+    file: ../.env

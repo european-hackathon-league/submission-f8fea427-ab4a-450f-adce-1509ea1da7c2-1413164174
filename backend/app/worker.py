@@ -7,9 +7,15 @@ from temporalio.worker import Worker
 
 from app.activities import complete_foundation, fail_analysis, source_check
 from app.config import Settings
+from app.control import refine_proposals
 from app.dispatch import dispatch_once
+from app.exports import export_build
+from app.findings import establish_baselines, extract_findings
+from app.ingestion import ingest_source, join_ingestion
+from app.proposals import prepare_proposals, publish_proposals
+from app.rendering import render_expire, render_poll, render_submit
 from app.telemetry import configure
-from app.workflows import AnalysisWorkflow
+from app.workflows import AnalysisWorkflow, DeliveryWorkflow
 
 
 async def main() -> None:
@@ -27,8 +33,23 @@ async def main() -> None:
         async with Worker(
             client,
             task_queue="vehicle-backend",
-            workflows=[AnalysisWorkflow],
-            activities=[source_check, complete_foundation, fail_analysis],
+            workflows=[AnalysisWorkflow, DeliveryWorkflow],
+            activities=[
+                source_check,
+                complete_foundation,
+                fail_analysis,
+                ingest_source,
+                join_ingestion,
+                extract_findings,
+                establish_baselines,
+                prepare_proposals,
+                publish_proposals,
+                refine_proposals,
+                render_submit,
+                render_poll,
+                render_expire,
+                export_build,
+            ],
             activity_executor=executor,
             max_concurrent_activities=4,
         ):

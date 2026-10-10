@@ -72,7 +72,14 @@ def complete_foundation(args: list[str]) -> None:
         )
         run.analysis_status = "processing"
         run.stage = "foundation_ready"
-        run.warnings = [*run.warnings, "Source ingestion is pending implementation"]
+        bindings = session.scalars(
+            select(RunSource).where(RunSource.run_id == run_id)
+        ).all()
+        if not bindings or not all(
+            binding.binding.get("workflow_revision") in {"ingestion-v1", "analysis-v1"}
+            for binding in bindings
+        ):
+            run.warnings = [*run.warnings, "Source ingestion is pending implementation"]
         emit(session, run, "analysis.updated", "analysis", run.id)
 
 

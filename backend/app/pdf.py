@@ -16,7 +16,8 @@ from app.ingest_types import CoverageIssue, ParsedPassage, ParseResult
 from app.parser_models import ModelArtifactsUnavailable, verify_artifacts
 from app.wire import PDFLocator, Scope
 
-PARSER_REVISION = "docling-pdf-v1"
+PARSER_REVISION = "docling-pdf-v2"
+MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 PDFKind = Literal["equipment", "strategy"]
 
 
@@ -48,7 +49,12 @@ def _locator(
     return PDFLocator(page=page, bbox=region, section=section)
 
 
-def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
+def normalize_document(
+    document: dict[str, Any],
+    kind: PDFKind,
+    *,
+    context_passages: list[ParsedPassage] | None = None,
+) -> ParseResult:
     """Normalize an actual Docling export without translating original passages."""
     result = ParseResult(
         kind=kind,
@@ -56,7 +62,17 @@ def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
         parser_versions={"docling": "2.137.0"},
     )
     texts = document.get("texts", [])
-    source_text = "\n".join(str(item.get("text", "")) for item in texts)
+    context = [
+        passage
+        for passage in context_passages or []
+        if passage.source_kind == kind
+        and passage.attributes.get("label") != "table_row"
+        and "option_code" not in passage.attributes
+    ]
+    source_text = "\n".join(
+        [str(item.get("text", "")) for item in texts]
+        + [passage.text for passage in context]
+    )
     edition_match = re.search(r"Juli\s+(20\d{2})", source_text, re.IGNORECASE)
     year_match = re.search(
         r"(?:Report|Bericht)\s+(20\d{2})", source_text, re.IGNORECASE
@@ -64,7 +80,7 @@ def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
     edition = f"{edition_match[1]}-07" if edition_match else None
     scope = Scope(
         markets=["DE"]
-        if re.search(r"\bDeutschland\b", source_text, re.IGNORECASE)
+        if re.search(r"\bDeutschland\b|(?:www\.)?bmw\.de/", source_text, re.IGNORECASE)
         else [],
         year=int(edition_match[1])
         if edition_match
@@ -95,12 +111,6 @@ def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
             legends[symbol] = "unknown"
         else:
             legends[symbol] = availability
-    footnotes = [
-        str(item.get("text", ""))
-        for item in texts
-        if item.get("label") == "footnote"
-        or re.match(r"^\d+\)", str(item.get("text", "")))
-    ]
     section = None
     for item in texts:
         text = str(item.get("text", "")).strip()
@@ -135,6 +145,22 @@ def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
                 else [],
             )
         )
+    source_context = context + result.passages
+    footnotes = [
+        passage
+        for passage in source_context
+        if passage.attributes.get("label") == "footnote"
+        or re.match(r"^\d+[). ]", passage.text)
+    ]
+    context_locators = [
+        passage.locator.model_dump(mode="json")
+        for passage in source_context
+        if re.search(
+            r"Juli\s+20\d{2}|Deutschland|bmw\.de/|Serienausstattung|Sonderausstattung",
+            passage.text,
+            re.IGNORECASE,
+        )
+    ]
     for table in document.get("tables", []):
         provenance = table.get("prov", [])
         if len(provenance) != 1:
@@ -150,6 +176,7 @@ def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
         cells = data.get("table_cells", [])
         rows: dict[int, list[dict[str, Any]]] = defaultdict(list)
         headers: dict[int, list[str]] = defaultdict(list)
+        header_cells: dict[int, list[dict[str, Any]]] = defaultdict(list)
         for cell in cells:
             row, col = (
                 int(cell["start_row_offset_idx"]),
@@ -159,10 +186,29 @@ def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
             if cell.get("column_header"):
                 for column in range(col, int(cell["end_col_offset_idx"])):
                     headers[column].append(str(cell["text"]).strip())
+                    header_cells[column].append(cell)
         for row, row_cells in sorted(rows.items()):
             if all(cell.get("column_header") for cell in row_cells):
                 continue
             row_cells.sort(key=lambda cell: int(cell["start_col_offset_idx"]))
+            if kind == "strategy":
+                result.passages.append(
+                    ParsedPassage(
+                        source_kind=kind,
+                        text=" | ".join(str(cell["text"]) for cell in row_cells),
+                        locator=table_locator,
+                        scope=scope,
+                        attributes={
+                            "label": "table_row",
+                            "claim_role": "context",
+                            "table_row": row,
+                        },
+                        limitations=[
+                            "Corporate strategy is context, not engineering feasibility"
+                        ],
+                    )
+                )
+                continue
             code_cells = [
                 cell
                 for cell in row_cells
@@ -175,23 +221,75 @@ def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
                 if cell not in code_cells and len(str(cell["text"]).strip()) > 3
             ]
             description = " | ".join(str(cell["text"]) for cell in description_cells)
-            condition_ids = re.findall(r"\b(\d+)\)", description)
-            conditions = [
-                note
-                for note in footnotes
-                if any(re.match(rf"^{number}\)", note) for number in condition_ids)
+            condition_ids = re.findall(r"\b(\d+)\)|(?<!\d)([¹²³⁴⁵⁶⁷⁸⁹])", description)
+            superscripts = str.maketrans("¹²³⁴⁵⁶⁷⁸⁹", "123456789")
+            condition_ids = [
+                number or superscript.translate(superscripts)
+                for number, superscript in condition_ids
             ]
+            matching_notes = []
+            unresolved = []
+            for number in condition_ids:
+                candidates = [
+                    note
+                    for note in footnotes
+                    if re.match(rf"^{number}[). ]", note.text)
+                    and (
+                        note.locator.page == table_locator.page
+                        or note.attributes.get("condition_scope") == "document"
+                    )
+                ]
+                if len({note.text for note in candidates}) != 1:
+                    unresolved.append(number)
+                else:
+                    matching_notes.extend(candidates)
+            conditions = [note.text for note in matching_notes]
+            if unresolved:
+                result.coverage.append(
+                    CoverageIssue(
+                        code="unresolved_footnote",
+                        message="Referenced condition lacks an unambiguous page-associated note",
+                        locator=table_locator,
+                    )
+                )
+            conditions.extend(
+                line.strip()
+                for line in description.splitlines()
+                if re.search(r"Nur in Verbindung|Hinweis:|nur mit", line, re.IGNORECASE)
+            )
             for cell in row_cells:
                 col = int(cell["start_col_offset_idx"])
                 header = " / ".join(headers.get(col, [])) or None
                 if cell in code_cells or cell in description_cells:
                     continue
                 symbol = str(cell["text"]).strip()
+                model_headers = header_cells.get(col, [])
+                leaf_headers = [
+                    candidate
+                    for candidate in model_headers
+                    if int(candidate["start_row_offset_idx"])
+                    == max(int(item["start_row_offset_idx"]) for item in model_headers)
+                ]
                 ambiguous = (
                     int(cell["end_col_offset_idx"]) - col != 1
                     or int(cell["end_row_offset_idx"]) - row != 1
+                    or sum(
+                        int(other["start_row_offset_idx"])
+                        <= row
+                        < int(other["end_row_offset_idx"])
+                        and int(other["start_col_offset_idx"])
+                        <= col
+                        < int(other["end_col_offset_idx"])
+                        for other in cells
+                    )
+                    != 1
                     or header is None
+                    or len(leaf_headers) != 1
+                    or int(leaf_headers[0]["end_col_offset_idx"])
+                    - int(leaf_headers[0]["start_col_offset_idx"])
+                    != 1
                     or code is None
+                    or bool(unresolved)
                 )
                 availability = (
                     "unknown" if ambiguous else legends.get(symbol, "unknown")
@@ -230,6 +328,11 @@ def normalize_document(document: dict[str, Any], kind: PDFKind) -> ParseResult:
                                 "edition": edition,
                                 "table_row": row,
                                 "table_column": col,
+                                "context_locators": context_locators,
+                                "condition_locators": [
+                                    note.locator.model_dump(mode="json")
+                                    for note in matching_notes
+                                ],
                                 "claim_role": "availability"
                                 if kind == "equipment"
                                 else "context",
@@ -252,6 +355,7 @@ def parse_pdf(
     page_range: tuple[int, int] | None = None,
     timeout_seconds: int = 180,
     memory_mb: int = 4096,
+    context_passages: list[ParsedPassage] | None = None,
 ) -> ParseResult:
     """Run PDF inference in an offline child; no file bodies enter logs or history."""
     if Path(filename).suffix.lower() != ".pdf" or not data.startswith(b"%PDF-"):
@@ -292,6 +396,10 @@ def parse_pdf(
             "page_range": page_range,
             "timeout_seconds": timeout_seconds,
             "memory_mb": memory_mb,
+            "context_passages": [
+                passage.model_dump(mode="json") for passage in context_passages or []
+            ],
+            "max_output_bytes": MAX_OUTPUT_BYTES,
         }
         env = {
             key: value
@@ -307,16 +415,33 @@ def parse_pdf(
             }
         )
         try:
-            child = subprocess.run(
-                [sys.executable, "-m", "app.pdf_worker"],
-                input=json.dumps(request).encode(),
-                capture_output=True,
-                timeout=timeout_seconds + 10,
-                env=env,
-            )
-            if child.returncode:
-                raise ValueError("Parser process failed")
-            result = ParseResult.model_validate_json(child.stdout)
+            with tempfile.TemporaryFile() as output:
+                child = subprocess.run(
+                    [sys.executable, "-m", "app.pdf_worker"],
+                    input=json.dumps(request).encode(),
+                    stdout=output,
+                    stderr=subprocess.DEVNULL,
+                    timeout=timeout_seconds + 10,
+                    env=env,
+                )
+                if child.returncode:
+                    raise ValueError("Parser process failed")
+                output.seek(0)
+                payload = output.read(MAX_OUTPUT_BYTES + 1)
+            if len(payload) > MAX_OUTPUT_BYTES:
+                return ParseResult(
+                    kind="unknown",
+                    parser_revision=PARSER_REVISION,
+                    status="failed",
+                    parser_versions=revisions,
+                    coverage=[
+                        CoverageIssue(
+                            code="pdf_output_limit",
+                            message="PDF parser output exceeds its bounded size",
+                        )
+                    ],
+                )
+            result = ParseResult.model_validate_json(payload)
             result.parser_versions.update(revisions)
             return result
         except ValueError, OSError, subprocess.TimeoutExpired:

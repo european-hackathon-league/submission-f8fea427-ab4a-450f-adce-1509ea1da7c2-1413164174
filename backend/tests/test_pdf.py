@@ -74,6 +74,10 @@ def test_equipment_keeps_column_identity_legend_conditions_and_german_scope():
     )
     assert all(p.locator.page == 1 and p.locator.bbox for p in options)
     assert all("Sitzkomfort" in p.text for p in options)
+    assert all(
+        any(ref["page"] == 1 for ref in p.attributes["context_locators"])
+        for p in options
+    )
     unknown = [p for p in result.passages if p.attributes.get("option_code") == "6XX"]
     assert unknown and all(p.attributes["availability"] == "unknown" for p in unknown)
     assert any(issue.code == "ambiguous_table_cell" for issue in result.coverage)
@@ -216,3 +220,145 @@ def test_isolated_parser_failure_has_source_specific_coverage(
     assert result.status == "failed"
     assert result.coverage[0].code == "pdf_parser_limit"
     assert "private" not in result.model_dump_json()
+
+
+def test_grounded_cover_and_legend_are_reused_with_exact_context_locations():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    cover = equipment_document()
+    context = normalize_document(cover, "equipment").passages
+    for passage in context:
+        if passage.attributes.get("label") == "footnote":
+            passage.attributes["condition_scope"] = "document"
+    later = equipment_document()
+    later["texts"] = []
+    later["pages"] = {"13": later["pages"]["1"]}
+    later["tables"][0]["prov"][0]["page_no"] = 13
+    result = normalize_document(later, "equipment", context_passages=context)
+    claims = [p for p in result.passages if p.attributes.get("option_code") == "4ZZ"]
+    assert claims and all(
+        p.scope.markets == ["DE"] and p.scope.year == 2026 for p in claims
+    )
+    assert all(p.locator.page == 13 for p in claims)
+    assert all(
+        any(ref["page"] == 1 for ref in p.attributes["context_locators"])
+        for p in claims
+    )
+    assert all(p.attributes["conditions"] for p in claims)
+
+
+def test_strategy_tables_preserve_context_values_without_equipment_claims():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    result = normalize_document(equipment_document(), "strategy")
+    table = [p for p in result.passages if p.attributes.get("label") == "table_row"]
+    assert table and all(p.attributes["claim_role"] == "context" for p in table)
+    assert any("4ZZ" in p.text and "●" in p.text for p in table)
+    assert all("availability" not in p.attributes for p in table)
+
+
+def test_pdf_worker_output_is_capped_before_parent_json_parsing(tmp_path, monkeypatch):
+    import subprocess
+
+    import app.pdf as pdf
+
+    monkeypatch.setattr(pdf, "verify_artifacts", lambda root: {"synthetic": "pinned"})
+    monkeypatch.setattr(pdf, "MAX_OUTPUT_BYTES", 512, raising=False)
+
+    def execute(args, **kwargs):
+        assert "capture_output" not in kwargs
+        kwargs["stdout"].write(b"x" * 513)
+        return subprocess.CompletedProcess(args, 0)
+
+    monkeypatch.setattr(pdf.subprocess, "run", execute)
+    result = pdf.parse_pdf(b"%PDF-1.4", "equipment.pdf", artifacts_path=tmp_path)
+    assert result.status == "failed"
+    assert result.coverage[0].code == "pdf_output_limit"
+
+
+def test_repeated_footnote_numbers_do_not_borrow_conditions_from_another_page():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    document["pages"]["2"] = document["pages"]["1"]
+    document["texts"][-1]["prov"][0]["page_no"] = 2
+    document["texts"][-1]["text"] = "1) Synthetic unrelated package on another page"
+    result = normalize_document(document, "equipment")
+    options = [p for p in result.passages if p.attributes.get("option_code") == "4ZZ"]
+    assert options and all(p.attributes["conditions"] == [] for p in options)
+    assert all(p.attributes["availability"] == "unknown" for p in options)
+    assert any(issue.code == "unresolved_footnote" for issue in result.coverage)
+
+
+def test_conflicting_repeated_legends_never_restore_confident_availability():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    document["texts"][1]["text"] = (
+        "● Serienausstattung; ● Sonderausstattung; ● Serienausstattung"
+    )
+    result = normalize_document(document, "equipment")
+    claims = [p for p in result.passages if p.attributes.get("symbol") == "●"]
+    assert claims and all(p.attributes["availability"] == "unknown" for p in claims)
+
+
+def test_overlapping_model_cells_do_not_publish_confident_associations():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    cells = document["tables"][0]["data"]["table_cells"]
+    duplicate = dict(cells[6], text="○")
+    cells.append(duplicate)
+    result = normalize_document(document, "equipment")
+    claims = [
+        p
+        for p in result.passages
+        if p.attributes.get("option_code") == "4ZZ"
+        and p.attributes.get("model_column") == "520i"
+    ]
+    assert claims and all(p.attributes["availability"] == "unknown" for p in claims)
+
+
+def test_encrypted_pdf_decryption_does_not_clone_unrelated_deep_document_trees(
+    tmp_path,
+):
+    from pypdf import PdfReader, PdfWriter
+    from pypdf.generic import DictionaryObject, NameObject
+
+    from app.pdf_worker import readable_pdf
+
+    writer = PdfWriter()
+    writer.add_blank_page(width=100, height=100)
+    root = DictionaryObject()
+    writer._root_object[NameObject("/StructTreeRoot")] = writer._add_object(root)
+    for _ in range(1100):
+        child = DictionaryObject()
+        root[NameObject("/K")] = writer._add_object(child)
+        root = child
+    writer.encrypt("")
+    original = tmp_path / "original.pdf"
+    writer.write(original)
+    path, page_count = readable_pdf(original)
+    assert page_count == 1
+    reader = PdfReader(path)
+    assert not reader.is_encrypted
+    assert len(reader.pages) == 1
+
+
+def test_merged_leaf_model_header_keeps_availability_unknown():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    cells = document["tables"][0]["data"]["table_cells"]
+    cells[2]["text"] = "520i / 530e"
+    cells[2]["end_col_offset_idx"] = 4
+    cells.remove(cells[3])
+    result = normalize_document(document, "equipment")
+    claims = [p for p in result.passages if p.attributes.get("option_code") == "4ZZ"]
+    assert claims and all(p.attributes["availability"] == "unknown" for p in claims)

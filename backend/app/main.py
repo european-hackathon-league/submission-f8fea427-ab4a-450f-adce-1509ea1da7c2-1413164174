@@ -3,7 +3,7 @@ import json
 import logging
 import time
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Annotated, Any, NoReturn
+from typing import Annotated, Any
 from uuid import uuid4
 
 from fastapi import (
@@ -27,14 +27,20 @@ from sqlalchemy.orm import Session as DBSession
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
-from app import runs
+from app import control, rendering, runs
+from app import evidence as evidence_queries
+from app import exports as export_jobs
+from app import findings as finding_queries
+from app import proposals as proposal_queries
+from app import research as research_queries
 from app import wire as w
 from app.auth import Actor, actor, reject
 from app.commands import audit, command, emit, new_id
 from app.config import Settings
-from app.db import Outbox, Run, RunSource, Session, Source, SourceVersion
+from app.db import Outbox, Run, RunSource, Session, Source, SourceVersion, StageOutput
 from app.ingestion import parser_binding
 from app.limits import BodyLimit
+from app.readiness import check_readiness
 from app.storage import digest, inspect_upload, storage
 from app.telemetry import configure, latency, requests, tracer
 
@@ -129,6 +135,14 @@ def health() -> dict[str, str]:
     return {"status": "alive", "contract_version": "1"}
 
 
+@app.get("/ready")
+async def readiness() -> JSONResponse:
+    payload, status = await check_readiness()
+    return JSONResponse(
+        payload, status_code=status, headers={"Cache-Control": "no-store"}
+    )
+
+
 router = APIRouter(
     prefix="/api/v1",
     dependencies=[Depends(actor)],
@@ -139,15 +153,6 @@ router = APIRouter(
 Key = Annotated[str, Header(alias="Idempotency-Key", min_length=1, max_length=200)]
 Auth = Annotated[Actor, Depends(actor)]
 Limit = Annotated[int, Query(ge=1, le=100)]
-
-
-def pending() -> NoReturn:
-    raise HTTPException(
-        501,
-        w.Error(
-            code="not_implemented", message="This operation is pending implementation"
-        ).model_dump(),
-    )
 
 
 @router.get("/vehicles", response_model=w.Page[w.Vehicle])
@@ -325,6 +330,31 @@ def create_run(
         )
         session.add(run)
         session.flush()
+        settings = Settings()
+        session.add(
+            StageOutput(
+                run_id=run.id,
+                generation_id=run.generation_id,
+                stage_key="configuration",
+                payload={
+                    "model": settings.app_model,
+                    "base_url": settings.openai_base_url,
+                    "prompt_revision": "findings-v1",
+                    "schema_revision": "findings-v1",
+                    "planning_horizon": settings.planning_horizon,
+                    "reference_year": settings.reference_year,
+                    "catalog": runs.catalog(),
+                    "research_max_searches": settings.research_max_searches,
+                    "research_max_sources": settings.research_max_sources,
+                    "research_timeout_seconds": settings.research_timeout_seconds,
+                    "research_max_bytes": settings.research_max_bytes,
+                    "research_max_tokens": settings.research_max_tokens,
+                    "ai_batch_size": settings.ai_batch_size,
+                    "ai_timeout_seconds": settings.ai_timeout_seconds,
+                    "ai_max_output_tokens": settings.ai_max_output_tokens,
+                },
+            )
+        )
         for version in versions:
             source = next(
                 source for source in sources if source.id == version.source_id
@@ -398,48 +428,65 @@ async def events(
 @router.get("/runs/{run_id}/findings", response_model=w.FindingsPage)
 def findings(
     run_id: str,
+    identity: Auth,
     limit: Limit = 50,
     cursor: str | None = None,
     part_id: str | None = None,
     cohort_id: str | None = None,
-) -> NoReturn:
-    pending()
+) -> w.FindingsPage:
+    return finding_queries.listing(identity, run_id, limit, cursor, part_id, cohort_id)
 
 
 @router.get("/runs/{run_id}/graph", response_model=w.Graph)
 def graph(
     run_id: str,
+    identity: Auth,
     limit: Limit = 50,
     cursor: str | None = None,
     part_id: str | None = None,
     cohort_id: str | None = None,
-) -> NoReturn:
-    pending()
+) -> w.Graph:
+    return finding_queries.graph(identity, run_id, limit, cursor, part_id, cohort_id)
 
 
 @router.get("/runs/{run_id}/research", response_model=w.Page[w.Research])
-def research(run_id: str, limit: Limit = 50, cursor: str | None = None) -> NoReturn:
-    pending()
+def research(
+    run_id: str, identity: Auth, limit: Limit = 50, cursor: str | None = None
+) -> w.Page[w.Research]:
+    return research_queries.listing(identity, run_id, limit, cursor)
 
 
 @router.get("/runs/{run_id}/conflicts", response_model=w.Conflicts)
-def conflicts(run_id: str) -> NoReturn:
-    pending()
+def conflicts(run_id: str, identity: Auth) -> w.Conflicts:
+    return proposal_queries.conflicts(identity, run_id)
 
 
 @router.get("/runs/{run_id}/proposals", response_model=w.Proposals)
-def proposals(run_id: str, proposal_set_version: int | None = None) -> NoReturn:
-    pending()
+def proposals(
+    run_id: str,
+    identity: Auth,
+    proposal_set_version: int | None = Query(default=None, ge=1),
+) -> w.Proposals:
+    return control.get_proposals(identity, run_id, proposal_set_version)
 
 
 @router.get("/runs/{run_id}/evidence/{evidence_id}", response_model=w.Evidence)
-def evidence(run_id: str, evidence_id: str) -> NoReturn:
-    pending()
+def evidence(run_id: str, evidence_id: str, identity: Auth) -> w.Evidence:
+    return evidence_queries.read(identity, run_id, evidence_id)
+
+
+@router.get("/runs/{run_id}/evidence", response_model=w.Page[w.Evidence])
+def evidence_list(
+    run_id: str, identity: Auth, limit: Limit = 50, cursor: str | None = None
+) -> w.Page[w.Evidence]:
+    return evidence_queries.listing(identity, run_id, limit, cursor)
 
 
 @router.post("/runs/{run_id}/instructions", response_model=w.Accepted, status_code=202)
-def instructions(run_id: str, body: w.Instruction, idempotency_key: Key) -> NoReturn:
-    pending()
+def instructions(
+    run_id: str, body: w.Instruction, idempotency_key: Key, identity: Auth
+) -> w.Accepted:
+    return control.instruct(identity, run_id, body, idempotency_key)
 
 
 @router.post(
@@ -448,24 +495,32 @@ def instructions(run_id: str, body: w.Instruction, idempotency_key: Key) -> NoRe
     status_code=202,
 )
 def continue_checkpoint(
-    run_id: str, checkpoint_id: str, body: w.Continuation, idempotency_key: Key
-) -> NoReturn:
-    pending()
+    run_id: str,
+    checkpoint_id: str,
+    body: w.Continuation,
+    idempotency_key: Key,
+    identity: Auth,
+) -> w.Accepted:
+    return control.continue_run(identity, run_id, checkpoint_id, body, idempotency_key)
 
 
 @router.post("/runs/{run_id}/decisions", response_model=w.Accepted, status_code=202)
-def decisions(run_id: str, body: w.Decision, idempotency_key: Key) -> NoReturn:
-    pending()
+def decisions(
+    run_id: str, body: w.Decision, idempotency_key: Key, identity: Auth
+) -> w.Accepted:
+    return control.decide(identity, run_id, body, idempotency_key)
 
 
 @router.post("/runs/{run_id}/renders", response_model=w.Accepted, status_code=202)
-def create_render(run_id: str, body: w.RenderCommand, idempotency_key: Key) -> NoReturn:
-    pending()
+def create_render(
+    run_id: str, body: w.RenderCommand, idempotency_key: Key, identity: Auth
+) -> w.Accepted:
+    return rendering.create_render(identity, run_id, body, idempotency_key)
 
 
 @router.get("/runs/{run_id}/renders/{render_request_id}", response_model=w.RenderResult)
-def render(run_id: str, render_request_id: str) -> NoReturn:
-    pending()
+def render(run_id: str, render_request_id: str, identity: Auth) -> w.RenderResult:
+    return rendering.get_render(identity, run_id, render_request_id)
 
 
 @router.post(
@@ -473,23 +528,63 @@ def render(run_id: str, render_request_id: str) -> NoReturn:
     response_model=w.Accepted,
     status_code=202,
 )
-def retry_render(run_id: str, render_request_id: str, idempotency_key: Key) -> NoReturn:
-    pending()
+def retry_render(
+    run_id: str, render_request_id: str, idempotency_key: Key, identity: Auth
+) -> w.Accepted:
+    return rendering.retry_render(identity, run_id, render_request_id, idempotency_key)
+
+
+@router.get(
+    "/runs/{run_id}/renders/{render_request_id}/assets/{asset_id}", response_model=None
+)
+def render_asset(
+    run_id: str, render_request_id: str, asset_id: str, identity: Auth
+) -> Response:
+    data, media_type = rendering.asset_bytes(
+        identity, run_id, render_request_id, asset_id
+    )
+    return Response(
+        data,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/runs/{run_id}/history", response_model=w.Page[w.Audit])
-def history(run_id: str, limit: Limit = 50, cursor: str | None = None) -> NoReturn:
-    pending()
+def history(
+    run_id: str, identity: Auth, limit: Limit = 50, cursor: str | None = None
+) -> w.Page[w.Audit]:
+    return evidence_queries.history(identity, run_id, limit, cursor)
 
 
 @router.post("/runs/{run_id}/exports", response_model=w.Accepted, status_code=202)
-def create_export(run_id: str, body: w.ExportCommand, idempotency_key: Key) -> NoReturn:
-    pending()
+def create_export(
+    run_id: str, body: w.ExportCommand, idempotency_key: Key, identity: Auth
+) -> w.Accepted:
+    return export_jobs.create_export(identity, run_id, body, idempotency_key)
 
 
 @router.get("/runs/{run_id}/exports/{export_id}", response_model=w.ExportResult)
-def export(run_id: str, export_id: str) -> NoReturn:
-    pending()
+def export(run_id: str, export_id: str, identity: Auth) -> w.ExportResult:
+    return export_jobs.get_export(identity, run_id, export_id)
+
+
+@router.get("/runs/{run_id}/exports/{export_id}/download", response_model=None)
+def export_download(run_id: str, export_id: str, identity: Auth) -> Response:
+    data, media_type = export_jobs.download_export(identity, run_id, export_id)
+    extension = "json" if media_type == "application/json" else "xlsx"
+    return Response(
+        data,
+        media_type=media_type,
+        headers={
+            "Content-Disposition": f'attachment; filename="proposal-export.{extension}"',
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 app.include_router(router)

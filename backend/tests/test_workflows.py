@@ -8,17 +8,37 @@ from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 
 import pytest
-from sqlalchemy import select
+from sqlalchemy import delete, select
 from temporalio import activity
 from temporalio.client import Client
 from temporalio.worker import Replayer, Worker
-from test_runs import create_run
+from test_runs import create_run as create_current_run
 
 from app.activities import complete_foundation, fail_analysis, source_check
 from app.config import Settings
-from app.db import Command, Outbox, Run, Session, StageOutput
+from app.db import Command, Outbox, Run, RunSource, Session, StageOutput
 from app.dispatch import dispatch_once
 from app.workflows import AnalysisWorkflow
+
+
+def create_run(client):
+    # These regression cases exercise the persisted S1 workflow policy.
+    run_id, body = create_current_run(client)
+    with Session.begin() as session:
+        session.execute(
+            delete(StageOutput).where(
+                StageOutput.run_id == run_id, StageOutput.stage_key == "configuration"
+            )
+        )
+        for member in session.scalars(
+            select(RunSource).where(RunSource.run_id == run_id)
+        ):
+            member.binding = {
+                key: value
+                for key, value in member.binding.items()
+                if key != "workflow_revision"
+            }
+    return run_id, body
 
 
 def test_workflow_patch_replays_history_recorded_before_the_code_change(client):
@@ -201,6 +221,15 @@ def test_independent_activities_overlap_and_respect_concurrency_bound(client):
         headers={"Idempotency-Key": str(uuid4())},
     )
     run_id = response.json()["run_id"]
+    with Session.begin() as session:
+        for member in session.scalars(
+            select(RunSource).where(RunSource.run_id == run_id)
+        ):
+            member.binding = {
+                key: value
+                for key, value in member.binding.items()
+                if key != "workflow_revision"
+            }
     active = 0
     maximum = 0
     lock = threading.Lock()

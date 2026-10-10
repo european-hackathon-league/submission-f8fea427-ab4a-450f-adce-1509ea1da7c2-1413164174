@@ -43,6 +43,10 @@ def test_positive_strength_can_support_a_preservation_requirement(client):
     result.changes[0].supporting_evidence_ids = ["unrelated"]
     with pytest.raises(ValueError, match="outside supported finding evidence"):
         validated_draft(result, [finding], [], run_id, generation)
+    result.changes[0].supporting_evidence_ids = []
+    result.changes[0].opposing_evidence_ids = ["positive"]
+    with pytest.raises(ValueError, match="supporting evidence.*preservation"):
+        validated_draft(result, [finding], [], run_id, generation)
 
 
 @pytest.mark.parametrize("repaired", [False, True])

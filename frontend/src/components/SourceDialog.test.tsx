@@ -74,3 +74,21 @@ it("does not open unsafe URL from a published web locator",()=>{
  render(<SourceDialog api={{mode:"real"} as Api} evidence={item} onClose={()=>{}}/>);
  expect(screen.queryByRole("link",{name:"Open cited page"})).not.toBeInTheDocument();
 });
+it("ends native modal inertness before restoring opener focus on removal",()=>{
+ const opener=document.createElement("button");document.body.append(opener);opener.focus();
+ let modalOpen=false;
+ const showDescriptor=Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype,"showModal");
+ const closeDescriptor=Object.getOwnPropertyDescriptor(HTMLDialogElement.prototype,"close");
+ const focus=opener.focus.bind(opener);
+ vi.spyOn(opener,"focus").mockImplementation(()=>{if(!modalOpen)focus();});
+ Object.defineProperty(HTMLDialogElement.prototype,"showModal",{configurable:true,value:function(this:HTMLDialogElement){modalOpen=true;this.setAttribute("open","");}});
+ Object.defineProperty(HTMLDialogElement.prototype,"close",{configurable:true,value:function(this:HTMLDialogElement){modalOpen=false;this.removeAttribute("open");}});
+ try {
+  const {unmount}=render(<SourceDialog api={{mode:"real"} as Api} evidence={evidence[0]} onClose={()=>{}}/>);
+  expect(screen.getByRole("button",{name:"Close source"})).toHaveFocus();unmount();expect(opener).toHaveFocus();
+ } finally {
+  if(showDescriptor)Object.defineProperty(HTMLDialogElement.prototype,"showModal",showDescriptor);else delete (HTMLDialogElement.prototype as unknown as Record<string,unknown>).showModal;
+  if(closeDescriptor)Object.defineProperty(HTMLDialogElement.prototype,"close",closeDescriptor);else delete (HTMLDialogElement.prototype as unknown as Record<string,unknown>).close;
+  vi.restoreAllMocks();opener.remove();
+ }
+});

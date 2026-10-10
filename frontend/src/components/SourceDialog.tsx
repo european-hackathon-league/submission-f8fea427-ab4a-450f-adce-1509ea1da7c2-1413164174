@@ -20,10 +20,14 @@ export default function SourceDialog({ api, evidence, onClose }: { api: Api; evi
   const identity = JSON.stringify([evidence.evidence_id, evidence.source_version_id, sourceUrl]);
   useEffect(() => {
     const opener = document.activeElement as HTMLElement | null;
-    if (ref.current?.showModal) ref.current.showModal();
-    else ref.current?.setAttribute("open", "");
-    ref.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    return () => { if (opener?.isConnected) opener.focus(); };
+    const dialog = ref.current;
+    if (dialog?.showModal) dialog.showModal();
+    else dialog?.setAttribute("open", "");
+    dialog?.querySelector<HTMLButtonElement>("button")?.focus();
+    return () => {
+      if (dialog?.open && typeof dialog.close === "function") dialog.close();
+      if (opener?.isConnected) opener.focus();
+    };
   }, []);
   useEffect(() => {
     const controller = new AbortController();

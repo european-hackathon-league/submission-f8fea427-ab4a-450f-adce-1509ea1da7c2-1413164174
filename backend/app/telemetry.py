@@ -1,18 +1,33 @@
 import logging
 
 from opentelemetry import metrics, trace
+from opentelemetry.context import Context
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
-from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace import Span, SpanProcessor, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from app.config import Settings
 
 
+class PrivateRequestFields(SpanProcessor):
+    def on_start(self, span: Span, parent_context: Context | None = None) -> None:
+        # Native HTTP spans capture arbitrary URL/Host values before routing.
+        for field in (
+            "url.path",
+            "url.query",
+            "server.address",
+            "http.request.method_original",
+        ):
+            if field in (span.attributes or {}):
+                span.set_attribute(field, "REDACTED")
+
+
 def configure(settings: Settings) -> None:
     resource = Resource.create({"service.name": "vehicle-requirements-backend"})
     provider = TracerProvider(resource=resource)
+    provider.add_span_processor(PrivateRequestFields())
     readers = []
     if settings.otlp_endpoint:
         from opentelemetry.exporter.otlp.proto.http.metric_exporter import (

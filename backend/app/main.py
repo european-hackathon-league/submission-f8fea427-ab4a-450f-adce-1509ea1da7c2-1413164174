@@ -36,7 +36,11 @@ from app.limits import BodyLimit
 from app.storage import digest, inspect_upload, storage
 from app.telemetry import configure, latency, requests, tracer
 
-app = FastAPI(title="Vehicle requirements backend", version="1")
+app = FastAPI(
+    title="Vehicle requirements backend",
+    version="1",
+    telemetry={"logs": False, "auto_configure": False},
+)
 app.add_middleware(BodyLimit)
 configure(Settings())
 app.add_middleware(
@@ -345,7 +349,12 @@ async def events(
     follow: bool = True,
 ) -> AsyncIterator[ServerSentEvent]:
     while True:
-        batch = await asyncio.to_thread(runs.backlog, identity, run_id, sequence)
+        try:
+            batch = await asyncio.to_thread(runs.backlog, identity, run_id, sequence)
+        except HTTPException as error:
+            if error.status_code in (403, 404):
+                return
+            raise
         for event in batch:
             yield event
             sequence = event.data["sequence"]

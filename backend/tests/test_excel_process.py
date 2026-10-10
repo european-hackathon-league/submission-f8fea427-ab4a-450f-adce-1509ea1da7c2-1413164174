@@ -38,3 +38,13 @@ def test_excel_deadline_or_child_termination_returns_explicit_coverage(monkeypat
         assert result.status == "failed"
         assert result.records == []
         assert result.coverage[0].code == "excel_parser_resource_limit"
+
+
+def test_excel_child_bounds_native_thread_pools(monkeypatch):
+    def fail(command, **options):
+        assert options["env"]["OPENBLAS_NUM_THREADS"] == "1"
+        assert options["env"]["OMP_NUM_THREADS"] == "1"
+        raise subprocess.TimeoutExpired(command, 30)
+
+    monkeypatch.setattr(subprocess, "run", fail)
+    assert parse_excel_bounded(b"synthetic", policy()).status == "failed"

@@ -119,9 +119,13 @@ def inspect_upload(
             capture_output=True,
             timeout=30 if kind == "pdf" else 10,
             env={
-                key: value
-                for key, value in os.environ.items()
-                if key in {"PATH", "PYTHONPATH", "SYSTEMROOT", "TEMP", "TMP"}
+                **{
+                    key: value
+                    for key, value in os.environ.items()
+                    if key in {"PATH", "PYTHONPATH", "SYSTEMROOT", "TEMP", "TMP"}
+                },
+                "OPENBLAS_NUM_THREADS": "1",
+                "OMP_NUM_THREADS": "1",
             },
         )
         if process.returncode:

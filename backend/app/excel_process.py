@@ -1,6 +1,7 @@
 """Disposable, bounded Excel normalization with frozen policy and typed output."""
 
 import json
+import os
 import subprocess
 import sys
 import tempfile
@@ -40,6 +41,7 @@ def parse_excel_bounded(data: bytes, binding: dict[str, Any]) -> ParseResult:
                 timeout=WALL_SECONDS,
                 stdout=subprocess.DEVNULL,
                 stderr=subprocess.DEVNULL,
+                env={**os.environ, "OPENBLAS_NUM_THREADS": "1", "OMP_NUM_THREADS": "1"},
             )
             if output.stat().st_size > MAX_OUTPUT_BYTES:
                 raise ValueError("Output limit exceeded")

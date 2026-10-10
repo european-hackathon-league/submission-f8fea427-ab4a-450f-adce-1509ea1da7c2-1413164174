@@ -168,6 +168,8 @@ def test_preflight_uses_format_specific_wall_time_budget(
 
     def checked_run(command, **options):
         assert options["timeout"] == timeout
+        assert options["env"]["OPENBLAS_NUM_THREADS"] == "1"
+        assert options["env"]["OMP_NUM_THREADS"] == "1"
         return subprocess.CompletedProcess(command, 0, stdout=b'["pdf", null]')
 
     monkeypatch.setattr(subprocess, "run", checked_run)

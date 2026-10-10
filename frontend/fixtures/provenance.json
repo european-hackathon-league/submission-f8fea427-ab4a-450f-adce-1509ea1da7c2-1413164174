@@ -1,0 +1,6 @@
+{
+  "source_ref": "origin/backend",
+  "source_commit": "2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46",
+  "files": "contracts/{openapi,schemas,scenarios,renderer.schema}.json",
+  "synthetic": true
+}

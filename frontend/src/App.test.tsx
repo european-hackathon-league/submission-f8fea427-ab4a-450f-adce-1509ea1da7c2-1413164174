@@ -8,7 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "./App";
-import { createMockApi } from "./api/client";
+import { ApiError, createMockApi } from "./api/client";
 
 afterEach(() => { cleanup(); sessionStorage.clear(); });
 
@@ -302,14 +302,14 @@ it("creates server-supported configurations even when local visual asset is unav
   expect(screen.getByRole("button", { name: "New run" })).toBeEnabled();
 });
 
-it("retries an uncertain accepted run with original frozen command and key", async () => {
+it.each([new TypeError("Response interrupted"), new ApiError("server_error", "Response interrupted", null, 500, false)])("retries an uncertain accepted run with original frozen command and key (%s)", async (failure) => {
   const base = createMockApi();
   const commands: Array<{ key?: string; body: unknown }> = [];
   const api = { ...base, mode: "real" as const, sessionNamespace: "uncertain-create", request: async <T,>(path: string, body?: unknown, key?: string): Promise<T> => {
     const result = await base.request<T>(path, body, key);
     if (path === "/runs") {
       commands.push({ key, body });
-      if (commands.length === 1) throw new TypeError("Response interrupted");
+      if (commands.length === 1) throw failure;
     }
     return result;
   } };
@@ -538,4 +538,22 @@ it("preserves initially defaulted finding and variant identities when backend re
   expect(screen.getByRole("combobox", { name: /^Variant$/ })).toHaveValue("variant-digital");
   await user.click(screen.getByRole("tab", { name: "Findings" }));
   expect(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+it("opens exact PM proposal evidence without substituting the previously selected customer finding", async () => {
+  const user = await createRun();
+  await user.click(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ }));
+  await user.click(screen.getByRole("tab", { name: "Proposals" }));
+  await user.type(screen.getByLabelText("PM instruction"), "Investigate a new PM-originated idea");
+  await user.click(screen.getByRole("button", { name: "Add proposal" }));
+  await screen.findByText(/Waiting for backend recomputation/);
+  await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+  await screen.findByRole("heading", { name: "Proposals / version 2" });
+  await user.click(screen.getAllByRole("button", { name: "View evidence" }).at(-1)!);
+  expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeInTheDocument();
+  expect(screen.getByText(/No available finding is linked to this proposal/)).toBeInTheDocument();
+  const explanation = screen.getByRole("region", { name: /Change explanation pm-change-/ });
+  expect(within(explanation).getByText("Investigate a new PM-originated idea")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Comfort controls" })).not.toBeInTheDocument();
+  expect(screen.getByRole("tabpanel", { name: "Evidence" })).toHaveFocus();
 });

@@ -29,9 +29,10 @@ import ConflictPanel from "./components/ConflictPanel";
 import ProposalWorkspace from "./components/ProposalWorkspace";
 import HistoryPanel from "./components/HistoryPanel";
 import RenderPanel from "./components/RenderPanel";
+import ChangeExplanation from "./components/ChangeExplanation";
 import { recoverRun } from "./runRecovery";
 import { readSession, saveSession, clearSession } from "./session";
-import type { PendingRun } from "./session";
+import type { PendingRun, ProposalSelection } from "./session";
 import type {
   Api,
   Evidence,
@@ -98,6 +99,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
     useState<ComponentId | null>(spatialPartIds.has(restored?.selectedComponent ?? "") && sceneCatalog.parts.some(p => p.part_id === restored?.selectedComponent) ? restored!.selectedComponent as ComponentId : null);
   const [view, setView] = useState<VehicleView>(restored?.view === "interior" ? "interior" : "exterior");
   const [variantId, setVariantId] = useState(restored?.variantId ?? "");
+  const [proposalSelection, setProposalSelection] = useState<ProposalSelection | null>(restored?.proposalSelection ?? null);
   const [heatmap, setHeatmap] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -180,8 +182,8 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
 
   const persistSession = useCallback(() => {
     if (api.mode !== "real") return;
-    saveSession(sessionNamespace, { pendingRun, runId, tab, selectedFindingId, selectedComponent: selectedComponent ?? "", view, variantId, ideaDraft, proposalDrafts: [...proposalDrafts.current] });
-  }, [api.mode, sessionNamespace, pendingRun, runId, tab, selectedFindingId, selectedComponent, view, variantId, ideaDraft]);
+    saveSession(sessionNamespace, { pendingRun, runId, tab, selectedFindingId, selectedComponent: selectedComponent ?? "", view, variantId, proposalSelection, ideaDraft, proposalDrafts: [...proposalDrafts.current] });
+  }, [api.mode, sessionNamespace, pendingRun, runId, tab, selectedFindingId, selectedComponent, view, variantId, proposalSelection, ideaDraft]);
   useEffect(persistSession, [persistSession]);
   useEffect(() => {
     window.addEventListener("pagehide", persistSession);
@@ -254,7 +256,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
       try {
         result = await api.request<{ run_id: string }>("/runs", command.config, command.key);
       } catch (error) {
-        if (error instanceof ApiError && !error.retryable && error.status !== null) setPendingRun(null);
+        if (error instanceof ApiError && !error.retryable && error.status !== null && error.status < 500) setPendingRun(null);
         throw error;
       }
       activeRunId.current = result.run_id;
@@ -265,6 +267,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   }
 
   function selectFinding(next: Finding) {
+    setProposalSelection(null);
     setFindingFocusRequest(old => old + 1);
     setSelectedFindingId(next.finding_id);
     const mapped = baselineAvailable && next.part_ids.find(id => spatialPartIds.has(id) && sceneCatalog.parts.some(part => part.part_id === id && part.capabilities.some(c => c === "list_annotation" || c === "photo_annotation")));
@@ -273,6 +276,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   }
 
   function selectPart(id: ComponentId) {
+    setProposalSelection(null);
     setTab("Evidence");
     setSelectedComponent(id);
     const matches = workspace?.findings.filter(f => f.part_ids.includes(id)) ?? [];
@@ -307,6 +311,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
     setSelectedFindingId("");
     setSelectedComponent(null);
     setVariantId("");
+    setProposalSelection(null);
     if (api.mode === "mock") { api.dispose?.(); setApi(createApi()); }
   };
 
@@ -677,6 +682,11 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
                         />
                         {savedConfig?.deep_dive.enabled && <ResearchPanel api={api} runId={runId!} finding={selectedFinding} bundles={workspace.research} error={workspace.resourceErrors?.research} onRetry={() => refresh(runId!)} onOpen={setSource} />}
                       </>
+                    ) : proposalSelection ? (
+                      <>
+                        <p>No available finding is linked to this proposal. Customer findings remain separate from PM ideas.</p>
+                        {proposalSelection.proposalVersion === workspace.proposals.proposal_set_version ? <ChangeExplanation api={api} runId={runId!} proposals={workspace.proposals} variantId={proposalSelection.variantId} changeId={proposalSelection.changeId} onOpen={setSource} /> : <p>Selected proposal version {proposalSelection.proposalVersion} has changed. Inspect that exact immutable version in History.</p>}
+                      </>
                     ) : (
                       <div className="empty-state">
                         {selectedFindingId ? "Selected finding is unavailable in this snapshot. Return to Findings or reconnect to retry." : "No finding mapped to this part. Vehicle-wide findings remain available in Findings."}
@@ -686,6 +696,12 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
                     <ProposalWorkspace api={api} workspace={workspace} variantId={activeVariantId} onVariantChange={setVariantId} busy={busy} onRefresh={() => refresh(runId!)} sessionNamespace={sessionNamespace} legacyDrafts={[...proposalDrafts.current]} legacyIdea={ideaDraft} onEvidence={change => {
                       const linked = workspace.findings.find(f => (change.wire?.finding_ids ?? [change.finding_id]).includes(f.finding_id));
                       if (linked) selectFinding(linked);
+                      else {
+                        setSelectedFindingId(null);
+                        setSelectedComponent(null);
+                        setProposalSelection({proposalVersion: workspace.proposals.proposal_set_version, variantId: activeVariantId, changeId: change.change_id});
+                        setFindingFocusRequest(old => old + 1);
+                      }
                       setTab("Evidence");
                     }} />
                   </div>

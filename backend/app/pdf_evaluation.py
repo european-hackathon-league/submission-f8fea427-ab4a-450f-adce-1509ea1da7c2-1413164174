@@ -144,6 +144,8 @@ def main() -> None:
             }
         )
     )
+    if result.status not in {"ready", "partial"} or not report["release_gate_passed"]:
+        raise SystemExit(1)
 
 
 if __name__ == "__main__":

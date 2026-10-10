@@ -221,7 +221,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
     <header className="bmw-asset-viewer__header">
       <div className="bmw-asset-viewer__identity">
         <h2>BMW i5 M60</h2>
-        <p>Exterior · 2023 model · cabin photo reference</p>
+        <p>G60 · 2023 · fully electric</p>
       </div>
       <div className="bmw-asset-viewer__controls" role="group" aria-label="Vehicle view">
         <button type="button" aria-pressed={view==='exterior'} onClick={()=>onViewChange('exterior')}>Exterior 3D</button>
@@ -251,7 +251,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
             <button type="button" aria-label="Zoom out" title="Zoom out" onClick={()=>handleZoom(1)} disabled={!sceneReady}>−</button>
             <button type="button" aria-label="Zoom in" title="Zoom in" onClick={()=>handleZoom(-1)} disabled={!sceneReady}>+</button>
           </div>
-          <div className="bmw-asset-viewer__stage-caption"><span>Exterior · interactive 3D</span><span>{sceneReady?'Sketchfab model connected':apiFailed?'Preview image':'Connecting'}</span></div>
+          <div className="bmw-asset-viewer__stage-caption"><span>{apiFailed?'Exterior · preview image':'Exterior · interactive 3D'}</span><span>{sceneReady?'Sketchfab model connected':apiFailed?'Preview image':'Connecting'}</span></div>
         </>:<div className="bmw-asset-viewer__photo-wrap">
           <div className="bmw-asset-viewer__photo-canvas">
             <img className="bmw-asset-viewer__interior-photo" src="/vehicles/g60-interior.jpg" alt="BMW 5 Series G60 cabin reference photo, photographed by Ethan Llamas"/>
@@ -295,7 +295,7 @@ export default function BmwAssetViewer({selectedComponent,onSelectComponent,view
     {view==='interior'&&<div className="bmw-asset-viewer__credits" aria-label="Interior photo attribution">
       <span>Photo: <a href="https://commons.wikimedia.org/wiki/File:BMW_520i_G60_Oxide_Grey_Metallic_03.jpg" target="_blank" rel="noreferrer">Ethan Llamas · BMW 520i G60</a></span>
       <a href="https://creativecommons.org/licenses/by-sa/4.0/" target="_blank" rel="noreferrer">CC BY-SA 4.0</a>
-      <span>Displayed with crop · synthetic feedback overlay</span>
+      <span>Fitted photo · synthetic feedback overlay</span>
     </div>}
 
     <footer className="bmw-asset-viewer__provenance">

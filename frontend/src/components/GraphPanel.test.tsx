@@ -71,3 +71,16 @@ it("navigates relationship endpoints with keyboard while preserving graph filter
  expect(screen.getByRole("region",{name:"Selected graph entity"})).toHaveTextContent(`evidence / ${evidence[0].evidence_id}`);
  expect(screen.getByLabelText("Node type")).toHaveValue("finding");
 });
+
+it.each(['endpoint','relationship'])('retains keyboard destination when a focused %s control disappears with its relationship',async(kind)=>{
+ const user=userEvent.setup();const w={...workspace,graph:normalize.graph({revision:1,nodes:[{id:'from',entity_type:'part',revision:1},{id:'to',entity_type:'part',revision:1}],edges:[{edge_id:'edge-opaque',from_id:'from',to_id:'to',relationship:'mention',evidence_ids:[]}]})};
+ const {rerender}=render(<GraphPanel workspace={w} onSelect={()=>{}}/>);
+ const control=screen.getByRole('button',{name:kind==='endpoint'?'Inspect endpoint from':'Inspect relationship edge-opaque'});control.focus();await user.keyboard('{Enter}');expect(control).toHaveFocus();
+ rerender(<GraphPanel workspace={{...w,graph:{...w.graph,revision:2,edges:[]}}} onSelect={()=>{}}/>);
+ expect(document.activeElement?.tagName).toMatch(/^H[23]$/);
+ if(kind==='relationship')expect(screen.getByRole('region',{name:'Relationship citations'})).toHaveTextContent('edge-opaque');
+});
+it('does not steal focus from graph search when a previously selected relationship disappears',async()=>{
+ const user=userEvent.setup();const {rerender}=render(<GraphPanel workspace={workspace} onSelect={()=>{}}/>);
+ await user.click(screen.getByRole('button',{name:`Inspect relationship ${workspace.graph.edges[0].edge_id}`}));const search=screen.getByRole('textbox',{name:'Search graph'});search.focus();rerender(<GraphPanel workspace={{...workspace,graph:{...workspace.graph,edges:[]}}} onSelect={()=>{}}/>);expect(search).toHaveFocus();
+});

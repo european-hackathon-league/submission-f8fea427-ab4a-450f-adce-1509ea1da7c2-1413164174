@@ -32,6 +32,7 @@ import HistoryPanel from "./components/HistoryPanel";
 import RenderPanel from "./components/RenderPanel";
 import ChangeExplanation from "./components/ChangeExplanation";
 import SceneCapabilities from "./components/SceneCapabilities";
+import AcceptanceEnvironment from "./components/AcceptanceEnvironment";
 import { recoverRun } from "./runRecovery";
 import { readSession, saveSession, clearSession } from "./session";
 import type { PendingRun, ProposalSelection } from "./session";
@@ -105,25 +106,31 @@ export default function App({ api: suppliedApi }: { api?: Api }) {
   );
   if (!connectedApi)
     return (
-      <ApiAccess
-        baseUrl={import.meta.env.VITE_API_BASE_URL || "/api/v1"}
-        onConnect={(base, headers, sessionNamespace) =>
-          setConnectedApi(
-            createRealApi(base, { headers: () => headers, sessionNamespace }),
-          )
-        }
-      />
+      <>
+        <AcceptanceEnvironment />
+        <ApiAccess
+          baseUrl={import.meta.env.VITE_API_BASE_URL || "/api/v1"}
+          onConnect={(base, headers, sessionNamespace) =>
+            setConnectedApi(
+              createRealApi(base, { headers: () => headers, sessionNamespace }),
+            )
+          }
+        />
+      </>
     );
   return (
-    <WorkspaceApp
-      key={connectedApi.sessionNamespace ?? connectedApi.mode}
-      api={connectedApi}
-      onDisconnect={
-        connectedApi.mode === "real" && !suppliedApi
-          ? () => setConnectedApi(null)
-          : undefined
-      }
-    />
+    <>
+      <AcceptanceEnvironment />
+      <WorkspaceApp
+        key={connectedApi.sessionNamespace ?? connectedApi.mode}
+        api={connectedApi}
+        onDisconnect={
+          connectedApi.mode === "real" && !suppliedApi
+            ? () => setConnectedApi(null)
+            : undefined
+        }
+      />
+    </>
   );
 }
 
@@ -145,6 +152,7 @@ function WorkspaceApp({
     restored?.pendingRun ?? null,
   );
   const [vehicles, setVehicles] = useState<Vehicle[]>([]);
+  const [catalogReady, setCatalogReady] = useState(false);
   const [vehicleError, setVehicleError] = useState("");
   const [vehicleRetry, setVehicleRetry] = useState(0);
   const [vehicleId, setVehicleId] = useState("g60-i5-m60");
@@ -284,6 +292,7 @@ function WorkspaceApp({
 
   useEffect(() => {
     let active = true;
+    setCatalogReady(false);
     setVehicleError("");
     (api.vehicles
       ? api.vehicles()
@@ -292,6 +301,7 @@ function WorkspaceApp({
       .then((result) => {
         if (active) {
           setVehicles(result);
+          setCatalogReady(true);
           setVehicleId((current) =>
             result.some((v) => v.vehicle_id === current)
               ? current
@@ -517,13 +527,22 @@ function WorkspaceApp({
       document.getElementById("panel-Evidence")?.focus();
   }, [findingFocusRequest, tab]);
   useEffect(() => {
+    if (!catalogReady || (runId && !workspace)) return;
     if (
       selectedComponent &&
       (!baselineAvailable ||
         (selectedFindingId && !finding?.part_ids.includes(selectedComponent)))
     )
       setSelectedComponent(null);
-  }, [baselineAvailable, finding, selectedFindingId, selectedComponent]);
+  }, [
+    catalogReady,
+    runId,
+    workspace,
+    baselineAvailable,
+    finding,
+    selectedFindingId,
+    selectedComponent,
+  ]);
 
   const reset = () => {
     activeRunId.current = null;

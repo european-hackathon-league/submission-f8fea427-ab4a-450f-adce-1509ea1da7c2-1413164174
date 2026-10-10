@@ -21,7 +21,7 @@ Copy `.env.example` to `.env.local` as needed. No secrets are needed for mock mo
 
 Real mode asks for an existing API access token and authorized workspace ID. It sends `Authorization: Bearer …` and `X-Workspace-ID`, matching the published backend contract. Tokens stay in memory, never browser storage, environment examples or URLs. Enter access again after reload; matching API/workspace restores current-tab run identity, selections and versioned proposal drafts. API consumers can instead supply `createRealApi(base, { headers: async () => applicationSessionHeaders, sessionNamespace })`. Existing identity provider, token issuance and membership remain external.
 
-`src/api/wire.ts` follows backend `origin/backend` at `2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46`. Read-only copies of its OpenAPI, schemas and ten scenarios are pinned under `fixtures/`. `src/api/contracts.ts` contains UI projections; normalizers retain original wire metadata and never rewrite semantic IDs or calculate counts/scores. Schema tests validate shared and frontend fixture payloads without coercion.
+`src/api/wire.ts` follows backend fixture pin `2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46`. Read-only copies of its OpenAPI, schemas and ten scenarios are pinned under `fixtures/`. `src/api/contracts.ts` contains UI projections; normalizers retain original wire metadata and never rewrite semantic IDs or calculate counts/scores. Schema tests validate shared and frontend fixture payloads without coercion.
 
 A coherent snapshot precedes authenticated fetch SSE. Resume uses last event ID; snapshots recover gaps/expired cursors. Duplicate and older events cannot patch displayed resources. Polling provides fallback when transport is unavailable. Access errors stop background retries; Reconnect restarts recovery after access is restored. Mutation network retries reuse the original idempotency key and body. Saved configuration comes from the server snapshot; only completed source IDs create a run.
 
@@ -31,7 +31,7 @@ The G60 i5 M60 hosted exterior and bundled preview are labeled visual references
 
 Reimagine calls the application API, never a provider or `/renderer/v1/jobs`. Synthetic render outcomes do not generate geometry. Real exports must use API-returned authorized links and exact versions.
 
-Backend routes currently publish schemas but several analysis/proposal/render/export handlers return `501 not_implemented`. No backend was reachable at the documented localhost port during initial acceptance. Frontend fixture/network evidence is separate from live backend, original-file, external research and generation acceptance. Research dates and configured variant limits are absent from the current published schema; these dependencies remain explicit in the ledger.
+Backend routes currently publish schemas but several analysis/proposal/render/export handlers return `501 not_implemented`. No backend was reachable at the documented localhost port during F6 acceptance; the current backend ref still has 501 handlers. Frontend fixture/network evidence is separate from live backend, original-file, external research and generation acceptance. Research dates and configured variant limits are absent from the current published schema; these dependencies remain explicit in the ledger.
 
 
 F2 graph navigation resolves exact entity IDs, then exposes explicit finding choices. Search/type filters and progressive detail retain selected entity; paginated resources preserve server revisions. Findings stay grouped as spatially mapped, vehicle-wide, or unmapped/non-geometric. Unknown semantic IDs and hierarchy-only parts never select an unrelated viewer component. Saved run asset/catalog IDs, rather than current catalog defaults, determine viewer compatibility.
@@ -48,3 +48,31 @@ F4 proposal instructions bind exact proposal versions. Text/target, PM-idea and 
 Render jobs remain bound to their original baseline/catalog/proposal/variant identities; old or stale jobs stay inspectable without replacing current assets. Export requests use the inspected immutable version and selected variants. Queued/processing/ready/failed jobs recover through resource retrieval; download links appear only after server manifest verification. JSON and XLSX are application API formats; the synthetic mock supplies JSON and explicitly rejects XLSX rather than fabricating a spreadsheet export.
 
 F5 scene and render-asset acceptance: [verification](../doc/frontend/F5-VERIFICATION.md). Synthetic render fixtures include a labeled static annotation card, never generated vehicle imagery. The scene capability panel explains supported IDs, separate photo references and unavailable physical preservation verification. Variant preview failures retain proposal explanations and permit retry or API status/link refresh.
+
+
+## F6 HTTP acceptance harness
+
+A clean checkout can run the real API adapter against an opt-in **frontend test harness** without a backend or secrets:
+
+```sh
+cd frontend
+npm ci
+npm run test:acceptance
+npm run dev:harness
+```
+
+Open the printed localhost URL. Use public fixture token `harness-token` and one exact shared scenario name as Workspace ID: `standard_autonomous`, `deep_dive_success`, `deep_dive_partial`, `guided_conflict`, `duplicate_uploads`, `pm_edit_stale`, `render_partial`, `render_late`, `reconnect`, or `versioned_export`. Do not enter real credentials. The UI banner identifies synthetic HTTP fixtures; uploaded bytes are retained for source-opening tests but never analyzed. A file named `.xlsx` or `.pdf` exercises upload interaction without proving spreadsheet/PDF parsing.
+
+Tracked `.env.harness` sets `VITE_API_MODE=real`, same-origin `/api/v1`, and development-only harness activation. Existing shell variables or `.env.local` can override Vite configuration; remove those overrides when reproducing clean harness acceptance. The middleware is enabled only for development serve and is excluded from production builds. Normal `npm run dev` remains default mock mode. Production real mode requires a separately deployed backend and existing authorized access.
+
+Each harness workspace has isolated in-memory fixture state. Browser reload/reconnect preserves the run while that development server process remains alive; restarting the process clears harness runs. Tokens remain memory-only in the browser, so re-enter public fixture access after reload. The fixed `run-synthetic` identity belongs to its isolated workspace, not a live global run. Never use the harness to certify live backend persistence or multiple-user authorization.
+
+To exercise an actual image-loading failure and retry locally:
+
+```sh
+FRONTEND_HARNESS_FAIL_ASSET_ONCE=1 npm run dev:harness
+```
+
+The first request for the known synthetic annotation SVG returns 503 without caching; retry serves its unchanged static bytes. No provider generation occurs. Automated tests also inject API access denial, interrupted requests, research failure, duplicate/replayed SSE and cursor expiry over native HTTP.
+
+Final [F6 evidence](../doc/frontend/F6-VERIFICATION.md) records 387 passing tests, typecheck/build, clean installation/start, native 1440×1000/390×844 checks and all ten scenario mappings. Read-only F6 backend refresh at `12c1ade5dd3829cd6f48d7336091f954207f161f` found no `contracts/` changes from the fixture pin. See the ledger for precise live API, metadata and asset dependencies.

@@ -1,6 +1,6 @@
 # Frontend requirement acceptance ledger
 
-Updated 10 October 2026 through the F5 implementation gate. Scope: `frontend_plan.md`, `plan.md`, `backlog.md`; frontend-only authority from the implementation request. Each package updates its rows with exact executed evidence before its PR gate. A screen or happy-path mock does not establish acceptance.
+Updated 11 October 2026 through the combined merge gate. See COMBINED-VERIFICATION.md for fresh branch evidence. Scope: `frontend_plan.md`, `plan.md`, `backlog.md`; frontend-only authority from the implementation request. Each package updates its rows with exact executed evidence before its PR gate. A screen or happy-path mock does not establish acceptance.
 
 ## Status and evidence rules
 
@@ -9,15 +9,15 @@ Updated 10 October 2026 through the F5 implementation gate. Scope: `frontend_pla
 - **Frontend verified / external blocked**: frontend behavior passes contract-valid tests; live dependency remains unavailable. Use only after recorded checks.
 - **Verified**: requirement passes recorded applicable checks, including live evidence when claimed.
 
-Initial inspection is static evidence, not a fresh test execution. Existing checks below are pointers, not newly certified passing results. Later-package rows retain initial gaps until their own verification gate.
+All rows below now reference executed package checks. “Frontend verified / external blocked” means the frontend interaction and recovery behavior were tested against published contracts; it does not certify live source analysis, research, rendering, or service persistence.
 
 Common code pointers: `frontend/src/App.tsx` (workspace, panels and commands), `frontend/src/api/{client,contracts,fixtures}.ts` (API boundary), `frontend/src/App.test.tsx` (workspace tests), `frontend/src/api/client.test.ts` (adapter tests), `frontend/src/viewer/{BmwAssetViewer,modelMapping}.ts*` (vehicle navigation/mapping). All tests and changes stay within frontend-owned paths.
 
 ## Published contracts and external dependencies
 
-Pinned backend: `origin/backend` at `2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46`, inspected read-only after root refreshed refs. Published artifacts: `contracts/openapi.json`, `contracts/schemas.json`, `contracts/scenarios.json`, `contracts/catalog.example.json`, `contracts/renderer.schema.json` on that ref. Local historical DTOs differ substantially and are not shared schemas.
+Fixture pin: backend `2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46`. F6 refreshed and inspected `origin/backend` at `12c1ade5dd3829cd6f48d7336091f954207f161f`; `git diff` confirms no changes under `contracts/` between these refs. The merged base adds documented protected render-asset/export download routes and optional ingestion/evidence APIs; existing DTO schemas and shared scenarios are unchanged. Published artifacts: `contracts/openapi.json`, `contracts/schemas.json`, `contracts/scenarios.json`, `contracts/catalog.example.json`, `contracts/renderer.schema.json` on that ref. Frontend wire DTOs follow these published schemas; UI projections are separate.
 
-- **API-501**: backend `backend/app/main.py` routes for findings, graph, research, conflicts, proposals, evidence, instructions and checkpoint continuation call `pending()` and return `501 not_implemented`; rendering/export/history routes must likewise be checked before live claims. Implement established frontend API surfaces and verify with frontend network harness; never label harness evidence live analysis/generation.
+- **API-501 (historical label; now LIVE-ACCEPTANCE)**: the earlier inspected backend ref returned 501. The current frontend base `97b71221ecb62385f5d43632c406165c6d1da690` includes implemented backend routes. No listener is reachable at `127.0.0.1:8000/health`; deployed service acceptance remains external. Existing ledger references to API-501 describe this live acceptance dependency, not the current implementation status. Protected render/export links now use authenticated binary retrieval through the API boundary. No backend was changed or started.
 - **DATES**: Research/Claim/Evidence schemas do not publish research as-of, publication or accessed timestamps. Local `Research.as_of` is not an authoritative wire field. Display unavailable date honestly; dated research acceptance requires backend contract addition.
 - **LIMITS**: no published initial/max variant-limit field. Do not hardcode four; display provided scopes and state missing limit metadata.
 - **ASSETS**: only labeled G60 i5 M60 hosted exterior/reference preview exists; G60 520i cabin is a separate reference photo. F70, G68, G70 exact assets unavailable. Geometry, exact-trim cabin and mesh mappings unverified; list/photo fallback must remain usable. See `MODEL-COVERAGE.md`.
@@ -30,7 +30,7 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 ## F1 — API adapter, run setup, states and recovery
 
-| ID | Required acceptance behavior | Code / existing test pointers | Initial status / gap | External dependency |
+| ID | Required acceptance behavior | Code / test pointers | Final frontend status / evidence | External dependency |
 |---|---|---|---|---|
 | F1.01 | Types, payloads, errors, IDs, versions and fixtures match published shared contract | `api/wire.ts`, `normalize.ts`, pinned `fixtures/`, `contractsValidation.test.ts`, `api/published.test.ts` | Frontend verified / external blocked: exact published wire fields, immutable IDs/versions, multipart/envelopes, numeric targets and schema-valid fixtures; incompatible snapshot versions rejected | Pinned contracts; API-501 for live resource acceptance |
 | F1.02 | One API boundary; configuration selects mock/real | `api/client.ts`, `api/mock.ts`, `ApiAccess.tsx`, `.env.example`; published adapter/header tests | Frontend verified / external blocked: same projection for synthetic/real wire transports; configuration selection, runtime Bearer/workspace headers | AUTH; real service deployment |
@@ -42,7 +42,7 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 ## F2 — Baseline workspace, graph, tags and evidence
 
-| ID | Required acceptance behavior | Code / existing test pointers | Initial status / gap | External dependency |
+| ID | Required acceptance behavior | Code / test pointers | Final frontend status / evidence | External dependency |
 |---|---|---|---|---|
 | F2.01 | Vehicle navigation, graph navigation/filtering/progressive detail and contract pagination | Viewer controls; `components/GraphPanel.tsx/test`; `api/client.ts`, `published.test.ts` | Frontend verified / external blocked: keyboard graph entity/relationship navigation, type/search filters, progressive 20-node detail; opaque vehicle/graph/findings pagination with revision checks | API-501 graph/findings |
 | F2.02 | Finding/part/graph/evidence identities remain consistent | App selection tests; GraphPanel exact/ambiguous/removed entity tests | Frontend verified / external blocked: opaque IDs retained; unknown and hierarchy-only parts remain nonspatial; graph requires explicit finding choice | Published IDs; ASSETS |
@@ -55,7 +55,7 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 ## F3 — Deep Dive, conflicts and alternatives
 
-| ID | Required acceptance behavior | Code / existing test pointers | Initial status / gap | External dependency |
+| ID | Required acceptance behavior | Code / test pointers | Final frontend status / evidence | External dependency |
 |---|---|---|---|---|
 | F3.01 | Queued/searching/checking/ready/partial/unavailable research states complete | `components/ResearchPanel.tsx/test`; `api/researchRecovery.test.ts`; App research integration | Frontend verified / external blocked: six distinct states, stable asynchronous updates and useful finding access throughout research failure | API-501 research |
 | F3.02 | Facts/opinions/inferences, citations, dates, scope, counterevidence, alternatives and gaps distinct | ResearchPanel stable claims/limitations/scopes; EvidenceList/SourceDialog source access | Frontend verified / external blocked: fact/public opinion/system inference distinct; exact citations/counterevidence, alternatives, null recommendation, scope and gaps; unavailable dates explicit | DATES; API-501 evidence |
@@ -67,7 +67,7 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 ## F4 — Proposal editing, results, history and export
 
-| ID | Required acceptance behavior | Code / existing test pointers | Initial status / gap | External dependency |
+| ID | Required acceptance behavior | Code / test pointers | Final frontend status / evidence | External dependency |
 |---|---|---|---|---|
 | F4.01 | Edit/remove/add proposal, target editing and variant regrouping complete | `components/ProposalWorkspace.tsx/test`, `api/proposalHistory.test.ts` | Frontend verified / external blocked: canonical text/remove/add/numeric-or-null target/regroup instructions, known cohort IDs and empty scopes; feedback counts unchanged | API-501 instructions |
 | F4.02 | Exact proposal versions; drafts retained through stale reconciliation | `proposalDraft.ts/test`, ProposalWorkspace stale/reload/removed-ID tests; `session.ts/test` | Frontend verified / external blocked: separate text/target/idea/grouping base versions, explicit reconciliation, removed draft inspection, unknown command same-key/body and namespaced recovery | Published stale-version contract; persisted backend run |
@@ -81,7 +81,7 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 ## F5 — Frontend renderer surface and scene integration
 
-| ID | Required acceptance behavior | Code / existing test pointers | Initial status / gap | External dependency |
+| ID | Required acceptance behavior | Code / test pointers | Final frontend status / evidence | External dependency |
 |---|---|---|---|---|
 | F5.01 | Versioned scene catalog, supported assets, semantic mapping and capabilities/limits | `components/SceneCapabilities.tsx/test`, `viewer/modelMapping.ts/test`, versioned scene catalog | Frontend verified / external blocked: exact saved vehicle/asset/catalog gate, safe asset references, semantic parent/part identities and keyboard capability disclosure | ASSETS |
 | F5.02 | Reimagine request/result through application API | `components/RenderPanel.tsx/test`, `api/renderFixtures.test.ts` | Frontend verified / external blocked: canonical application Reimagine command/result, exact binding and existing authorization headers | API-501 rendering |
@@ -94,32 +94,39 @@ Published distinctions important for acceptance: Graph nodes are `{id, entity_ty
 
 ## F6 — Frontend integration and acceptance
 
-| ID | Required acceptance behavior | Code / existing test pointers | Initial status / gap | External dependency |
+| ID | Required acceptance behavior | Code / test pointers | Final frontend status / evidence | External dependency |
 |---|---|---|---|---|
-| F6.01 | Configuration real mode verified against published schemas/fixtures | Real adapter test; `.env.example` | Partial: old shape only; schema-valid network harness missing | Pinned contracts; AUTH |
-| F6.02 | Run against existing reachable backend without backend edits | README integration notes | Missing: no fresh reachable backend evidence | API-501 |
-| F6.03 | Otherwise network harness; clear separation from live acceptance | Existing fetch stub unit test | Missing: full frontend network harness and evidence labels | API-501 |
-| F6.04 | All ten shared scenarios covered | Mock scenario switch; client/App tests | Partial: several historical local cases; full named scenario mapping missing | Pinned scenarios |
-| F6.05 | Upload → run → finding → evidence → edit → Reimagine → numbered explanation → exact-version export | App workflow tests; historical verification doc | Partial: individual checks; complete contract-valid network path missing | API-501; ASSETS |
-| F6.06 | Desktop/mobile, keyboard/focus/reduced motion, loading/empty/errors, asset/network failures | CSS/viewer tests; historical browser report | Partial: fresh cross-state browser acceptance missing | Hosted asset network |
-| F6.07 | Clean checkout installs/tests/builds/starts from documented commands/config without secrets | Frontend README, package scripts, `.env.example` | Partial: commands exist; clean isolated install/start evidence missing | None |
-| F6.08 | Ledger/handoff records exact evidence | This ledger; `VERIFICATION.md`, `frontend/README.md` | Partial: initial static ledger only; package PR/check results pending | None |
+| F6.01 | Configuration real mode verified against published schemas/fixtures | `.env.harness`, `testing/contractHarness.ts/test`, `testing/networkAcceptance.test.ts` | Frontend verified / external blocked: real HTTP adapter, multipart, authorization/workspace headers, schema-checked requests/responses, immutable versions and authorized source/export bytes; malformed fixtures fail closed | Live service and AUTH |
+| F6.02 | Existing reachable backend without backend edits | F6 verification read-only ref and localhost inspection | Externally blocked: no documented localhost listener; current base includes implemented backend routes; deployed acceptance was not run. No backend changes or invented endpoint | API-501 |
+| F6.03 | Network harness clearly separated from live acceptance | Dev-only Vite middleware; `AcceptanceEnvironment.tsx/test`; HTTP integration tests | Frontend verified: opt-in actual HTTP/SSE, synthetic banner before access and inside workspace, public fixture credentials only; excluded from production | Live analysis/research/generation remains external |
+| F6.04 | All ten shared scenarios | `testing/networkAcceptance.test.ts` | Frontend verified / external blocked: all ten exact shared names, schema-valid resources plus scenario-specific acceptance assertions; see mapping below | Pinned scenarios; API-501 |
+| F6.05 | Complete upload → run → finding → evidence → edit → Reimagine → explanation → exact-version export | `App.networkAcceptance.test.tsx`, full HTTP chain test, native browser F6 flow | Frontend verified / external blocked: UI and native network chain through version 2; numbered focus/identity, exact returned manifest/download bytes and source bytes tested | API-501; ASSETS |
+| F6.06 | Desktop/mobile, keyboard/focus/reduced motion, loading/empty/errors, asset/network failures | `accessibilityAcceptance.test.tsx`, GraphPanel focus regressions, App remount regression, F6 browser report | Frontend verified / external blocked: 1440×1000 and 390×844 browser; no page horizontal overflow; Escape/source focus, graph empty/search/navigation, native image 503/retry, access reconnect, saved draft/run/Body selection. Reduced-motion SDK timing/CSS verified automatically | Hosted SDK/device rendering; ASSETS |
+| F6.07 | Clean install/test/build/start, documented config, no secrets | package scripts, `.env.harness`, frontend README | Frontend verified: clean detached checkout at `34c1d1e`; npm ci (0 vulnerabilities), 387 tests/34 files, typecheck/build; actual dev:harness start on 5188 without .env.local | None |
+| F6.08 | Exact ledger/handoff evidence | This ledger; `F6-VERIFICATION.md`, `VERIFICATION.md`, frontend README | Frontend verified: all requirement rows, package gates, scenario mapping, PR dependency order and exact external gaps recorded | None |
 
 ## Shared scenario gate
 
-| Scenario | Initial coverage pointer | Required final evidence |
-|---|---|---|
-| standard_autonomous | App create/default/partial package tests | Published fixture + network workflow, no PM wait |
-| deep_dive_success | Mock scenario switch | Ready claims/citations; uploaded counts unchanged |
-| deep_dive_partial | App partial gap test | Partial/null recommendation preserves useful results |
-| guided_conflict | App continuation/client checkpoint test | Published cohort assignments, stale recovery, resume once |
-| duplicate_uploads | Client duplicate contents test | Published upload shape; no count inflation |
-| pm_edit_stale | App/client stale draft tests | Exact-version rejection/reconcile preserving all drafts |
-| render_partial | App/client partial tests | Useful asset + unsupported outcome and limits |
-| render_late | Old-render label test only | Old async completion cannot replace current asset |
-| reconnect | No event test | Replay/dedup/gap/expired cursor and draft/selection recovery |
-| versioned_export | Historical browser mock export report | Authoritative manifest/link matches selected exact version |
+All rows execute through native Node HTTP using `createRealApi`; request/response payloads are checked against pinned shared schemas. These are frontend contract acceptance, not live backend acceptance.
+
+| Scenario | Executed evidence in `testing/networkAcceptance.test.ts` |
+|---|---|
+| standard_autonomous | Coherent run/resources, saved autonomous mode, no PM wait; complete HTTP and UI workflow tests |
+| deep_dive_success | Ready typed claims and exact citations, count invariance |
+| deep_dive_partial | Partial research and nullable wire/projection equivalence, useful findings, explicit gaps, count invariance; null-recommendation UI behavior separately covered by ResearchPanel tests |
+| guided_conflict | Actual versioned checkpoint, allowed resolution, known cohort assignments, one idempotent continuation and count invariance |
+| duplicate_uploads | Same bytes retain source identity and feedback counts |
+| pm_edit_stale | 409 exact-version rejection, retained draft and explicit current-version reconciliation |
+| render_partial | Useful static annotation asset and unsupported physical outcome, explicit synthetic/preservation limits |
+| render_late | Concurrent old-version completion remains version 1 while current proposal is version 2; component tests prevent asset replacement |
+| reconnect | Actual SSE frames, duplicates/older events, exclusive Last-Event-ID replay, 410 snapshot recovery, access-denial stop; UI remount preserves selection/draft |
+| versioned_export | Immutable earlier proposal API, authoritative exact-version request/manifest and downloaded JSON after later edit |
 
 ## Package gates and handoff evidence
 
-F1 gate: 79 tests across 9 files pass; `npm run typecheck`, `npm run build`, `git diff --check` pass. See [F1 verification](F1-VERIFICATION.md). Separate sub-agent review found setup/retry/access/session/opaque-ID issues; all fixed with regression tests. F2 gate: 142 tests across 14 files, typecheck/build/diff-check pass; final native browser focus and graph/source path verified. See [F2 verification](F2-VERIFICATION.md). F3 gate: 210 tests across 18 files, typecheck/build/diff-check pass; stale guided browser reconciliation and scoped research verified. See [F3 verification](F3-VERIFICATION.md). F4 gate: 309 tests across 26 files, typecheck/build/diff-check pass; exact edit/render/explanation/history/export browser path verified. See [F4 verification](F4-VERIFICATION.md). F5 gate: 345 tests across 29 files, typecheck/build/diff-check pass; loaded synthetic variant preview, exact identity, keyboard explanation and unsupported vehicle browser checks verified. See [F5 verification](F5-VERIFICATION.md). F6 gate pending. Each package records commit/PR/base dependency, executed test counts, typecheck/build, applicable browser checks, separate reviewer findings and resolution, CI result, plus precise remaining external acceptance. Dependent work starts only after predecessor verification/PR gate; do not merge without user approval.
+F1 gate: 79 tests across 9 files pass; `npm run typecheck`, `npm run build`, `git diff --check` pass. See [F1 verification](F1-VERIFICATION.md). Separate sub-agent review found setup/retry/access/session/opaque-ID issues; all fixed with regression tests. F2 gate: 142 tests across 14 files, typecheck/build/diff-check pass; final native browser focus and graph/source path verified. See [F2 verification](F2-VERIFICATION.md). F3 gate: 210 tests across 18 files, typecheck/build/diff-check pass; stale guided browser reconciliation and scoped research verified. See [F3 verification](F3-VERIFICATION.md). F4 gate: 309 tests across 26 files, typecheck/build/diff-check pass; exact edit/render/explanation/history/export browser path verified. See [F4 verification](F4-VERIFICATION.md). F5 gate: 345 tests across 29 files, typecheck/build/diff-check pass; loaded synthetic variant preview, exact identity, keyboard explanation and unsupported vehicle browser checks verified. See [F5 verification](F5-VERIFICATION.md). F6 gate: clean install, 387 tests across 34 files, typecheck/build/diff-check pass; actual HTTP/SSE ten-scenario harness, complete UI chain and native desktop/mobile failure/recovery checks pass. See [F6 verification](F6-VERIFICATION.md). Each package records commit/PR/base dependency, executed test counts, typecheck/build, applicable browser checks, separate reviewer findings and resolution, CI result, plus precise remaining external acceptance. Dependent work starts only after predecessor verification/PR gate; do not merge without user approval.
+
+
+PR merge dependency order: [F1 #4](https://github.com/indkhan/vehicle-requirements-ai/pull/4) → [F2 #5](https://github.com/indkhan/vehicle-requirements-ai/pull/5) → [F3 #6](https://github.com/indkhan/vehicle-requirements-ai/pull/6) → [F4 #7](https://github.com/indkhan/vehicle-requirements-ai/pull/7) → [F5 #8](https://github.com/indkhan/vehicle-requirements-ai/pull/8) → [F6 #9](https://github.com/indkhan/vehicle-requirements-ai/pull/9) (F6 retargeted to `frontend` after F5 merged). Live-system acceptance remains blocked as listed above; no frontend-owned behavior is deferred to a mock screen.
+
+All six PRs passed available GitGuardian Security Checks. No frontend CI workflow exists; frontend verification uses the recorded local package and clean-checkout gates.

@@ -669,7 +669,7 @@ describe("frontend plan workspace", () => {
   });
 });
 
-it("restores real-mode run identity, selected panel and unsaved versioned proposal after remount", async () => {
+it("restores real-mode run identity, spatial selection, selected panel and unsaved versioned proposal after remount", async () => {
   const api = { ...createMockApi(), mode: "real" as const };
   const user = userEvent.setup();
   const first = render(<App api={api} />);
@@ -677,6 +677,7 @@ it("restores real-mode run identity, selected panel and unsaved versioned propos
   await screen.findByText("ready");
   await user.click(screen.getByRole("button", { name: "Start run" }));
   await screen.findByText("proposals_ready");
+  await user.click(await screen.findByRole("button", { name: /^Body/ }));
   await user.click(screen.getByRole("tab", { name: "Proposals" }));
   await user.clear(screen.getByLabelText("Proposal text"));
   await user.type(screen.getByLabelText("Proposal text"), "Retain across reload");
@@ -684,6 +685,7 @@ it("restores real-mode run identity, selected panel and unsaved versioned propos
   render(<App api={api} />);
   await screen.findByText("Saved configuration");
   expect(await screen.findByLabelText("Proposal text")).toHaveValue("Retain across reload");
+  await waitFor(() => expect(screen.getByRole("button", { name: /^Body/ })).toHaveAttribute("aria-pressed", "true"));
   expect(screen.getByText("run-synthetic")).toBeInTheDocument();
   sessionStorage.clear();
 });

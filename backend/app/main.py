@@ -1,3 +1,6 @@
+import json
+import logging
+import time
 from collections.abc import Awaitable, Callable
 from typing import Annotated, NoReturn
 from uuid import uuid4
@@ -22,8 +25,10 @@ from starlette.responses import Response
 from app import wire as w
 from app.auth import Actor, actor
 from app.config import Settings
+from app.telemetry import configure, latency, requests, tracer
 
 app = FastAPI(title="Vehicle requirements backend", version="1")
+configure(Settings())
 app.add_middleware(
     CORSMiddleware,
     allow_origins=Settings().cors_origins,
@@ -43,7 +48,34 @@ async def request_id(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
     request.state.request_id = str(uuid4())
-    response = await call_next(request)
+    started = time.perf_counter()
+    with tracer.start_as_current_span("api.request") as span:
+        span.set_attribute("request.id", request.state.request_id)
+        try:
+            response = await call_next(request)
+        except Exception as error:
+            span.set_attribute("error.type", type(error).__name__)
+            response = JSONResponse(
+                status_code=500,
+                content=w.Error(
+                    code="internal_error", message="The operation failed"
+                ).model_dump(),
+            )
+        span.set_attribute("http.status_code", response.status_code)
+        requests.add(
+            1, {"http.method": request.method, "http.status_code": response.status_code}
+        )
+        latency.record(time.perf_counter() - started, {"http.method": request.method})
+        logging.getLogger("backend").info(
+            json.dumps(
+                {
+                    "event": "api.request",
+                    "request_id": request.state.request_id,
+                    "method": request.method,
+                    "status": response.status_code,
+                }
+            )
+        )
     response.headers["X-Request-ID"] = request.state.request_id
     return response
 

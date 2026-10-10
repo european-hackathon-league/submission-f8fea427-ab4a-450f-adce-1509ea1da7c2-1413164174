@@ -130,7 +130,9 @@ describe("frontend plan workspace", () => {
       "Keep climate controls visible.",
     );
     await user.click(screen.getByRole("button", { name: "Save edit" }));
-    expect(await screen.findByText("Proposal version 2")).toBeInTheDocument();
+    expect(await screen.findByText(/Waiting for backend recomputation/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    expect(await screen.findByRole("heading", { name: "Proposals / version 2" })).toBeInTheDocument();
     expect(screen.getByLabelText("Proposal text")).toHaveValue(
       "Keep climate controls visible.",
     );
@@ -147,8 +149,8 @@ describe("frontend plan workspace", () => {
     expect(
       screen.getByText(/Annotation only/),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Not validated or approved/)).toBeInTheDocument();
-  });
+    expect(screen.getByText(/Rendering does not mean validated or approved/)).toBeInTheDocument();
+  }, 12000);
 
   it("retains an unsaved proposal when inspecting evidence and returning", async () => {
     const user = await createRun();
@@ -186,7 +188,9 @@ describe("frontend plan workspace", () => {
       }),
     );
     await user.click(screen.getByRole("button", { name: "Save edit" }));
-    expect(await screen.findByText("Proposal version 3")).toBeInTheDocument();
+    await screen.findByText(/Waiting for backend recomputation/);
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    expect(await screen.findByRole("heading", { name: "Proposals / version 3" })).toBeInTheDocument();
   });
 
   it("continues a guided checkpoint in a panel and records the PM selection", async () => {
@@ -199,7 +203,7 @@ describe("frontend plan workspace", () => {
       screen.queryByRole("button", { name: "Continue checkpoint checkpoint-comfort" }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "History" }));
-    expect(screen.getByText("PM selected continue")).toBeInTheDocument();
+    expect(screen.getByText(/PM selected continue/)).toBeInTheDocument();
   });
 
   it("keeps an older render labeled after proposal edits", async () => {
@@ -211,9 +215,11 @@ describe("frontend plan workspace", () => {
       expect(screen.getByRole("button", { name: "Save edit" })).toBeEnabled(),
     );
     await user.click(screen.getByRole("button", { name: "Save edit" }));
-    await screen.findByText("Proposal version 2");
+    await screen.findByText(/Waiting for backend recomputation/);
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    await screen.findByRole("heading", { name: "Proposals / version 2" });
     expect(
-      screen.getByText(/Older render. Current proposal version 2/),
+      screen.getByText(/Older render or earlier attempt.*Current selected proposal version 2/),
     ).toBeInTheDocument();
     expect(screen.getByText("Render proposal version 1")).toBeInTheDocument();
   });
@@ -491,4 +497,26 @@ it("discards late research refresh after New run", async () => {
   release(); await waitFor(() => expect(screen.queryByText("proposals_ready")).not.toBeInTheDocument());
   expect(screen.getByRole("heading", { name: "New analysis run" })).toBeInTheDocument();
   expect(screen.getByText("No analysis run yet.")).toBeInTheDocument();
+});
+
+it("retains an explicitly selected missing variant across reload without binding commands to another variant", async () => {
+  const base = createMockApi(); let removed = false;
+  const api = { ...base, mode: "real" as const, sessionNamespace: "removed-variant", workspace: async (id: string) => {
+    const w = await base.workspace(id);
+    if (removed) w.proposals.variants = w.proposals.variants.filter(v => v.variant_id !== "variant-physical");
+    return w;
+  } };
+  const user = userEvent.setup(); const first = render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Create run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("tab", { name: "Proposals" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: /^Variant$/ }), "variant-physical");
+  await user.clear(screen.getByLabelText("Proposal text")); await user.type(screen.getByLabelText("Proposal text"), "Retain physical variant draft");
+  first.unmount(); removed = true; render(<App api={api} />);
+  await screen.findByText(/Selected variant unavailable in current proposal version/);
+  expect(screen.getByRole("button", { name: /^Reimagine$/ })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Save edit" })).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByRole("combobox", { name: /^Variant$/ }), "variant-digital");
+  expect(await screen.findByRole("button", { name: "Save edit" })).toBeEnabled();
+  expect(screen.getByLabelText("Proposal text")).not.toHaveValue("Retain physical variant draft");
 });

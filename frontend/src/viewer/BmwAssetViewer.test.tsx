@@ -16,6 +16,17 @@ describe('normalizeSketchfabNodeMap',()=>{
 });
 
 describe('BmwAssetViewer', () => {
+  it('keeps selected component inside the active view when switching presets',()=>{
+    const onSelectComponent=vi.fn();
+    const onViewChange=vi.fn();
+    render(<BmwAssetViewer selectedComponent="body" onSelectComponent={onSelectComponent} view="exterior" onViewChange={onViewChange} heatmap={false} period="2026" findings={findings}/>);
+
+    fireEvent.click(screen.getByRole('button',{name:'Interior photo'}));
+
+    expect(onViewChange).toHaveBeenCalledWith('interior');
+    expect(onSelectComponent).toHaveBeenCalledWith('steering');
+  });
+
   it('shows real-asset attribution and keeps parent-controlled component selection usable', () => {
     const onSelectComponent=vi.fn();
     const props={onSelectComponent,view:'exterior' as const,onViewChange:vi.fn(),heatmap:true,period:'2026' as const,findings,className:'bmw-asset-viewer--compact'};
@@ -50,8 +61,8 @@ describe('BmwAssetViewer', () => {
       start:vi.fn(),stop:vi.fn(),
       addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
-      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,{nodes:{front:{instanceID:77,name:'headlamps'}}}),
-      setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,{nodes:{front:{instanceID:77,name:'headlamps'},wheel:{instanceID:78,name:'steering_wheel'}}}),
+      setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
     };
     const init=vi.fn();
     class SketchfabMock { init(uid:string,options:InitOptions){init(uid,options);options.success(api);} }
@@ -62,8 +73,11 @@ describe('BmwAssetViewer', () => {
     expect(events.viewerready).toBeTypeOf('function');
     act(()=>events.viewerready());
     await waitFor(()=>expect(onStatusChange).toHaveBeenCalledWith('ready'));
+    expect(api.setBackground).toHaveBeenCalledWith({color:[0.15,0.16,0.18]});
     events.click({instanceID:77});
     expect(onSelectComponent).toHaveBeenCalledWith('lighting');
+    events.click({instanceID:78});
+    expect(onSelectComponent).toHaveBeenCalledTimes(1);
   });
 
   it('reinitializes the hosted model after switching away from and back to exterior', async () => {
@@ -72,7 +86,7 @@ describe('BmwAssetViewer', () => {
       start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
       getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),
-      setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+      setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
     };
     const init=vi.fn((_uid:string,options:InitOptions)=>options.success(api));
     class SketchfabMock { init=init; }
@@ -104,7 +118,7 @@ describe('BmwAssetViewer', () => {
     const api={
       start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
-      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
     };
     const init=vi.fn((_uid:string,options:InitOptions)=>init.mock.calls.length===1?options.error():options.success(api));
     class SketchfabMock { init=init; }
@@ -123,7 +137,7 @@ describe('BmwAssetViewer', () => {
     const api={
       start:vi.fn(),stop:vi.fn(),addEventListener:vi.fn((name:string,callback:(value?:any)=>void)=>{events[name]=callback;}),
       getCameraLookAt:(callback:(error:unknown,camera:any)=>void)=>callback(null,{position:[2,2,4],target:[0,0,0]}),
-      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),recenterCamera:vi.fn(),
+      getNodeMap:(callback:(error:unknown,nodes:unknown)=>void)=>callback(null,[]),setCameraLookAt:vi.fn(),setBackground:vi.fn(),recenterCamera:vi.fn(),
     };
     class SketchfabMock { init(_uid:string,options:InitOptions){options.success(api);} }
     Object.assign(window,{Sketchfab:SketchfabMock});

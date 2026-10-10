@@ -18,7 +18,7 @@ it('completes upload → finding → evidence → edit → Reimagine → numbere
   const user=userEvent.setup();render(<App api={api}/>);
   await screen.findByRole('option',{name:'BMW i5 M60 / G60'});
   await user.upload(screen.getByLabelText('Upload files'),new NodeFile(['synthetic feedback'],'acceptance.xlsx',{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}) as unknown as File);
-  await screen.findByText('ready');await user.click(screen.getByRole('button',{name:'Create run'}));
+  await screen.findByText('ready');await user.click(screen.getByRole('button',{name:'Start run'}));
   await screen.findByText('proposals_ready');
   expect(screen.queryByRole('button',{name:'Continue checkpoint'})).not.toBeInTheDocument();
   await user.click(screen.getByRole('tab',{name:'Evidence'}));

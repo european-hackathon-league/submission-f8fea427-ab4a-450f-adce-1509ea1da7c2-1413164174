@@ -1,0 +1,378 @@
+from copy import deepcopy
+from io import BytesIO
+from uuid import uuid4
+
+import pytest
+from fastapi import HTTPException
+from openpyxl import load_workbook
+
+from app import wire as w
+from app.control import apply_instruction
+from app.exports import export_bytes
+from app.rendering import build_manifest, queued_result, validate_result
+
+
+def sample():
+    change = w.Change(
+        change_id="change_a",
+        requirement_id="requirement_a",
+        version=1,
+        origin="ai",
+        outcome="Customer comfort",
+        part_ids=["part_seat"],
+        scope=w.Scope(cohort_ids=["cohort_a", "cohort_b"]),
+        horizon=2030,
+        before=None,
+        after="Evaluate comfort",
+        finding_ids=["finding_a"],
+        supporting_evidence_ids=[],
+        opposing_evidence_ids=[],
+        metric=None,
+        unit=None,
+        target=None,
+        target_basis=None,
+        conditions=[],
+        validation_method="Customer study",
+        target_maturity="needs_validation",
+        factors=w.Factors(
+            impact=3, breadth=2, gap=1, future_relevance=4, rationales={}
+        ),
+        score=50,
+        scoring_policy_version="policy_v1",
+        evidence_strength="low",
+        uncertainty=[],
+    )
+    return w.Proposals(
+        proposal_set_version=1,
+        run_id="run_demo",
+        generation_id="generation_a",
+        source_version_ids=[],
+        research_ids=[],
+        config_version=1,
+        scoring_policy_version="policy_v1",
+        variants=[
+            w.Variant(
+                variant_id="variant_a",
+                title="Initial",
+                cohort_ids=["cohort_a", "cohort_b"],
+                assumptions=[],
+                requirement_ids=[change.requirement_id],
+                change_ids=[change.change_id],
+                related_variant_ids=[],
+            )
+        ],
+        changes=[change],
+        unresolved_conflict_ids=[],
+        gaps=[],
+    )
+
+
+@pytest.mark.parametrize(
+    "operation,fields,targets,intent",
+    [
+        ("edit_change", {"after": "PM revision"}, ["change_a"], None),
+        ("remove_change", {}, ["change_a"], None),
+        ("add_change", {"after": "PM idea"}, ["variant_a"], "Comfort idea"),
+        (
+            "edit_target",
+            {
+                "target": 3,
+                "metric": "rating",
+                "unit": "points",
+                "target_basis": "Proposed study",
+            },
+            ["change_a"],
+            None,
+        ),
+        ("regroup_variants", {"change_ids": ["change_a"]}, ["variant_a"], None),
+        ("request_more_variants", {}, ["variant_a"], "Scoped comfort alternative"),
+    ],
+)
+def test_six_pm_operations_preserve_original_and_publish_a_new_version(
+    operation, fields, targets, intent
+):
+    base = sample()
+    original = base.model_dump()
+    result = apply_instruction(
+        base,
+        w.Instruction(
+            operation=operation,
+            base_proposal_set_version=1,
+            target_ids=targets,
+            changed_fields=fields,
+            intent=intent,
+        ),
+        "generation_b",
+        2030,
+    )
+    assert base.model_dump() == original
+    assert result.proposal_set_version == 2
+    assert result.generation_id == "generation_b"
+    if operation in {"edit_change", "edit_target"}:
+        assert result.changes[0].origin == "pm"
+        assert result.changes[0].version == 2
+        assert result.changes[0].factors.impact is None
+        assert result.changes[0].decision_state == "proposed"
+    if operation == "remove_change":
+        assert result.changes == [] and result.variants[0].change_ids == []
+    if operation == "add_change":
+        assert result.changes[-1].horizon == 2030
+        assert result.changes[-1].origin == "pm"
+        assert result.changes[-1].supporting_evidence_ids == []
+    if operation == "request_more_variants":
+        assert len(result.variants) == 3
+        assert {tuple(value.cohort_ids) for value in result.variants[1:]} == {
+            ("cohort_a",),
+            ("cohort_b",),
+        }
+        assert result.gaps
+
+
+def test_pm_cannot_inject_approval_or_unsupported_numeric_target():
+    for fields in ({"decision_state": "approved"}, {"target": 3}):
+        with pytest.raises(HTTPException):
+            apply_instruction(
+                sample(),
+                w.Instruction(
+                    operation="edit_change",
+                    base_proposal_set_version=1,
+                    target_ids=["change_a"],
+                    changed_fields=fields,
+                ),
+                "generation_b",
+            )
+
+
+def test_more_variants_without_distinct_supported_scope_reports_a_gap():
+    base = sample()
+    base.variants[0].cohort_ids = ["cohort_a"]
+    result = apply_instruction(
+        base,
+        w.Instruction(
+            operation="request_more_variants",
+            base_proposal_set_version=1,
+            target_ids=[],
+            changed_fields={},
+            intent="Unverified alternative",
+        ),
+        "generation_b",
+    )
+    assert len(result.variants) == 1
+    assert result.gaps
+
+
+def test_renderer_rejects_wrong_version_unknown_changes_and_omitted_terminal_results():
+    body = w.RenderCommand(
+        proposal_set_version=1, variant_ids=["variant_a"], baseline_asset_id="asset_a"
+    )
+    manifest = build_manifest(
+        sample(),
+        body,
+        "render_a",
+        {"baseline_asset_id": "asset_a", "part_catalog_version": "catalog_a"},
+    )
+    result = queued_result(manifest)
+    result.status = "succeeded"
+    for mutation in ("wrong_version", "unknown_change", "missing_change"):
+        invalid = result.model_copy(deep=True)
+        if mutation == "wrong_version":
+            invalid.proposal_set_version = 2
+        if mutation == "unknown_change":
+            invalid.outcomes = [
+                w.RenderOutcome(
+                    change_id="unknown", outcome="unsupported", asset_ids=[]
+                )
+            ]
+        with pytest.raises(ValueError):
+            validate_result(manifest, invalid)
+
+
+def test_renderer_mixed_outcomes_are_partial_and_do_not_change_proposals():
+    base = sample()
+    extra = base.changes[0].model_copy(deep=True)
+    extra.change_id = "change_b"
+    base.changes.append(extra)
+    base.variants[0].change_ids.append(extra.change_id)
+    manifest = build_manifest(
+        base,
+        w.RenderCommand(
+            proposal_set_version=1,
+            variant_ids=["variant_a"],
+            baseline_asset_id="asset_a",
+        ),
+        "render_a",
+        {"baseline_asset_id": "asset_a", "part_catalog_version": "catalog_a"},
+    )
+    result = queued_result(manifest)
+    result.status = "succeeded"
+    result.outcomes = [
+        w.RenderOutcome(change_id="change_a", outcome="annotated", asset_ids=[]),
+        w.RenderOutcome(
+            change_id="change_b",
+            outcome="unsupported",
+            reason="Geometry unavailable",
+            asset_ids=[],
+        ),
+    ]
+    assert validate_result(manifest, result).status == "partial"
+    assert base.changes[0].decision_state == "proposed"
+
+
+def test_xlsx_preserves_numbers_nulls_factors_and_neutralizes_untrusted_formulas():
+    base = sample().model_dump(mode="json")
+    base["changes"][0]["after"] = '\t=HYPERLINK("https://example.invalid")'
+    base["changes"][0]["target"] = 3.5
+    snapshot = {
+        "proposals": base,
+        "evidence": [],
+        "decisions": [],
+        "audit": [],
+        "source_versions": [],
+        "analysis": {},
+        "cutoff": "2026-10-10T12:00:00+00:00",
+    }
+    original = deepcopy(snapshot)
+    binary = export_bytes(snapshot, "xlsx")
+    assert binary == export_bytes(snapshot, "xlsx")
+    book = load_workbook(BytesIO(binary), data_only=False, keep_links=False)
+    sheet = book["Requirements"]
+    headers = {cell.value: cell.column for cell in sheet[1]}
+    assert sheet.cell(2, headers["target"]).value == 3.5
+    assert sheet.cell(2, headers["unit"]).value is None
+    assert sheet.cell(2, headers["after"]).value.startswith("'")
+    assert sheet.cell(2, headers["after"]).data_type == "s"
+    factors = book["Factors"]
+    factor_headers = {cell.value: cell.column for cell in factors[1]}
+    assert factors.cell(2, factor_headers["impact"]).value == 3
+    assert snapshot == original
+    book.close()
+
+
+def ready_run(client):
+    from test_ingestion_cache import frozen_run
+
+    from app.db import Run, Session, StageOutput
+
+    run_id, generation, source_version, _ = frozen_run(client)
+    proposals = sample()
+    proposals.run_id = run_id
+    proposals.generation_id = generation
+    proposals.source_version_ids = [source_version]
+    with Session.begin() as session:
+        run = session.get(Run, run_id)
+        run.analysis_status = "proposals_ready"
+        run.current_proposal_set_version = 1
+        session.add(
+            StageOutput(
+                run_id=run_id,
+                generation_id=generation,
+                stage_key="proposals:1",
+                payload=proposals.model_dump(mode="json"),
+            )
+        )
+    return run_id, generation
+
+
+def test_edit_command_retries_once_and_rejects_concurrent_stale_base(client):
+    from app.auth import Actor
+    from app.control import get_proposals, instruct, refine_proposals
+    from app.db import Run, Session
+
+    actor = Actor("pm_demo", "workspace_demo", "pm")
+    run_id, original_generation = ready_run(client)
+    body = w.Instruction(
+        operation="edit_change",
+        base_proposal_set_version=1,
+        target_ids=["change_a"],
+        changed_fields={"after": "PM revision"},
+    )
+    key = str(uuid4())
+    first = instruct(actor, run_id, body, key)
+    assert instruct(actor, run_id, body, key) == first
+    with pytest.raises(HTTPException) as error:
+        instruct(actor, run_id, body, str(uuid4()))
+    assert error.value.status_code == 409
+    with Session() as session:
+        generation = session.get(Run, run_id).generation_id
+    assert generation != original_generation
+    assert refine_proposals([run_id, generation, first.command_id]) == "ready"
+    assert refine_proposals([run_id, generation, first.command_id]) == "ready"
+    assert get_proposals(actor, run_id, 1).changes[0].after == "Evaluate comfort"
+    assert get_proposals(actor, run_id).changes[0].after == "PM revision"
+
+
+def test_export_freezes_decisions_and_download_is_workspace_authorized(client):
+    from app.auth import Actor
+    from app.control import decide
+    from app.exports import create_export, download_export, export_build
+
+    actor = Actor("pm_demo", "workspace_demo", "pm")
+    run_id, generation = ready_run(client)
+    exported = create_export(
+        actor,
+        run_id,
+        w.ExportCommand(
+            proposal_set_version=1, variant_ids=["variant_a"], format="json"
+        ),
+        str(uuid4()),
+    )
+    decide(
+        actor,
+        run_id,
+        w.Decision(
+            proposal_set_version=1,
+            variant_id="variant_a",
+            change_ids=["change_a"],
+            action="approve",
+            rationale="PM checked evidence",
+        ),
+        str(uuid4()),
+    )
+    assert export_build([run_id, generation, exported.command_id]) == "ready"
+    binary, media = download_export(actor, run_id, exported.resource_id)
+    import json
+
+    snapshot = json.loads(binary)
+    assert snapshot["decisions"] == []
+    assert snapshot["proposals"]["changes"][0]["decision_state"] == "proposed"
+    assert media == "application/json"
+    with pytest.raises(HTTPException) as error:
+        download_export(
+            Actor("pm_other", "workspace_other", "pm"), run_id, exported.resource_id
+        )
+    assert error.value.status_code == 404
+
+
+def test_unconfigured_renderer_fails_explicitly_retains_proposals_and_retry_identity(
+    client, monkeypatch
+):
+    import app.rendering as rendering
+    from app.auth import Actor
+    from app.control import get_proposals
+
+    actor = Actor("pm_demo", "workspace_demo", "pm")
+    run_id, generation = ready_run(client)
+    monkeypatch.setattr(
+        rendering,
+        "renderer_call",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            ValueError("renderer_unconfigured")
+        ),
+    )
+    request = rendering.create_render(
+        actor,
+        run_id,
+        w.RenderCommand(
+            proposal_set_version=1,
+            variant_ids=["variant_a"],
+            baseline_asset_id="asset_demo_v1",
+        ),
+        str(uuid4()),
+    )
+    assert (
+        rendering.render_submit([run_id, generation, request.resource_id]) == "failed"
+    )
+    assert get_proposals(actor, run_id).changes[0].after == "Evaluate comfort"
+    retried = rendering.retry_render(actor, run_id, request.resource_id, str(uuid4()))
+    assert retried.command_id != request.command_id
+    assert retried.resource_id == request.resource_id

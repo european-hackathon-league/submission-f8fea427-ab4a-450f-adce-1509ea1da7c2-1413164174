@@ -218,6 +218,9 @@ export interface Api {
   vehicles?(): Promise<Vehicle[]>;
   canReadSource?(url: string): boolean;
   readSource?(url: string, signal: AbortSignal): Promise<Blob>;
+  /** Protected application render assets and authoritative export bytes only. */
+  canReadAsset?(url: string): boolean;
+  readAsset?(url: string, signal: AbortSignal): Promise<Blob>;
   dispose?(): void;
   request<T>(
     path: string,

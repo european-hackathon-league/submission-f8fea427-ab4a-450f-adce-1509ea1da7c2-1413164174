@@ -1,6 +1,6 @@
 # Frontend requirement acceptance ledger
 
-Updated 10 October 2026 through the F6 implementation gate. Scope: `frontend_plan.md`, `plan.md`, `backlog.md`; frontend-only authority from the implementation request. Each package updates its rows with exact executed evidence before its PR gate. A screen or happy-path mock does not establish acceptance.
+Updated 11 October 2026 through the combined merge gate. See COMBINED-VERIFICATION.md for fresh branch evidence. Scope: `frontend_plan.md`, `plan.md`, `backlog.md`; frontend-only authority from the implementation request. Each package updates its rows with exact executed evidence before its PR gate. A screen or happy-path mock does not establish acceptance.
 
 ## Status and evidence rules
 
@@ -15,9 +15,9 @@ Common code pointers: `frontend/src/App.tsx` (workspace, panels and commands), `
 
 ## Published contracts and external dependencies
 
-Fixture pin: backend `2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46`. F6 refreshed and inspected `origin/backend` at `12c1ade5dd3829cd6f48d7336091f954207f161f`; `git diff` confirms no changes under `contracts/` between these refs. Published artifacts: `contracts/openapi.json`, `contracts/schemas.json`, `contracts/scenarios.json`, `contracts/catalog.example.json`, `contracts/renderer.schema.json` on that ref. Frontend wire DTOs follow these published schemas; UI projections are separate.
+Fixture pin: backend `2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46`. F6 refreshed and inspected `origin/backend` at `12c1ade5dd3829cd6f48d7336091f954207f161f`; `git diff` confirms no changes under `contracts/` between these refs. The merged base adds documented protected render-asset/export download routes and optional ingestion/evidence APIs; existing DTO schemas and shared scenarios are unchanged. Published artifacts: `contracts/openapi.json`, `contracts/schemas.json`, `contracts/scenarios.json`, `contracts/catalog.example.json`, `contracts/renderer.schema.json` on that ref. Frontend wire DTOs follow these published schemas; UI projections are separate.
 
-- **API-501**: backend `backend/app/main.py` routes for findings, graph, research, conflicts, proposals, evidence, instructions and checkpoint continuation call `pending()` and return `501 not_implemented`; rendering, export and immutable-history routes also return `501 not_implemented` on the F6-inspected ref. No listener was reachable at `127.0.0.1:8000/health`; no backend was changed or started. Implement established frontend API surfaces and verify with frontend network harness; never label harness evidence live analysis/generation.
+- **API-501 (historical label; now LIVE-ACCEPTANCE)**: the earlier inspected backend ref returned 501. The current frontend base `97b71221ecb62385f5d43632c406165c6d1da690` includes implemented backend routes. No listener is reachable at `127.0.0.1:8000/health`; deployed service acceptance remains external. Existing ledger references to API-501 describe this live acceptance dependency, not the current implementation status. Protected render/export links now use authenticated binary retrieval through the API boundary. No backend was changed or started.
 - **DATES**: Research/Claim/Evidence schemas do not publish research as-of, publication or accessed timestamps. Local `Research.as_of` is not an authoritative wire field. Display unavailable date honestly; dated research acceptance requires backend contract addition.
 - **LIMITS**: no published initial/max variant-limit field. Do not hardcode four; display provided scopes and state missing limit metadata.
 - **ASSETS**: only labeled G60 i5 M60 hosted exterior/reference preview exists; G60 520i cabin is a separate reference photo. F70, G68, G70 exact assets unavailable. Geometry, exact-trim cabin and mesh mappings unverified; list/photo fallback must remain usable. See `MODEL-COVERAGE.md`.

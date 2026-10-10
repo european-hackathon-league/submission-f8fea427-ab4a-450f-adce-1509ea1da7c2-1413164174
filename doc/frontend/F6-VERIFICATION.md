@@ -1,3 +1,5 @@
+> Historical package evidence below describes the original F6 gate. Current merged-branch evidence and backend availability supersede it in [COMBINED-VERIFICATION.md](COMBINED-VERIFICATION.md).
+
 # F6 integration and acceptance verification
 
 10 October 2026. Scope: frontend application, tests, fixtures and documentation only. Branch `codex/frontend-f6` is stacked on verified F5 `eca4e883077de5dc33d17dbfaa1d6eef62081bdc`. Final application/test implementation: `34c1d1e`; later commits update this evidence and PR references only.

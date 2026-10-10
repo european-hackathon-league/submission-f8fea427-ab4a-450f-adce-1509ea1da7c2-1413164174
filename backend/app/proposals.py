@@ -39,8 +39,23 @@ def score(factors: w.Factors) -> float | None:
     )
 
 
+class DraftFactors(w.Factors):
+    # Strict provider schemas require named keys; the public API keeps its dictionary.
+    rationales: dict[str, str] = Field(
+        json_schema_extra={
+            "additionalProperties": False,
+            "properties": {name: {"type": "string"} for name in WEIGHTS},
+            "required": list(WEIGHTS),
+        }
+    )
+
+
+class DraftChange(w.Change):
+    factors: DraftFactors
+
+
 class Draft(w.Wire):
-    changes: list[w.Change] = Field(max_length=40)
+    changes: list[DraftChange] = Field(max_length=40)
     gaps: list[str]
     variants: list[w.Variant] = Field(default_factory=list, max_length=4)
     conflicts: list[w.Conflict] = Field(default_factory=list)
@@ -442,7 +457,7 @@ def publish_proposals(args: list[str]) -> str:
             config_version=1,
             scoring_policy_version=POLICY,
             variants=variants,
-            changes=draft.changes,
+            changes=list(draft.changes),
             unresolved_conflict_ids=[
                 conflict.conflict_id
                 for conflict in conflict_state.conflicts

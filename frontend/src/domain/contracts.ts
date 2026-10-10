@@ -13,9 +13,10 @@ export interface FeedbackCount {
 export interface PartFeedback {
   id: ComponentId;
   counts: FeedbackCount;
+  cohort_ids?: string[];
 }
 export interface VehicleViewerProps {
-  selectedComponent: ComponentId;
+  selectedComponent: ComponentId | null;
   onSelectComponent: (id: ComponentId) => void;
   view: VehicleView;
   onViewChange: (view: VehicleView) => void;

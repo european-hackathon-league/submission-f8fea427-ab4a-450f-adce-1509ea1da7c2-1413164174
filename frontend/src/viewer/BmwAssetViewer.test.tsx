@@ -32,6 +32,23 @@ describe('aspect-aware camera framing',()=>{
 });
 
 describe('BmwAssetViewer', () => {
+  it('shows every cohort aggregate for a shared part without summing counts or choosing one heat color',()=>{
+    const scoped=[
+      {id:'body' as const,cohort_ids:['urban','premium'],counts:{negative_records:3,total_records:10,negative_share:.3,intensity_value:.8,intensity_scale_id:'backend-volume-v1',low_evidence:false,provisional:false}},
+      {id:'body' as const,cohort_ids:['rural'],counts:{negative_records:2,total_records:4,negative_share:.5,intensity_value:.2,intensity_scale_id:'backend-volume-v1',low_evidence:true,provisional:true}},
+    ];
+    const props={selectedComponent:'body' as const,onSelectComponent:vi.fn(),view:'exterior' as const,onViewChange:vi.fn(),heatmap:true};
+    const {rerender}=render(<BmwAssetViewer {...props} findings={scoped}/>);
+    const body=screen.getByRole('button',{name:/Body.*urban/});
+    expect(body).toHaveTextContent('Cohorts urban, premium: 3/10 negative feedback records');
+    expect(body).toHaveTextContent('Cohorts rural: 2/4 negative feedback records / provisional / low evidence');
+    expect(body).not.toHaveTextContent('5/14');
+    expect(body.querySelector('.bmw-asset-viewer__part-dot')).toHaveStyle({'--heat':'#8a909b'});
+    rerender(<BmwAssetViewer {...props} findings={[scoped[1]]}/>);
+    expect(screen.getByRole('button',{name:/Body.*rural/})).toHaveTextContent('Cohorts rural: 2/4');
+    expect(screen.getByRole('button',{name:/Body.*rural/}).querySelector('.bmw-asset-viewer__part-dot')).not.toHaveStyle({'--heat':'#8a909b'});
+  });
+
   it('keeps selected component inside the active view when switching presets',()=>{
     const onSelectComponent=vi.fn();
     const onViewChange=vi.fn();
@@ -69,7 +86,7 @@ describe('BmwAssetViewer', () => {
     expect(onSelectComponent).toHaveBeenCalledWith('dashboard');
   });
 
-  it('maps a real Sketchfab node click to component selection after viewer readiness', async () => {
+  it('does not map plausible unverified Sketchfab nodes to a component', async () => {
     const onSelectComponent=vi.fn();
     const onStatusChange=vi.fn();
     const events:Record<string,(value?:any)=>void>={};
@@ -91,9 +108,11 @@ describe('BmwAssetViewer', () => {
     await waitFor(()=>expect(onStatusChange).toHaveBeenCalledWith('ready'));
     expect(api.setBackground).toHaveBeenCalledWith({color:[0.15,0.16,0.18]});
     events.click({instanceID:77});
-    expect(onSelectComponent).toHaveBeenCalledWith('lighting');
+    expect(onSelectComponent).not.toHaveBeenCalled();
     events.click({instanceID:78});
-    expect(onSelectComponent).toHaveBeenCalledTimes(1);
+    expect(onSelectComponent).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole('button',{name:/Headlamps/}));
+    expect(onSelectComponent).toHaveBeenCalledWith('lighting');
   });
 
   it('keeps hosted camera and iframe when switching views or refreshing aggregate data', async () => {
@@ -198,6 +217,43 @@ describe('BmwAssetViewer', () => {
     fireEvent.click(screen.getByRole('button',{name:'Zoom in'}));
     expect(api.setCameraLookAt).toHaveBeenCalledWith([1.6,1.6,3.2],[0,0,0],expect.any(Number));
     getItem.mockRestore();setItem.mockRestore();
+  });
+
+
+  it('keeps vehicle-wide findings spatially unselected across view changes',()=>{
+    const onSelectComponent=vi.fn();
+    render(<BmwAssetViewer selectedComponent={null} onSelectComponent={onSelectComponent} view="exterior" onViewChange={vi.fn()} heatmap findings={findings}/>);
+    expect(screen.getByText('No spatial part selected')).toBeInTheDocument();
+    expect(screen.getAllByRole('button',{pressed:true})).toHaveLength(1);
+    fireEvent.click(screen.getByRole('button',{name:'Interior photo'}));
+    expect(onSelectComponent).not.toHaveBeenCalled();
+  });
+
+  it('recovers a missing cabin photograph without floating markers over an unavailable image',()=>{
+    render(<BmwAssetViewer selectedComponent="dashboard" onSelectComponent={vi.fn()} view="interior" onViewChange={vi.fn()} heatmap findings={findings}/>);
+    fireEvent.error(screen.getByRole('img',{name:/BMW 5 Series G60 cabin reference photo/i}));
+    expect(screen.getByText(/Cabin reference image unavailable/)).toBeInTheDocument();
+    expect(screen.queryByRole('button',{name:/Dashboard feedback marker/})).not.toBeInTheDocument();
+    expect(screen.getByRole('button',{name:/Dashboard.*negative feedback records/})).toBeEnabled();
+    screen.getByRole('button',{name:'Retry cabin image'}).focus();
+    fireEvent.click(screen.getByRole('button',{name:'Retry cabin image'}));
+    expect(screen.getByRole('button',{name:'Interior photo'})).toHaveFocus();
+    expect(screen.getByRole('img',{name:/BMW 5 Series G60 cabin reference photo/i})).toBeInTheDocument();
+  });
+
+  it('offers recovery when both hosted model and local exterior preview fail',async()=>{
+    class SketchfabMock {init(_uid:string,options:InitOptions){options.error();}}
+    Object.assign(window,{Sketchfab:SketchfabMock});
+    render(<BmwAssetViewer selectedComponent="body" onSelectComponent={vi.fn()} view="exterior" onViewChange={vi.fn()} heatmap={false} findings={findings}/>);
+    fireEvent.error(screen.getByRole('img',{name:/BMW i5 M60 three-quarter exterior preview/i}));
+    await screen.findByRole('button',{name:'Retry 3D model'});
+    expect(screen.getByText(/Exterior preview unavailable/)).toBeInTheDocument();
+    expect(screen.queryByText(/Verified preview stays available/)).not.toBeInTheDocument();
+    expect(screen.getByRole('button',{name:'Retry 3D model'})).toBeEnabled();
+    screen.getByRole('button',{name:'Retry exterior preview'}).focus();
+    fireEvent.click(screen.getByRole('button',{name:'Retry exterior preview'}));
+    expect(screen.getByRole('button',{name:'Exterior 3D'})).toHaveFocus();
+    expect(screen.getByRole('img',{name:/BMW i5 M60 three-quarter exterior preview/i})).toBeInTheDocument();
   });
 
   it('reports initialization failure and keeps verified preview available', async () => {

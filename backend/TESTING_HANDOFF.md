@@ -232,3 +232,76 @@ test commands and making unintended provider calls; live tests used an isolated
 queue and dispatched only their own command. Starting normal processing requires
 reviewing that test backlog before starting the worker. This audit made local
 commits only; it did not deploy or push them.
+
+## Backend audit follow-up, 11 October 2026
+
+This section supersedes the earlier live-connection results. Tested application
+code: `5263454`. Real provider calls used the private environment file mounted
+as a Docker secret. Private inputs, passages and reference answers remain ignored.
+Full PDF corpus ingestion is still running; this is an interim evidence record.
+
+### Separately committed corrections
+
+| Commit | Reproduced defect and correction |
+|---|---|
+| `a19ad53` | Native OpenBLAS thread creation exhausted the upload sandbox in the actual parser image. Upload and Excel subprocesses now bound native thread pools. |
+| `f7216f8` | Ten-page PDF checkpoints exhausted the CPU budget. New source bindings freeze two-page checkpoints. |
+| `b923e6a` | A returned invalid AI draft was lost and retries reported an uncertain call. Provider outputs are cached before validation, with at most one bounded correction attempt. Unsupported scopes remain rejected. |
+| `7ba8234` | Full PDF ingestion could exceed the one-hour activity budget. A Temporal patch gives new workflows four hours while preserving legacy replay. |
+| `344c7b1` | A failed page pair dropped readable pages. Exhausted pairs split into single-page checkpoints; successful caches retain their identity. A single-page failure stays explicit. |
+| `b04d170` | Research assessment saw navigation prefixes instead of substantive body text. It now selects an exact, bounded lexical match to the need. Synonym recall remains limited. |
+| `5263454` | Added controlled assessment coverage for exact quotes, scoped applicability, opinion/counterevidence retention, unchanged feedback counts and idempotent reuse. |
+
+### Live AI and HTTP acceptance
+
+The independent `vehicle-backend-acceptance` Docker project uses fresh local
+PostgreSQL/Temporal/objects volumes, the normal API and dispatcher/worker, and real
+OpenAI calls. Its API is available at `http://127.0.0.1:8001`. AI and research
+timeouts in this acceptance configuration are 180 seconds. The normal project
+keeps its existing volumes and API at port 8000. Both APIs returned `/ready` HTTP
+200 after rebuilding, with database and Temporal ready.
+
+| Check | Measured result |
+|---|---|
+| Real G60 sample | Run `86baabd2-6f21-4d88-ba8a-5541c9450a1c`: three independent records, three findings, three changes, one variant; proposals ready in 195 seconds; citations resolved and history replay passed. |
+| Real F70/G60/G70 HTTP pipeline | Run `716d50dc-2a4c-431d-92e1-95fb62f4402b`: six independent records with seven retained annotation rows, plus the complete study and sales workbooks; six findings, five changes, three variants. Upload-to-edit/export acceptance took 482 seconds, including a deliberately stopped worker. |
+| Refinement/recovery | The edit remained queued while the worker was stopped and completed after restart. Version one and findings stayed unchanged; version two published. Idempotent retries, stale edits, score recomputation and citation resolution passed. |
+| PM decisions/export/events | Explicit test decision deferred a change. JSON/XLSX downloads, frozen version two, history, exclusive SSE replay and nonmember denial passed. No approval was fabricated. |
+| Live guided conflict | Synthetic run `415ed95b-7e6d-430e-89c5-57ef7ddf5043`: four contrasting records produced one conflict; processing waited for PM; an idempotent `preserve_alternatives` continuation published two variants, still proposed. The fixture first used an unsupported workbook layout, which was correctly rejected; an invalid resolution was also rejected. |
+| Live research | Run `c69dbed8-e87a-47db-954b-1679d9a6c5cf`: hosted search, two safely fetched public sources, two validated claims, zero validated counterevidence; partial with explicit long-duration, equipment and market-applicability gaps. One search, five reserved fetches and 6,000 reserved tokens. Reserved tokens are a conservative budget, not measured billing. |
+| Real Temporal replay | Six histories replayed with latest workflow code: real analysis, guided analysis/continuation, edit, two exports and renderer failure. |
+| Renderer | The real request failed explicitly because no renderer is configured; proposals stayed available. Successful authenticated renderer integration remains open. |
+
+Live AI completion establishes connectivity and the listed contracts, not semantic
+correctness for every customer statement. The sample uses the demo vehicle/part/
+asset catalog, so actual derivative equipment applicability is still a gate.
+Research's live opposing-evidence quality remains open despite controlled tests.
+
+### Cleaning, source integrity and recovery
+
+All supplied feedback workbooks were normalized in the actual parser image:
+F70 2,128 records/4,076 annotations; G60 4,000/5,005; G70 4,000/4,690.
+Independent checks matched every one of the 13,771 annotation texts and identities
+to original cells, including complete row locators. All 1,663 study/sales metrics
+matched source values and raw cell references: 1,627 study metrics and 36 sales
+metrics, including six literal zeros. These checks exercised 173,346 original
+cell/locator comparisons. Fractions, proportion bases, unknown sample sizes and
+future-year flags were checked. Unmapped sales regions remain explicitly partial.
+This checks numeric/source fidelity; it does not manually validate every metric's
+business interpretation.
+
+An actual PostgreSQL custom-format dump was restored into a separate database.
+All row values matched across 17 tables and 8,619 rows at that snapshot. Original
+data was retained. A separate object-store restore copied 19 files/383,137 bytes
+to a disposable destination; every byte digest matched, including all 17 source
+versions. These are local restore checks, not a production backup policy.
+
+The inspected unrelated Supabase Docker projects expose local auth/storage
+services, but they are not configured for this backend; one storage service
+returned 503. Their JWT keys use ES256 while this backend currently accepts RS256.
+No renderer or OTLP container was found. No unrelated Docker service was modified.
+Production OIDC/S3/telemetry and hosted Temporal integration remain open.
+
+The default project's worker remains stopped to avoid consuming accumulated test
+commands and making unintended AI calls. The separate acceptance worker is running
+with the latest application code. This audit only creates local commits.

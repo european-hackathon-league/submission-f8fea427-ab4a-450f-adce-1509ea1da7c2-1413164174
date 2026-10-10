@@ -92,7 +92,7 @@ def _call[M: w.Wire](
         raise ValueError("provider_input_budget_exhausted")
     with OpenAI(
         api_key=settings.openai_api_key.get_secret_value(),
-        base_url=settings.openai_base_url,
+        base_url=policy.get("base_url", settings.openai_base_url),
         timeout=policy.get("ai_timeout_seconds", settings.ai_timeout_seconds),
         max_retries=0,
     ) as client:

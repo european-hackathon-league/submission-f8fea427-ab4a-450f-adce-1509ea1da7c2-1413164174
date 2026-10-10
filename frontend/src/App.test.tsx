@@ -57,6 +57,9 @@ describe("frontend plan workspace", () => {
     render(<App />);
     await screen.findByRole("option", { name: "BMW 1 Series / F70" });
     await user.selectOptions(screen.getByLabelText("Vehicle"), "f70");
+    const scene = screen.getByRole("region", { name: "Scene capabilities" });
+    expect(scene).toHaveTextContent("f70");
+    expect(within(scene).queryByRole("link", { name: "Open baseline preview" })).not.toBeInTheDocument();
     expect(screen.getByText("Baseline asset unavailable")).toBeInTheDocument();
     expect(
       screen.queryByRole("region", { name: "BMW i5 M60 vehicle viewer" }),
@@ -147,7 +150,7 @@ describe("frontend plan workspace", () => {
       await screen.findByText(/Render proposal version 1/),
     ).toBeInTheDocument();
     expect(
-      await screen.findByText(/Annotation only/, {}, { timeout: 7000 }),
+      await screen.findByText(/Static synthetic annotation reference/, {}, { timeout: 7000 }),
     ).toBeInTheDocument();
     expect(screen.getByText(/Rendering does not mean validated or approved/)).toBeInTheDocument();
   }, 12000);

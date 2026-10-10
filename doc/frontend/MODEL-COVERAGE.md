@@ -15,3 +15,11 @@ Sources: asset records and citations above; F70 assessment recorded in [research
 
 
 F2 scene-catalog gate uses exact saved vehicle, baseline asset and part-catalog version. The local versioned catalog uses published `contract_version`, `part_catalog_version`, `mesh_refs` and `anchor_ref` keys plus explicit local asset metadata. Parent references, cycles, duplicate IDs, ambiguous mesh references and photo anchors are validated. All current mesh references are empty and geometry anchors null: no mesh picking is claimed. Six frontend component controls provide list/photo navigation; `vehicle` and `cabin` are hierarchy nodes, not spatial controls. Image/model failures retain component lists and explicit retries. Missing or ambiguous cohort-wide aggregates are never added or treated as a vehicle total.
+
+## F5 render-result boundary
+
+The scene capability panel binds the saved vehicle, baseline asset and part catalog version. It lists semantic parts and their declared capabilities; photo coordinates are image annotations, not physical geometry. Unsupported triples receive no replacement model.
+
+Variant previews consume only outcome-referenced assets from the exact application render result. Baseline preview/model and separate cabin reference remain independently addressable. Native previews support loading, failure, a 15-second timeout, retry and authorized-link refresh through render-status GET. Unknown media remain explicit links; unsafe URLs and conflicting duplicate asset IDs are withheld.
+
+`frontend-render-annotation.svg` is a static, labeled synthetic test annotation card. It depicts no vehicle, geometry or generated result and does not visualize edited proposal text. Synthetic fixtures never establish preservation. The published application `RenderResult` has no preservation constraints or validation fields; those guarantees require an external contract addition.

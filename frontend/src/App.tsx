@@ -30,6 +30,7 @@ import ProposalWorkspace from "./components/ProposalWorkspace";
 import HistoryPanel from "./components/HistoryPanel";
 import RenderPanel from "./components/RenderPanel";
 import ChangeExplanation from "./components/ChangeExplanation";
+import SceneCapabilities from "./components/SceneCapabilities";
 import { recoverRun } from "./runRecovery";
 import { readSession, saveSession, clearSession } from "./session";
 import type { PendingRun, ProposalSelection } from "./session";
@@ -561,6 +562,11 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
                 </p>
               </div>
             )}
+            <SceneCapabilities vehicle={vehicle} config={savedConfig ?? {
+              vehicle_id: vehicleId,
+              baseline_asset_id: vehicle?.baseline_asset_id ?? "",
+              part_catalog_version: vehicle?.part_catalog_version ?? "",
+            }} />
             {run?.warnings.map((w) => (
               <p className="coverage-note" key={w}>
                 {w}

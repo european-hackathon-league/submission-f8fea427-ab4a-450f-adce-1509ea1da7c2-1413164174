@@ -765,6 +765,14 @@ summary {
     height: 40px;
   }
 }
+.scene-capabilities { margin-top: 16px; padding: 14px; border: 1px solid var(--line, #d5d9df); border-radius: 8px; overflow-wrap: anywhere; }
+.scene-capabilities dl { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 6px 12px; }
+.scene-capabilities dd { margin: 0; }
+.scene-capabilities table { width: 100%; table-layout: fixed; border-collapse: collapse; }
+.scene-capabilities th, .scene-capabilities td { padding: 8px 4px; text-align: left; vertical-align: top; border-bottom: 1px solid var(--line, #d5d9df); }
+.asset-reference-links { display: flex; flex-wrap: wrap; gap: 8px 16px; }
+.render-assets figure { margin: 12px 0; overflow-wrap: anywhere; }
+.render-assets img { max-width: 100%; height: auto; }
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -18,6 +18,7 @@ import {
 } from "./renderJobs";
 import type { RenderBinding, RenderJob } from "./renderJobs";
 export interface RenderPanelProps {
+  compact?: boolean;
   api: Api;
   workspace: Workspace;
   variantId: string;
@@ -215,7 +216,16 @@ function Job({
     result?.wire?.assets.filter((asset) => assetIds.has(asset.asset_id)) ?? [];
   const assetList = (
     <div className="render-assets">
-      <RenderAssets api={api} assets={assets} identity={JSON.stringify([bindingKey(job.binding), job.requestId, renderedVariant?.variant_id])} onRefreshLinks={() => setPollAttempt(old => old + 1)} />
+      <RenderAssets
+        api={api}
+        assets={assets}
+        identity={JSON.stringify([
+          bindingKey(job.binding),
+          job.requestId,
+          renderedVariant?.variant_id,
+        ])}
+        onRefreshLinks={() => setPollAttempt((old) => old + 1)}
+      />
     </div>
   );
   return (
@@ -224,25 +234,29 @@ function Job({
       aria-label={`Render job ${job.requestId ?? job.localId}`}
     >
       <h3>Render proposal version {job.binding.proposalVersion}</h3>
-      <p>
-        Run {job.binding.runId} / variants {job.binding.variantIds.join(", ")} /
-        baseline {job.binding.baselineAssetId} / catalog{" "}
-        {job.binding.partCatalogVersion}
-      </p>
-      {!current && (
-        <p className="notice">
-          Older render or earlier attempt: proposal version{" "}
-          {job.binding.proposalVersion}. Current selected proposal version{" "}
-          {workspace.proposals.proposal_set_version}; baseline remains selected.
+      <details open={!props.compact}>
+        <summary>Render details</summary>
+        <p>
+          Run {job.binding.runId} / variants {job.binding.variantIds.join(", ")}{" "}
+          / baseline {job.binding.baselineAssetId} / catalog{" "}
+          {job.binding.partCatalogVersion}
         </p>
-      )}
-      {stale && (
-        <p className="notice">
-          Backend marks this render stale. It cannot supply current-version
-          assets.
-        </p>
-      )}
-      <p>Rendering does not mean validated or approved.</p>
+        {!current && (
+          <p className="notice">
+            Older render or earlier attempt: proposal version{" "}
+            {job.binding.proposalVersion}. Current selected proposal version{" "}
+            {workspace.proposals.proposal_set_version}; baseline remains
+            selected.
+          </p>
+        )}
+        {stale && (
+          <p className="notice">
+            Backend marks this render stale. It cannot supply current-version
+            assets.
+          </p>
+        )}
+        <p>Rendering does not mean validated or approved.</p>
+      </details>
       {job.submission && (
         <>
           <p role="status">
@@ -260,16 +274,59 @@ function Job({
         <>
           <span className="status">{result.status}</span>
           {result.wire?.failure_reason && <p>{result.wire.failure_reason}</p>}
-          {result.wire?.outcomes.map((outcome) => (
-            <p key={outcome.change_id}>
-              {outcome.change_id}: {outcome.outcome} /{" "}
-              {outcome.reason || "No additional limitation supplied."}
-            </p>
-          ))}
+          {props.compact ? (
+            <div className={props.compact ? "render-outcomes" : undefined}>
+              {(
+                result.wire?.outcomes ??
+                result.outcomes.map((o) => ({
+                  change_id: o.change_id,
+                  outcome: o.status,
+                  reason: o.reason,
+                }))
+              ).map((outcome) => (
+                <details
+                  className={`outcome-tile ${outcome.outcome}`}
+                  key={outcome.change_id}
+                >
+                  <summary>
+                    <span className="outcome-symbol" aria-hidden="true">
+                      {
+                        {
+                          rendered: "✓",
+                          annotated: "▧",
+                          unsupported: "⊘",
+                          failed: "△",
+                        }[outcome.outcome]
+                      }
+                    </span>
+                    <strong>
+                      {proposal?.variants
+                        .flatMap((v) => v.changes)
+                        .find((c) => c.change_id === outcome.change_id)
+                        ?.part_ids.join(", ") || outcome.change_id}
+                    </strong>
+                    <span>{outcome.outcome}</span>
+                  </summary>
+                  <p>{outcome.reason || "No additional detail."}</p>
+                </details>
+              ))}
+            </div>
+          ) : (
+            result.wire?.outcomes.map((outcome) => (
+              <p key={outcome.change_id}>
+                {outcome.change_id}: {outcome.outcome} /{" "}
+                {outcome.reason || "No additional limitation supplied."}
+              </p>
+            ))
+          )}
           {current && !stale ? (
             <section aria-label="Current render assets">{assetList}</section>
           ) : (
-            <details onToggle={event => setShowEarlierAssets(event.currentTarget.open)}>
+            <details
+              onToggle={(event) =>
+                setShowEarlierAssets(event.currentTarget.open)
+              }
+            >
               <summary>Inspect earlier render assets {job.requestId}</summary>
               {showEarlierAssets && assetList}
             </details>
@@ -461,7 +518,7 @@ function RunRenderPanel(props: RenderPanelProps) {
   return (
     <section aria-label="Visualization">
       <div className="section-title">
-        <h2>Visualization</h2>
+        <h2>{props.compact ? "Renders" : "Visualization"}</h2>
         <button
           className="primary"
           disabled={

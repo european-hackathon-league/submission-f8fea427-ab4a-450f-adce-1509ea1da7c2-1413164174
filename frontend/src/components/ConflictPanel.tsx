@@ -7,6 +7,7 @@ import { readCheckpointDraft, saveCheckpointDraft } from "./checkpointDraft";
 import type { CheckpointDraft, CheckpointCommand } from "./checkpointDraft";
 
 export interface ConflictPanelProps {
+  compact?: boolean;
   api: Api;
   workspace: Workspace;
   busy?: boolean;
@@ -437,6 +438,87 @@ export default function ConflictPanel(props: ConflictPanelProps) {
       ...workspace.proposals.unresolved_conflicts,
     ]),
   ];
+  if (props.compact)
+    return (
+      <section
+        className="conflicts-visual"
+        aria-label="Conflicts and alternatives"
+      >
+        <h2>Conflicts</h2>
+        {!conflicts.length && (
+          <p className="empty-state">
+            {workspace.conflicts
+              ? "No conflicts supplied."
+              : "Conflict details unavailable."}
+          </p>
+        )}
+        {conflicts.map((c) => (
+          <article key={c.conflict_id}>
+            <div className="visual-heading">
+              <strong>
+                {c.finding_ids
+                  .map(
+                    (id) =>
+                      workspace.findings.find((f) => f.finding_id === id)
+                        ?.title ?? id,
+                  )
+                  .join(", ")}
+              </strong>
+              <span className="status">{c.resolution_status}</span>
+            </div>
+            <div className="opposing-cards">
+              {c.alternatives.map((scope, index) => (
+                <div className="viewpoint" key={index}>
+                  <span className="viewpoint-label">
+                    Alternative {index + 1}
+                  </span>
+                  <strong>
+                    {scope.cohort_ids?.join(", ") || "Cohort not specified"}
+                  </strong>
+                  <span>
+                    {scope.markets?.join(", ") || "Market not specified"}
+                  </span>
+                  <details>
+                    <summary>Scope</summary>
+                    <p>{scopeLabel(scope)}</p>
+                  </details>
+                </div>
+              ))}
+            </div>
+            <p className="conflict-rationale">{c.rationale}</p>
+          </article>
+        ))}
+        <details>
+          <summary>
+            Proposal alternatives · {workspace.proposals.variants.length}
+          </summary>
+          {workspace.proposals.variants.map((v) => (
+            <article key={v.variant_id}>
+              <h3>{v.title}</h3>
+              <p>{v.cohort_scope.join(", ")}</p>
+              {v.assumptions.map((a) => (
+                <p key={a}>{a}</p>
+              ))}
+            </article>
+          ))}
+        </details>
+        {!autonomous &&
+          [...checkpoints, ...retainedCheckpoints].map((cp) => (
+            <details key={cp.checkpoint_id} open={cp.wait_state === "waiting"}>
+              <summary>Resolve conflict</summary>
+              <CheckpointForm
+                {...props}
+                checkpoint={cp}
+                unavailable={
+                  !checkpoints.some(
+                    (current) => current.checkpoint_id === cp.checkpoint_id,
+                  )
+                }
+              />
+            </details>
+          ))}
+      </section>
+    );
   return (
     <section aria-label="Conflicts and alternatives">
       <h2>Conflicts and alternatives</h2>

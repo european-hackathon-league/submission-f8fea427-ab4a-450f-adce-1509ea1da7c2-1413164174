@@ -612,6 +612,58 @@ export function createMockTransport(scenario: string): {
           "checkpoint-comfort",
           `/api/v1/runs/${snapshot.run_id}/conflicts`,
         );
+      } else if (resource === "/decisions" && body) {
+        const decision = body as {
+          proposal_set_version: number;
+          variant_id: string;
+          change_ids: string[];
+          action: string;
+          rationale: string;
+        };
+        if (
+          decision.proposal_set_version !== proposals.proposal_set_version ||
+          snapshot.analysis_status !== "proposals_ready"
+        )
+          throw new ApiError(
+            "stale_version",
+            "Proposal version changed.",
+            null,
+            409,
+          );
+        const variant = proposals.variants.find(
+          (v) => v.variant_id === decision.variant_id,
+        );
+        if (
+          !variant ||
+          !decision.rationale?.trim() ||
+          !decision.change_ids?.length ||
+          decision.change_ids.some((id) => !variant.change_ids.includes(id)) ||
+          !["approve", "reject", "defer", "select"].includes(decision.action)
+        )
+          throw new ApiError(
+            "invalid_decision",
+            "Decision needs a rationale and changes from the selected variant.",
+            null,
+            422,
+          );
+        const state = {
+          approve: "approved",
+          reject: "rejected",
+          defer: "deferred",
+          select: "selected",
+        }[decision.action]!;
+        proposals.changes.forEach((c) => {
+          if (decision.change_ids.includes(c.change_id))
+            c.decision_state = state as typeof c.decision_state;
+        });
+        publishProposal();
+        touch();
+        record(`Change ${state}`, "pm");
+        history[history.length - 1].rationale = decision.rationale;
+        result = accepted(
+          `decision-${history.length}`,
+          `/api/v1/runs/${snapshot.run_id}/audit`,
+        );
       } else if (resource === "/renders" && body) {
         const command = body as Wire.RenderCommand;
         if (!snapshot.available_actions.includes("reimagine"))
@@ -673,8 +725,8 @@ export function createMockTransport(scenario: string): {
               return outcome
                 ? {
                     ...structuredClone(outcome),
-                    asset_ids: outcome.asset_ids.map((assetId) =>
-                      assetIds.get(assetId)!,
+                    asset_ids: outcome.asset_ids.map(
+                      (assetId) => assetIds.get(assetId)!,
                     ),
                   }
                 : {

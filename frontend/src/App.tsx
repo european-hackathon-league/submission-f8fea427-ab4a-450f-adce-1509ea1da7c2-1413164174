@@ -6,23 +6,22 @@ import {
   useRef,
   useState,
 } from "react";
-import type { CSSProperties, ReactNode } from "react";
 import {
-  ArrowRight,
   BookOpen,
   GitBranch,
   History,
-  LoaderCircle,
   Network,
   Plus,
   RefreshCw,
-  Upload as UploadIcon,
   X,
 } from "lucide-react";
 import { ApiError, commandKey, createApi, createRealApi } from "./api/client";
 import ApiAccess from "./ApiAccess";
-import FindingDetails from "./components/FindingDetails";
-import EvidenceList from "./components/EvidenceList";
+import WorkshopSummary, {
+  FeedbackOverview,
+  EvidenceOverview,
+  SuggestionReview,
+} from "./components/WorkshopSummary";
 import GraphPanel from "./components/GraphPanel";
 import SourceDialog from "./components/SourceDialog";
 import ResearchPanel from "./components/ResearchPanel";
@@ -50,6 +49,7 @@ import type { ComponentId, VehicleView } from "./domain/contracts";
 import { models } from "./collection/journeyData.js";
 import sceneCatalog from "../public/vehicles/scene-catalog-v1.json";
 import "./ui/workspace.css";
+import "./ui/workshop.css";
 
 const CollectionViewer = lazy(() => import("./collection/VehicleViewer.jsx"));
 const VehicleViewer = lazy(() => import("./viewer/BmwAssetViewer"));
@@ -59,6 +59,9 @@ const tabs = [
   { title: "Evidence", icon: BookOpen },
   { title: "Proposals", icon: GitBranch },
   { title: "History", icon: History },
+  { title: "Research", icon: BookOpen },
+  { title: "Conflicts", icon: GitBranch },
+  { title: "Renders", icon: BookOpen },
 ] as const;
 type Tab = (typeof tabs)[number]["title"];
 type UploadRow = {
@@ -101,13 +104,24 @@ type ProposalDraft = {
   dirty: boolean;
 };
 
-type CollectionModel = { id: string; name: string; family: string; trim: string };
+type CollectionModel = {
+  id: string;
+  name: string;
+  family: string;
+  trim: string;
+};
 function collectionVehicleId(model?: CollectionModel | null) {
   if (!model) return "g60-i5-m60";
   if (model.id === "G60-i5-M60-xDrive") return "g60-i5-m60";
-  return model.family === "G60" ? model.id.toLowerCase() : model.family.toLowerCase();
+  return model.family === "G60"
+    ? model.id.toLowerCase()
+    : model.family.toLowerCase();
 }
-export default function App({ api: suppliedApi, initialModel, onBack }: {
+export default function App({
+  api: suppliedApi,
+  initialModel,
+  onBack,
+}: {
   api?: Api;
   initialModel?: CollectionModel | null;
   onBack?: () => void;
@@ -174,7 +188,16 @@ function WorkspaceApp({
   const [catalogReady, setCatalogReady] = useState(false);
   const [vehicleError, setVehicleError] = useState("");
   const [vehicleRetry, setVehicleRetry] = useState(0);
-  const [vehicleId, setVehicleId] = useState(() => collectionVehicleId(initialModel));
+  const [vehicleId, setVehicleId] = useState(() =>
+    collectionVehicleId(initialModel),
+  );
+  const fileInput = useRef<HTMLInputElement>(null);
+  const [reviewChange, setReviewChange] = useState<{
+    variantId: string;
+    changeId: string;
+    displayedWorkspace: Workspace;
+  } | null>(null);
+  const [editing, setEditing] = useState(false);
   const [collectionViewerOpen, setCollectionViewerOpen] = useState(false);
   const [deepDive, setDeepDive] = useState(false);
   const [mode, setMode] = useState<"autonomous" | "guided">("autonomous");
@@ -186,7 +209,7 @@ function WorkspaceApp({
   const [tab, setTab] = useState<Tab>(
     tabs.some((t) => t.title === restored?.tab)
       ? (restored!.tab as Tab)
-      : "Findings",
+      : "Proposals",
   );
   const [selectedFindingId, setSelectedFindingId] = useState<string | null>(
     restored ? restored.selectedFindingId : "",
@@ -222,26 +245,14 @@ function WorkspaceApp({
       ]),
     ),
   );
-  const scopeDrafts = useRef(new Map<string, string>());
   const [dirtyDrafts, setDirtyDrafts] = useState(
     new Set<string>((restored?.proposalDrafts ?? []).map(([key]) => key)),
   );
   const [confirmNewRun, setConfirmNewRun] = useState(false);
-  const [savedConfigExpanded, setSavedConfigExpanded] = useState(false);
-  const [vehicleExpanded, setVehicleExpanded] = useState(false);
   const [ideaDraft, setIdeaDraft] = useState(restored?.ideaDraft ?? "");
   const [proposalDirty, setProposalDirty] = useState<boolean | null>(null);
   const hasUnsavedWork =
     proposalDirty ?? (dirtyDrafts.size > 0 || !!ideaDraft.trim());
-  const rememberDirty = useCallback((key: string, dirty: boolean) => {
-    setDirtyDrafts((old) => {
-      if (old.has(key) === dirty) return old;
-      const next = new Set(old);
-      if (dirty) next.add(key);
-      else next.delete(key);
-      return next;
-    });
-  }, []);
 
   useEffect(() => {
     if (!hasUnsavedWork) return;
@@ -267,9 +278,13 @@ function WorkspaceApp({
     !!vehicle?.baseline_asset_id && !!vehicle.part_catalog_version;
   const setupLocked = !!runId || !!pendingRun;
   useEffect(() => {
-    if (initialModel && !setupLocked) setVehicleId(collectionVehicleId(initialModel));
+    if (initialModel && !setupLocked)
+      setVehicleId(collectionVehicleId(initialModel));
   }, [initialModel, setupLocked]);
-  const previewModel = models.find(model => collectionVehicleId(model) === (savedConfig?.vehicle_id ?? vehicleId));
+  const previewModel = models.find(
+    (model) =>
+      collectionVehicleId(model) === (savedConfig?.vehicle_id ?? vehicleId),
+  );
   const finding =
     selectedFindingId === null
       ? undefined
@@ -327,7 +342,7 @@ function WorkspaceApp({
           setVehicles(result);
           setCatalogReady(true);
           setVehicleId((current) =>
-            (initialModel || result.some((v) => v.vehicle_id === current))
+            initialModel || result.some((v) => v.vehicle_id === current)
               ? current
               : (result[0]?.vehicle_id ?? current),
           );
@@ -523,12 +538,6 @@ function WorkspaceApp({
           ),
       );
     setSelectedComponent(mapped || null);
-    if (mapped)
-      setView(
-        ["dashboard", "steering", "seats"].includes(mapped)
-          ? "interior"
-          : "exterior",
-      );
   }
 
   function selectPart(id: ComponentId) {
@@ -542,7 +551,25 @@ function WorkspaceApp({
       existing?.finding_id ??
         (matches.length === 1 ? matches[0].finding_id : null),
     );
-    if (matches.length > 1 && !existing) setTab("Findings");
+    const linked =
+      workspace &&
+      [...workspace.proposals.variants]
+        .sort(
+          (a, b) =>
+            Number(b.variant_id === activeVariantId) -
+            Number(a.variant_id === activeVariantId),
+        )
+        .flatMap((v) => v.changes.map((c) => ({ v, c })))
+        .find(({ c }) => c.part_ids.includes(id));
+    if (linked) {
+      setVariantId(linked.v.variant_id);
+      setReviewChange({
+        variantId: linked.v.variant_id,
+        changeId: linked.c.change_id,
+        displayedWorkspace: workspace!,
+      });
+      setTab("Proposals");
+    } else if (matches.length > 1 && !existing) setTab("Findings");
   }
   const selectedFinding = finding;
 
@@ -573,13 +600,11 @@ function WorkspaceApp({
     runEpoch.current++;
     clearSession(sessionNamespace);
     proposalDrafts.current.clear();
-    scopeDrafts.current.clear();
     setDirtyDrafts(new Set());
     setProposalDirty(null);
     setConfirmNewRun(false);
-    setSavedConfigExpanded(false);
-    setVehicleExpanded(false);
-    setTab("Findings");
+    setTab("Proposals");
+    setReviewChange(null);
     setIdeaDraft("");
     setPendingRun(null);
     setWorkspace(null);
@@ -611,8 +636,16 @@ function WorkspaceApp({
           <span>Vehicle requirements</span>
         </div>
         {onBack && <button onClick={onBack}>Back to the BMW journey</button>}
-        {previewModel && <button onClick={() => setCollectionViewerOpen(true)}>Explore model in 360°</button>}
-        {initialModel && <span className="collection-context">Collection: {initialModel.name}</span>}
+        {previewModel && (
+          <button onClick={() => setCollectionViewerOpen(true)}>
+            Explore model in 360°
+          </button>
+        )}
+        {initialModel && (
+          <span className="collection-context">
+            Collection: {initialModel.name}
+          </span>
+        )}
         {onDisconnect && (
           <button
             onClick={() => {
@@ -627,322 +660,283 @@ function WorkspaceApp({
           {api.mode === "mock" ? "Synthetic workspace" : "Connected workspace"}
         </span>
       </header>
-      {collectionViewerOpen && previewModel && <Suspense fallback={<p role="status">Preparing model viewer…</p>}>
-        <CollectionViewer initial={previewModel.id} onClose={() => setCollectionViewerOpen(false)} />
-      </Suspense>}
+      {collectionViewerOpen && previewModel && (
+        <Suspense fallback={<p role="status">Preparing model viewer…</p>}>
+          <CollectionViewer
+            initial={previewModel.id}
+            onClose={() => setCollectionViewerOpen(false)}
+          />
+        </Suspense>
+      )}
       <main id="workspace">
         <section className="run-setup" aria-label="Run setup">
           <div className="section-title">
-            <h1 tabIndex={-1}>
-              {setupLocked ? "Saved configuration" : "New analysis run"}
-            </h1>
+            <h1 tabIndex={-1}>Workshop</h1>
             {setupLocked && (
               <button
+                disabled={busy}
                 onClick={(event) => {
                   event.currentTarget.focus();
                   setConfirmNewRun(true);
                 }}
-                disabled={busy}
               >
                 <Plus size={16} />
                 New run
               </button>
             )}
           </div>
-          {!run && (
-            <div className="setup-intro">
-              <p>
-                Choose a vehicle, add your source files, then start a run to
-                review customer findings and proposals.
-              </p>
-              {api.mode === "mock" && (
-                <p className="demo-notice">
-                  Demo mode: uploaded contents are not analyzed. Runs use
-                  synthetic findings and proposals.
-                </p>
-              )}
-            </div>
-          )}
-          {run && (
-            <div className="saved-config-summary">
+          {workspace && (
+            <div className="workshop-summary">
               <span>
-                {vehicle?.title} · {run.config.participation_mode}
-                {run.config.deep_dive.enabled ? " · Deep Dive" : ""}
+                <b>{workspace.findings.length}</b> customer needs
               </span>
-              <button
-                aria-expanded={savedConfigExpanded}
-                aria-controls="saved-config-fields"
-                onClick={() => setSavedConfigExpanded(!savedConfigExpanded)}
-              >
-                {savedConfigExpanded ? "Hide settings" : "Show settings"}
-              </button>
+              <span>
+                <b>{variant?.changes.length ?? 0}</b> suggested{" "}
+                {variant?.changes.length === 1 ? "change" : "changes"}
+              </span>
+              <span>
+                <b>
+                  {variant?.changes.filter(
+                    (c) => c.decision_state === "proposed",
+                  ).length ?? 0}
+                </b>{" "}
+                awaiting decision
+              </span>
             </div>
           )}
-          <div
-            id="saved-config-fields"
-            className={
-              run
-                ? `saved-config-fields${savedConfigExpanded ? " is-expanded" : ""}`
-                : undefined
-            }
-          >
-            {!run && (
-              <h2 className="setup-step">1. Choose vehicle and settings</h2>
-            )}
-            <div className="setup-fields">
-              <label className="vehicle-field">
-                Vehicle
-                <select
-                  aria-label="Vehicle"
-                  value={savedConfig?.vehicle_id ?? vehicleId}
-                  disabled={setupLocked || busy}
-                  onChange={(e) => setVehicleId(e.target.value)}
-                >
-                  {initialModel && vehicles.length > 0 && !vehicles.some(v => v.vehicle_id === vehicleId) && (
-                    <option value={vehicleId}>{initialModel.name} · Analysis unavailable</option>
-                  )}
-                  {vehicles.length ? (
-                    vehicles.map((v) => (
-                      <option key={v.vehicle_id} value={v.vehicle_id}>
-                        {v.title}
-                      </option>
-                    ))
-                  ) : (
-                    <option value="g60-i5-m60">
-                      {vehicleError
-                        ? "Vehicle options unavailable"
-                        : "Loading vehicles..."}
+
+          <div className="setup-fields">
+            <label className="vehicle-field">
+              Vehicle
+              <select
+                aria-label="Vehicle"
+                value={savedConfig?.vehicle_id ?? vehicleId}
+                disabled={setupLocked || busy}
+                onChange={(e) => setVehicleId(e.target.value)}
+              >
+                {initialModel &&
+                  vehicles.length > 0 &&
+                  !vehicles.some((v) => v.vehicle_id === vehicleId) && (
+                    <option value={vehicleId}>
+                      {initialModel.name} · Analysis unavailable
                     </option>
                   )}
-                </select>
-              </label>
-              <fieldset
+                {vehicles.length ? (
+                  vehicles.map((v) => (
+                    <option key={v.vehicle_id} value={v.vehicle_id}>
+                      {v.title}
+                    </option>
+                  ))
+                ) : (
+                  <option value={vehicleId}>
+                    {vehicleError
+                      ? "Vehicle options unavailable"
+                      : "Loading vehicles…"}
+                  </option>
+                )}
+              </select>
+            </label>
+            <label className="workshop-switch">
+              Autonomous
+              <input
+                role="switch"
+                type="checkbox"
+                checked={
+                  (savedConfig?.participation_mode ?? mode) === "autonomous"
+                }
                 disabled={setupLocked || busy}
-                aria-describedby={!run ? "participation-help" : undefined}
-              >
-                <legend>Participation</legend>
-                <label>
-                  <input
-                    type="radio"
-                    name="participation"
-                    checked={
-                      (savedConfig?.participation_mode ?? mode) === "autonomous"
-                    }
-                    onChange={() => setMode("autonomous")}
-                  />
-                  Autonomous
-                </label>
-                <label>
-                  <input
-                    type="radio"
-                    name="participation"
-                    checked={
-                      (savedConfig?.participation_mode ?? mode) === "guided"
-                    }
-                    onChange={() => setMode("guided")}
-                  />
-                  Guided
-                </label>
-              </fieldset>
-              <label className="check-field">
+                onChange={(e) =>
+                  setMode(e.target.checked ? "autonomous" : "guided")
+                }
+              />
+              <span className="switch-track" />
+            </label>
+            <label className="workshop-switch">
+              Deep Dive
+              <input
+                role="switch"
+                type="checkbox"
+                checked={savedConfig?.deep_dive.enabled ?? deepDive}
+                disabled={setupLocked || busy}
+                onChange={(e) => setDeepDive(e.target.checked)}
+              />
+              <span className="switch-track" />
+            </label>
+            {!run && (
+              <>
                 <input
-                  type="checkbox"
-                  aria-describedby={!run ? "deep-dive-help" : undefined}
-                  checked={savedConfig?.deep_dive.enabled ?? deepDive}
+                  ref={fileInput}
+                  className="sr-only"
+                  aria-label="Upload files"
+                  type="file"
+                  accept=".xlsx,.pdf"
+                  multiple
                   disabled={setupLocked || busy}
-                  onChange={(e) => setDeepDive(e.target.checked)}
+                  onChange={(e) => {
+                    void uploadFiles(Array.from(e.target.files ?? []));
+                    e.target.value = "";
+                  }}
                 />
-                Deep Dive
-              </label>
-            </div>
-            {!run && (
-              <>
-                {vehicleError && (
-                  <div className="vehicle-load-error">
-                    <p role="alert">{vehicleError}</p>
-                    <button
-                      onClick={() => setVehicleRetry((value) => value + 1)}
-                    >
-                      Retry loading vehicles
-                    </button>
-                  </div>
-                )}
-                <div className="setup-help">
-                  <p id="participation-help" className="muted">
-                    {mode === "autonomous"
-                      ? "Autonomous: completes proposals without intermediate choices."
-                      : "Guided: pauses at checkpoints for your input."}
-                  </p>
-                  <p id="deep-dive-help" className="muted">
-                    Deep Dive adds competitor research for identified customer
-                    needs.
-                  </p>
-                </div>
-                <h2 className="setup-step">2. Add source files</h2>
-                <p id="upload-help" className="muted">
-                  XLSX or PDF. Add one or more files; partial packages are
-                  welcome.
-                </p>
-                <div className="upload-zone">
-                  <label className="upload-control">
-                    <UploadIcon size={18} />
-                    <span>Upload files</span>
-                    <input
-                      aria-label="Upload files"
-                      aria-describedby="upload-help"
-                      type="file"
-                      accept=".xlsx,.pdf"
-                      multiple
-                      disabled={busy || setupLocked}
-                      onChange={(e) => {
-                        void uploadFiles(Array.from(e.target.files ?? []));
-                        e.target.value = "";
-                      }}
-                    />
-                  </label>
-                  <span className="muted">
-                    Customer feedback, studies and vehicle reference documents
-                  </span>
-                </div>
-              </>
-            )}
-            <ul className="upload-list">
-              {uploads.map((row) => (
-                <li key={row.id}>
-                  <span>{row.filename}</span>
-                  <span className={`status status-${row.status}`}>
-                    {row.status}
-                  </span>
-                  {row.reason && (
-                    <span className="upload-error">{row.reason}</span>
-                  )}
-                  {!run && (
-                    <button
-                      className="icon-button"
-                      aria-label={`Remove ${row.filename}`}
-                      title="Remove file"
-                      disabled={
-                        row.status === "uploading" || busy || setupLocked
-                      }
-                      onClick={() =>
-                        setUploads((old) => old.filter((u) => u.id !== row.id))
-                      }
-                    >
-                      <X size={15} />
-                    </button>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {!baselineAvailable && vehicles.length > 0 && run && (
-              <p className="notice">Baseline asset unavailable</p>
-            )}
-            {!run && (
-              <>
-                {hasUploadErrors && (
-                  <p className="upload-error">
-                    Remove failed or rejected files and choose them again to
-                    retry. They will not be included in the run.
-                  </p>
-                )}
-                <div className="start-run-action">
-                  <div>
-                    <h2 className="setup-step">3. Start your run</h2>
-                    <p id="start-run-readiness" role="status">
-                      {startReadiness}
-                    </p>
-                  </div>
-
+                {!runId && (
                   <button
                     className="primary"
                     aria-describedby="start-run-readiness"
                     disabled={
                       busy ||
+                      setupLocked ||
                       !!pendingRun ||
-                      (!runId &&
-                        (!configurationAvailable ||
-                          !!vehicleError ||
-                          !readySourceIds.length ||
-                          uploadingCount > 0))
+                      uploadingCount > 0 ||
+                      !configurationAvailable ||
+                      !!vehicleError
                     }
-                    onClick={() =>
-                      runId
-                        ? void act(async () => {
-                            await refresh(runId);
-                          })
-                        : void createRun({
-                            vehicle_id: vehicle!.vehicle_id,
-                            baseline_asset_id: vehicle!.baseline_asset_id!,
-                            part_catalog_version:
-                              vehicle!.part_catalog_version!,
-                            source_ids: readySourceIds,
-                            market_context: [],
-                            participation_mode: mode,
-                            deep_dive: { enabled: deepDive },
-                          })
-                    }
+                    onClick={() => {
+                      if (!readySourceIds.length) {
+                        fileInput.current?.click();
+                        return;
+                      }
+                      void createRun({
+                        vehicle_id: vehicle!.vehicle_id,
+                        baseline_asset_id: vehicle!.baseline_asset_id!,
+                        part_catalog_version: vehicle!.part_catalog_version!,
+                        source_ids: readySourceIds,
+                        market_context: [],
+                        participation_mode: mode,
+                        deep_dive: { enabled: deepDive },
+                      });
+                    }}
                   >
-                    {busy ? (
-                      <LoaderCircle size={16} />
-                    ) : (
-                      <ArrowRight size={16} />
-                    )}
-                    {busy
-                      ? runId
-                        ? "Connecting…"
-                        : "Starting run…"
-                      : runId
-                        ? "Reconnect to run"
-                        : "Start run"}
+                    {busy || uploadingCount
+                      ? "Working…"
+                      : readySourceIds.length
+                        ? "Start analysis"
+                        : "Add files"}
                   </button>
-                </div>
+                )}
               </>
             )}
           </div>
+          {!run && (
+            <p className="sr-only" id="start-run-readiness" role="status">
+              {startReadiness}
+            </p>
+          )}
+          {runId && !run && (
+            <button
+              disabled={busy}
+              onClick={() =>
+                void act(async () => {
+                  await refresh(runId!);
+                })
+              }
+            >
+              Reconnect to run
+            </button>
+          )}
+          {vehicleError && (
+            <div role="alert">
+              {vehicleError}
+              <button onClick={() => setVehicleRetry((v) => v + 1)}>
+                Retry loading vehicles
+              </button>
+            </div>
+          )}
+          {hasUploadErrors && (
+            <p className="upload-error">
+              Remove failed or rejected files and choose them again to retry.
+              They will not be included in the run.
+            </p>
+          )}
+          {!!uploads.length && (
+            <details
+              className="source-package"
+              open={!readySourceIds.length || hasUploadErrors}
+            >
+              <summary>
+                {uploads.length} {uploads.length === 1 ? "file" : "files"}{" "}
+                <span className="muted">
+                  {uploadingCount ? "· Uploading" : "· Manage"}
+                </span>
+              </summary>
+              <ul className="upload-list">
+                {uploads.map((row) => (
+                  <li key={row.id}>
+                    <span>{row.filename}</span>
+                    <span className={`status status-${row.status}`}>
+                      {row.status}
+                    </span>
+                    {row.reason && (
+                      <span className="upload-error">{row.reason}</span>
+                    )}
+                    {!run && (
+                      <button
+                        className="icon-button"
+                        aria-label={`Remove ${row.filename}`}
+                        disabled={
+                          row.status === "uploading" || busy || setupLocked
+                        }
+                        onClick={() =>
+                          setUploads((old) =>
+                            old.filter((u) => u.id !== row.id),
+                          )
+                        }
+                      >
+                        <X size={15} />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+              {!setupLocked && (
+                <button onClick={() => fileInput.current?.click()}>
+                  Add more files
+                </button>
+              )}
+            </details>
+          )}
           {pendingRun && !runId && (
             <div role="status" className="notice">
-              Run creation outcome pending. Settings frozen; retry original
-              request to recover its result.
+              Run creation pending. Settings frozen.
               <button disabled={busy} onClick={() => void createRun()}>
                 Retry run creation
               </button>
             </div>
           )}
           {run && (
-            <dl aria-label="Saved source package">
-              <dt>Completed source IDs</dt>
-              <dd>{run.config.source_ids.join(", ")}</dd>
-              <dt>Baseline asset</dt>
-              <dd>{run.config.baseline_asset_id}</dd>
-              <dt>Part catalog</dt>
-              <dd>{run.config.part_catalog_version}</dd>
-              <dt>Market context</dt>
-              <dd>{run.config.market_context.join(", ") || "Not supplied"}</dd>
-            </dl>
+            <details className="run-details">
+              <summary>
+                Analysis details{" "}
+                <span className="status">
+                  {run.analysis_status.replaceAll("_", " ")}
+                </span>
+              </summary>
+              <dl>
+                <dt>Completed source IDs</dt>
+                <dd>{run.config.source_ids.join(", ")}</dd>
+                <dt>Baseline asset</dt>
+                <dd>{run.config.baseline_asset_id}</dd>
+                <dt>Part catalog</dt>
+                <dd>{run.config.part_catalog_version}</dd>
+                <dt>Market context</dt>
+                <dd>
+                  {run.config.market_context.join(", ") ||
+                    "From source evidence"}
+                </dd>
+              </dl>
+              <p>{run.run_id}</p>
+              <p>{run.stage}</p>
+              <button
+                disabled={busy}
+                onClick={() =>
+                  void act(async () => {
+                    await refresh(runId!);
+                  })
+                }
+              >
+                Reconnect to run
+              </button>
+            </details>
           )}
-          {runId && !run && (
-            <p role="status">
-              Run {runId} accepted. Recovering saved configuration…
-            </p>
-          )}
-          {run && (
-            <div className="run-progress" role="status">
-              <span className="status">{run.analysis_status}</span>
-              <strong>{run.stage}</strong>
-              <span>{run.run_id}</span>
-              {busy && <LoaderCircle size={16} className="spin" />}
-              {run.analysis_status === "proposals_ready" && (
-                <button
-                  onClick={() => {
-                    setTab("Proposals");
-                    document.getElementById("tab-Proposals")?.focus();
-                  }}
-                >
-                  Review proposals <ArrowRight size={16} />
-                </button>
-              )}
-            </div>
-          )}
+          {runId && !run && <p role="status">Recovering saved analysis…</p>}
         </section>
         {error && (
           <div role="alert" className="error-bar">
@@ -975,45 +969,23 @@ function WorkspaceApp({
         )}
         {run && (
           <div
-            className="reimagine-toolbar"
+            className="variant-context"
             role="group"
             aria-label="Reimagine target"
           >
-            <div id="reimagine-context" className="reimagine-context">
-              <span className="muted">Selected variant</span>
-              <strong>{variant?.title ?? "No variant available"}</strong>
-              <span>
-                {run.current_proposal_set_version === null
-                  ? "Proposal version not yet published"
-                  : `Saved proposal version ${run.current_proposal_set_version}`}
-              </span>
-              {hasUnsavedWork && (
-                <p className="muted">
-                  Uses saved proposals; unsaved edits are excluded.
-                </p>
-              )}
-            </div>
+            <strong>{variant?.title ?? "Variant unavailable"}</strong>
+            <span>
+              Saved proposal version {workspace?.proposals.proposal_set_version}
+            </span>
           </div>
         )}
-        <div
-          className={`work-area${tab === "Proposals" && workspace ? " is-reviewing" : ""}`}
-        >
+        <div className="work-area">
           <section
-            className={`vehicle-column${run ? " has-run" : ""}${vehicleExpanded ? " is-expanded" : ""}`}
+            className={`vehicle-column${run ? " has-run" : ""}`}
             aria-label="Vehicle workspace"
           >
             <div className="section-title">
-              <h2>Baseline vehicle</h2>
-              {run && (
-                <button
-                  className="mobile-vehicle-toggle"
-                  aria-expanded={vehicleExpanded}
-                  aria-controls="vehicle-content"
-                  onClick={() => setVehicleExpanded(!vehicleExpanded)}
-                >
-                  {vehicleExpanded ? "Hide vehicle" : "Show vehicle"}
-                </button>
-              )}
+              <h2>{vehicle?.title ?? "Vehicle reference"}</h2>
               <label className="check-field">
                 <input
                   type="checkbox"
@@ -1057,29 +1029,28 @@ function WorkspaceApp({
                 </div>
               )}
             </div>
-            <SceneCapabilities
-              vehicle={vehicle}
-              config={savedConfig ?? {
-                vehicle_id: vehicleId,
-                baseline_asset_id: vehicle?.baseline_asset_id ?? "",
-                part_catalog_version: vehicle?.part_catalog_version ?? "",
-              }}
-            />
-            {run?.warnings.map((w) => (
-              <p className="coverage-note" key={w}>
-                {w}
+            <details className="vehicle-reference-details">
+              <summary>Vehicle details</summary>
+              <p>
+                Seat and dashboard tags mark approximate cabin regions in this
+                exterior model.
               </p>
-            ))}
-            {workspace && (
-              <RenderPanel
-                api={api}
-                workspace={workspace}
-                variantId={activeVariantId}
-                busy={busy}
-                onRefresh={() => refresh(runId!)}
-                onOpen={setSource}
+              <SceneCapabilities
+                vehicle={vehicle}
+                config={
+                  savedConfig ?? {
+                    vehicle_id: vehicleId,
+                    baseline_asset_id: vehicle?.baseline_asset_id ?? "",
+                    part_catalog_version: vehicle?.part_catalog_version ?? "",
+                  }
+                }
               />
-            )}
+              {run?.warnings.map((w) => (
+                <p className="coverage-note" key={w}>
+                  {w}
+                </p>
+              ))}
+            </details>
           </section>
           <section className="analysis-column" aria-label="Analysis panels">
             <div
@@ -1087,46 +1058,69 @@ function WorkspaceApp({
               role="tablist"
               aria-label="Analysis views"
             >
-              {tabs.map(({ title, icon: Icon }, index) => (
+              {(["Proposals", "Findings"] as const).map((title) => (
                 <button
-                  id={`tab-${title}`}
                   key={title}
+                  onKeyDown={(e) => {
+                    if (
+                      ["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)
+                    ) {
+                      e.preventDefault();
+                      const next =
+                        e.key === "Home"
+                          ? "Proposals"
+                          : e.key === "End"
+                            ? "Findings"
+                            : title === "Proposals"
+                              ? "Findings"
+                              : "Proposals";
+                      setTab(next);
+                      document.getElementById(`tab-${next}`)?.focus();
+                    }
+                  }}
+                  id={`tab-${title}`}
                   role="tab"
                   aria-selected={tab === title}
                   aria-controls={`panel-${title}`}
-                  tabIndex={tab === title ? 0 : -1}
                   onClick={() => setTab(title)}
-                  onKeyDown={(e) => {
-                    const next =
-                      e.key === "ArrowRight"
-                        ? (index + 1) % tabs.length
-                        : e.key === "ArrowLeft"
-                          ? (index + tabs.length - 1) % tabs.length
-                          : e.key === "Home"
-                            ? 0
-                            : e.key === "End"
-                              ? tabs.length - 1
-                              : null;
-                    if (next !== null) {
-                      e.preventDefault();
-                      setTab(tabs[next].title);
-                      document
-                        .getElementById(`tab-${tabs[next].title}`)
-                        ?.focus();
-                    }
-                  }}
                 >
-                  <Icon size={16} />
-                  {title}
+                  {title === "Proposals" ? "Suggestions" : "Customer feedback"}
                 </button>
               ))}
+              <select
+                id={
+                  tab !== "Proposals" && tab !== "Findings"
+                    ? `tab-${tab}`
+                    : "more-views"
+                }
+                aria-label="More review views"
+                value={tab === "Proposals" || tab === "Findings" ? "" : tab}
+                onChange={(e) => {
+                  if (e.target.value) setTab(e.target.value as Tab);
+                }}
+              >
+                <option value="">More</option>
+                {tabs
+                  .filter(
+                    (t) => t.title !== "Proposals" && t.title !== "Findings",
+                  )
+                  .map((t) => (
+                    <option key={t.title}>{t.title}</option>
+                  ))}
+              </select>
             </div>
             <div
               className="analysis-panel"
               role="tabpanel"
               tabIndex={-1}
               id={`panel-${tab}`}
-              aria-labelledby={`tab-${tab}`}
+              aria-label={
+                tab === "Proposals"
+                  ? "Suggestions"
+                  : tab === "Findings"
+                    ? "Customer feedback"
+                    : tab
+              }
             >
               {!workspace ? (
                 <div className="empty-state">
@@ -1139,98 +1133,95 @@ function WorkspaceApp({
                 </div>
               ) : (
                 <>
-                  <ConflictPanel
-                    api={api}
-                    workspace={workspace}
-                    busy={busy}
-                    onRefresh={() => refresh(runId!)}
-                  />
+                  <div hidden={tab !== "Conflicts"}>
+                    <ConflictPanel
+                      compact
+                      api={api}
+                      workspace={workspace}
+                      busy={busy}
+                      onRefresh={() => refresh(runId!)}
+                    />
+                  </div>
                   {tab === "Findings" && (
-                    <>
-                      <div className="section-title">
-                        <h2>Customer findings</h2>
-                        <span className="muted">Feedback records</span>
-                      </div>
-                      {[
-                        {
-                          title: "Part findings",
-                          matches: (f: Finding) =>
-                            f.part_ids.length > 0 &&
-                            f.part_ids.every(
-                              (id) =>
-                                baselineAvailable &&
-                                spatialPartIds.has(id) &&
-                                sceneCatalog.parts.some(
-                                  (p) => p.part_id === id,
-                                ),
-                            ),
-                        },
-                        {
-                          title: "Vehicle-wide findings",
-                          matches: (f: Finding) => f.part_ids.length === 0,
-                        },
-                        {
-                          title: "Unmapped or non-geometric findings",
-                          matches: (f: Finding) =>
-                            f.part_ids.length > 0 &&
-                            f.part_ids.some(
-                              (id) =>
-                                !baselineAvailable ||
-                                !spatialPartIds.has(id) ||
-                                !sceneCatalog.parts.some(
-                                  (p) => p.part_id === id,
-                                ),
-                            ),
-                        },
-                      ].map((group) => (
-                        <section key={group.title} aria-label={group.title}>
-                          <h3>{group.title}</h3>
-                          <div className="finding-list">
-                            {workspace.findings
-                              .filter(group.matches)
-                              .map((f) => (
-                                <button
-                                  className="finding-item"
-                                  key={f.finding_id}
-                                  aria-pressed={
-                                    finding?.finding_id === f.finding_id
-                                  }
-                                  onClick={() => {
-                                    selectFinding(f);
-                                    setTab("Evidence");
-                                  }}
-                                >
-                                  <BookOpen size={16} aria-hidden="true" />
-                                  <span>
-                                    <strong>{f.title}</strong>
-                                    <small>{f.customer_need}</small>
-                                    <small>
-                                      {f.counts.negative_records} of{" "}
-                                      {f.counts.total_records} negative feedback
-                                      records
-                                      {f.provisional ? " / provisional" : ""}
-                                    </small>
-                                    <small>
-                                      {f.part_ids.length
-                                        ? `Part IDs: ${f.part_ids.join(", ")}`
-                                        : "Vehicle-wide; no geometric mapping"}
-                                    </small>
-                                  </span>
-                                  <ArrowRight size={16} aria-hidden="true" />
-                                </button>
-                              ))}
-                            {!workspace.findings.some(group.matches) && (
-                              <p className="muted">
-                                No findings in this group.
-                              </p>
-                            )}
-                          </div>
-                        </section>
-                      ))}
-                    </>
+                    <FeedbackOverview
+                      findings={workspace.findings}
+                      selectedId={selectedFindingId}
+                      onReview={(f) => {
+                        selectFinding(f);
+                        setTab("Evidence");
+                      }}
+                    />
                   )}
+                  {tab === "Proposals" && (
+                    <WorkshopSummary
+                      api={api}
+                      workspace={workspace}
+                      variantId={activeVariantId}
+                      onReview={(c) =>
+                        setReviewChange({
+                          variantId: activeVariantId,
+                          changeId: c.change_id,
+                          displayedWorkspace: workspace,
+                        })
+                      }
+                    />
+                  )}
+                  {tab === "Research" && (
+                    <section>
+                      <h2>Research</h2>
+                      {savedConfig?.deep_dive.enabled ? (
+                        <>
+                          <label className="stacked-label">
+                            Finding
+                            <select
+                              value={selectedFindingId ?? ""}
+                              onChange={(e) => {
+                                const f = workspace.findings.find(
+                                  (f) => f.finding_id === e.target.value,
+                                );
+                                if (f) selectFinding(f);
+                              }}
+                            >
+                              {workspace.findings.map((f) => (
+                                <option key={f.finding_id} value={f.finding_id}>
+                                  {f.title}
+                                </option>
+                              ))}
+                            </select>
+                          </label>
+                          {selectedFinding && (
+                            <ResearchPanel
+                              compact
+                              api={api}
+                              runId={runId!}
+                              finding={selectedFinding}
+                              bundles={workspace.research}
+                              error={workspace.resourceErrors?.research}
+                              onRetry={() => refresh(runId!)}
+                              onOpen={setSource}
+                            />
+                          )}
+                        </>
+                      ) : (
+                        <div className="empty-state">Deep Dive off</div>
+                      )}
+                    </section>
+                  )}
+
+                  <div hidden={tab !== "Renders"}>
+                    <RenderPanel
+                      compact
+                      api={api}
+                      workspace={workspace}
+                      variantId={activeVariantId}
+                      busy={busy}
+                      onRefresh={() => refresh(runId!)}
+                      onOpen={setSource}
+                    />
+                  </div>
                   {tab === "Graph" && (
                     <GraphPanel
+                      compact
                       api={api}
                       runId={runId!}
                       onOpen={setSource}
@@ -1246,110 +1237,82 @@ function WorkspaceApp({
                       }}
                     />
                   )}
-                  {tab === "Evidence" &&
-                    (selectedFinding ? (
-                      <>
-                        <FindingDetails
-                          finding={selectedFinding}
-                          aggregates={run?.part_aggregates}
-                          changes={workspace.proposals.variants.flatMap(
-                            (v) => v.changes,
-                          )}
-                        />
-                        <EvidenceList
-                          api={api}
-                          runId={runId!}
-                          ids={selectedFinding.supporting_evidence_ids}
-                          title="Supporting observations"
-                          onOpen={setSource}
-                        />
-                        <EvidenceList
-                          api={api}
-                          runId={runId!}
-                          ids={selectedFinding.opposing_evidence_ids}
-                          title="Opposing observations"
-                          onOpen={setSource}
-                        />
-                        {savedConfig?.deep_dive.enabled && (
-                          <ResearchPanel
-                            api={api}
-                            runId={runId!}
-                            finding={selectedFinding}
-                            bundles={workspace.research}
-                            error={workspace.resourceErrors?.research}
-                            onRetry={() => refresh(runId!)}
-                            onOpen={setSource}
-                          />
-                        )}
-                      </>
-                    ) : proposalSelection ? (
-                      <>
-                        <p>
-                          No available finding is linked to this proposal.
-                          Customer findings remain separate from PM ideas.
-                        </p>
-                        {proposalSelection.proposalVersion ===
-                        workspace.proposals.proposal_set_version ? (
+                  {tab === "Evidence" && (
+                    <>
+                      {proposalSelection && !selectedFinding ? (
+                        <>
+                          <p>
+                            No available finding is linked to this proposal.
+                          </p>
                           <ChangeExplanation
                             api={api}
                             runId={runId!}
-                            proposals={workspace.proposals}
+                            proposals={
+                              proposalSelection.proposalVersion ===
+                              workspace.proposals.proposal_set_version
+                                ? workspace.proposals
+                                : { ...workspace.proposals, variants: [] }
+                            }
                             variantId={proposalSelection.variantId}
                             changeId={proposalSelection.changeId}
                             onOpen={setSource}
                           />
-                        ) : (
-                          <p>
-                            Selected proposal version{" "}
-                            {proposalSelection.proposalVersion} has changed.
-                            Inspect that exact immutable version in History.
-                          </p>
-                        )}
-                      </>
-                    ) : (
-                      <div className="empty-state">
-                        {selectedFindingId
-                          ? "Selected finding is unavailable in this snapshot. Return to Findings or reconnect to retry."
-                          : "No finding mapped to this part. Vehicle-wide findings remain available in Findings."}
-                      </div>
-                    ))}
+                        </>
+                      ) : (
+                        <EvidenceOverview
+                          api={api}
+                          workspace={workspace}
+                          selectedId={selectedFindingId}
+                          onOpen={setSource}
+                        />
+                      )}
+                    </>
+                  )}
                   <div hidden={tab !== "Proposals"}>
-                    <ProposalWorkspace
-                      api={api}
-                      workspace={workspace}
-                      variantId={activeVariantId}
-                      onVariantChange={setVariantId}
-                      busy={busy}
-                      onRefresh={() => refresh(runId!)}
-                      sessionNamespace={sessionNamespace}
-                      legacyDrafts={[...proposalDrafts.current]}
-                      legacyIdea={ideaDraft}
-                      onOpen={setSource}
-                      onDirtyChange={setProposalDirty}
-                      onEvidence={(change) => {
-                        const linked = workspace.findings.find((f) =>
-                          (
-                            change.wire?.finding_ids ?? [change.finding_id]
-                          ).includes(f.finding_id),
-                        );
-                        if (linked) selectFinding(linked);
-                        else {
-                          setSelectedFindingId(null);
-                          setSelectedComponent(null);
-                          setProposalSelection({
-                            proposalVersion:
-                              workspace.proposals.proposal_set_version,
-                            variantId: activeVariantId,
-                            changeId: change.change_id,
-                          });
-                          setFindingFocusRequest((old) => old + 1);
-                        }
-                        setTab("Evidence");
-                      }}
-                    />
+                    <details
+                      open={editing}
+                      onToggle={(e) => setEditing(e.currentTarget.open)}
+                      className="proposal-tools"
+                    >
+                      <summary>Edit suggestions & variants</summary>
+                      <ProposalWorkspace
+                        api={api}
+                        workspace={workspace}
+                        variantId={activeVariantId}
+                        onVariantChange={setVariantId}
+                        busy={busy}
+                        onRefresh={() => refresh(runId!)}
+                        sessionNamespace={sessionNamespace}
+                        legacyDrafts={[...proposalDrafts.current]}
+                        legacyIdea={ideaDraft}
+                        onOpen={setSource}
+                        onDirtyChange={setProposalDirty}
+                        onEvidence={(change) => {
+                          const linked = workspace.findings.find((f) =>
+                            (
+                              change.wire?.finding_ids ?? [change.finding_id]
+                            ).includes(f.finding_id),
+                          );
+                          if (linked) selectFinding(linked);
+                          else {
+                            setSelectedFindingId(null);
+                            setSelectedComponent(null);
+                            setProposalSelection({
+                              proposalVersion:
+                                workspace.proposals.proposal_set_version,
+                              variantId: activeVariantId,
+                              changeId: change.change_id,
+                            });
+                            setFindingFocusRequest((old) => old + 1);
+                          }
+                          setTab("Evidence");
+                        }}
+                      />
+                    </details>
                   </div>
                   <div hidden={tab !== "History"}>
                     <HistoryPanel
+                      compact
                       api={api}
                       workspace={workspace}
                       variantId={activeVariantId}
@@ -1364,6 +1327,26 @@ function WorkspaceApp({
           </section>
         </div>
       </main>
+      {reviewChange && workspace && (
+        <SuggestionReview
+          key={`${runId}:${reviewChange.variantId}:${reviewChange.changeId}`}
+          api={api}
+          workspace={{
+            ...reviewChange.displayedWorkspace,
+            snapshot: workspace.snapshot,
+          }}
+          variantId={reviewChange.variantId}
+          changeId={reviewChange.changeId}
+          onClose={() => setReviewChange(null)}
+          onRefresh={() => refresh(runId!)}
+          onOpen={setSource}
+          onEdit={() => {
+            setReviewChange(null);
+            setTab("Proposals");
+            setEditing(true);
+          }}
+        />
+      )}
       {confirmNewRun && (
         <ConfirmDialog
           title="Start a new run?"

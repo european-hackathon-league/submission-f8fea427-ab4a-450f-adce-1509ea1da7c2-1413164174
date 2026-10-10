@@ -2,6 +2,16 @@
 
 Scope follows [frontend_plan.md](../frontend_plan.md), [plan.md](../plan.md) and [backlog.md](../backlog.md). Requirements and package evidence live in [acceptance ledger](../doc/frontend/ACCEPTANCE.md). One vehicle workspace contains setup, graph, findings, evidence, proposals, Reimagine and history; deferred pitch/comparison dashboards remain excluded.
 
+## Workshop review experience
+
+The workshop follows the approved HTML preview: a persistent 60/40 vehicle and suggestions layout, Autonomous and Deep Dive switches, and one Add files action that becomes Start analysis after upload. Countries come from source evidence; there is no manual market selector.
+
+Suggestions open a compact review with an actual negative-feedback share, proposed change, source evidence, and version-bound approve/defer/reject commands. Customer feedback uses finding-level bars; Evidence separates supporting and opposing excerpts; Research shows candidate approaches and claim types; Conflicts preserves backend scopes and guided checkpoint controls. Renders retains per-change outcomes and authorized assets. History uses server audit events and keeps exact-version inspection/export under Versions & exports. Detailed editing remains under Edit suggestions & variants.
+
+Counts are backend logical-record counts. Overlapping findings and cohorts are never summed into invented respondent totals, and unknown shares stay unknown. The graph draws only supplied node/edge identities. Sketchfab labels project asset-specific reference coordinates each frame, with collision-aware screen placement and leader lines; cabin coordinates are approximate regions, not verified meshes. Existing semantic part controls remain available if projection or 3D loading is unavailable.
+
+Normal development uses synthetic fixtures; live parsing, research, rendering, and persistent backend analysis require the configured authenticated API.
+
 ## Collection and model browsing
 
 The default entry shows the BMW journey and 24-model collection imported selectively from PR #10. `#workspace` opens the existing requirements workshop directly. Collection selections carry into run setup, and returning to the journey preserves the mounted workshop's uploads and edits. A saved run keeps its original vehicle configuration until **New run**.

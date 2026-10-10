@@ -7,6 +7,7 @@ import type { ExportJob } from "./exportJob";
 import ChangeExplanation from "./ChangeExplanation";
 import AuthorizedDownload from "./AuthorizedDownload";
 export interface HistoryPanelProps {
+  compact?: boolean;
   api: Api;
   workspace: Workspace;
   variantId: string;
@@ -29,7 +30,9 @@ export default function HistoryPanel({
   busy,
   onRefresh,
   onOpen,
+  compact = false,
 }: HistoryPanelProps) {
+  const [actorFilter, setActorFilter] = useState("all");
   const runId = workspace.snapshot.run_id;
   const storageKey =
     api.mode === "real" && api.sessionNamespace
@@ -329,230 +332,307 @@ export default function HistoryPanel({
   }
   return (
     <section aria-label="Proposal history and export">
-      <h2>Proposal history and export</h2>
-      <p>
-        History is retrieved from the API. AI proposals, PM selections,
-        approvals, rendering and validation are separate states.
-      </p>
-      <label>
-        Inspect proposal version
-        <select
-          value={version ?? ""}
-          onChange={(event) => {
-            focusInspection.current = true;
-            setVersion(Number(event.target.value));
-          }}
-        >
-          {!versions.length && <option value="">No published version</option>}
-          {versions.map((v) => (
-            <option key={v} value={v}>
-              {v}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button disabled={refreshing || !!busy} onClick={() => void refresh()}>
-        Refresh proposal history
-      </button>
-      {loading && <p role="status">Loading immutable proposal…</p>}
-      {historyError && (
+      {compact && (
         <>
-          <p role="alert">{historyError}</p>
-          <button onClick={() => setAttempt((v) => v + 1)}>
-            Retry proposal inspection
-          </button>
-        </>
-      )}
-      {inspection && (
-        <article
-          aria-label={`Immutable proposal version ${inspection.proposal_set_version}`}
-        >
-          <h3 ref={inspectionHeading} tabIndex={-1}>
-            Immutable proposal version {inspection.proposal_set_version}
-          </h3>
-          <p>
-            Read-only server snapshot. Generation{" "}
-            {inspection.wire?.generation_id}; source versions{" "}
-            {inspection.wire?.source_version_ids.join(", ") || "None supplied"}.
-          </p>
-          {inspection.variants.map((variant) => (
-            <section key={variant.variant_id}>
-              <h4>
-                {variant.title} / {variant.variant_id}
-              </h4>
-              <p>
-                Cohort scope:{" "}
-                {variant.cohort_scope.join(", ") || "No cohorts assigned"}
-              </p>
-              {variant.changes.map((change, index) => (
-                <details
-                  key={change.change_id}
-                  onToggle={(event) => {
-                    const key = JSON.stringify([
-                      inspection.proposal_set_version,
-                      variant.variant_id,
-                      change.change_id,
-                    ]);
-                    const open = event.currentTarget.open;
-                    setExpanded((old) =>
-                      open
-                        ? [...new Set([...old, key])]
-                        : old.filter((id) => id !== key),
-                    );
-                  }}
-                >
-                  <summary>
-                    {index + 1}. {change.after} / {change.change_id}
-                  </summary>
-                  {expanded.includes(
-                    JSON.stringify([
-                      inspection.proposal_set_version,
-                      variant.variant_id,
-                      change.change_id,
-                    ]),
-                  ) && (
-                    <ChangeExplanation
-                      api={api}
-                      runId={runId}
-                      proposals={inspection}
-                      variantId={variant.variant_id}
-                      changeId={change.change_id}
-                      onOpen={onOpen}
-                    />
+          <div className="visual-heading">
+            <h2>History</h2>
+            <select
+              aria-label="History actor"
+              value={actorFilter}
+              onChange={(e) => setActorFilter(e.target.value)}
+            >
+              <option value="all">Everyone</option>
+              <option value="pm">Product manager</option>
+              <option value="ai">AI</option>
+              <option value="service">System</option>
+            </select>
+          </div>
+          <ol className="audit-timeline">
+            {[...workspace.history]
+              .reverse()
+              .filter(
+                (e) =>
+                  actorFilter === "all" ||
+                  (e.wire?.actor_type ?? e.actor) === actorFilter,
+              )
+              .map((entry) => (
+                <li className="audit-event" key={entry.event_id}>
+                  <span className="audit-dot" aria-hidden="true">
+                    {entry.wire?.actor_type === "pm"
+                      ? "P"
+                      : entry.wire?.actor_type === "ai"
+                        ? "AI"
+                        : "S"}
+                  </span>
+                  <div className="audit-heading">
+                    <strong>{entry.description}</strong>
+                    {entry.proposal_set_version !== null && (
+                      <span className="version-chip">
+                        v{entry.proposal_set_version}
+                      </span>
+                    )}
+                  </div>
+                  <div className="audit-meta">
+                    <span>{entry.actor}</span>
+                    <time dateTime={entry.occurred_at}>
+                      {new Date(entry.occurred_at).toLocaleString(undefined, {
+                        day: "numeric",
+                        month: "short",
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                  </div>
+                  {entry.wire?.rationale && (
+                    <details>
+                      <summary>Decision note</summary>
+                      <p>{entry.wire.rationale}</p>
+                    </details>
                   )}
-                </details>
+                </li>
               ))}
-            </section>
-          ))}
-        </article>
-      )}
-      <h3>Authoritative export</h3>
-      <p>
-        Exports bind the inspected proposal version and selected variant IDs.
-        Download appears only after matching server manifest verification.
-      </p>
-      <fieldset disabled={locked || submitting || !!busy}>
-        <legend>Export variants</legend>
-        {inspection?.variants.map((variant) => (
-          <label key={variant.variant_id}>
-            <input
-              type="checkbox"
-              checked={variants.includes(variant.variant_id)}
-              onChange={(event) =>
-                setVariants((old) =>
-                  event.target.checked
-                    ? [...old, variant.variant_id]
-                    : old.filter((id) => id !== variant.variant_id),
-                )
-              }
-            />
-            {variant.title} / {variant.variant_id}
-          </label>
-        ))}
-      </fieldset>
-      {variants.some(
-        (id) => !inspection?.variants.some((v) => v.variant_id === id),
-      ) && (
-        <p>
-          Selected variant absent from inspected version. Choose an existing
-          variant explicitly before exporting.
-        </p>
-      )}
-      <label>
-        Export format
-        <select
-          value={format}
-          disabled={locked || submitting || !!busy}
-          onChange={(event) =>
-            setFormat(event.target.value as ExportCommand["format"])
-          }
-        >
-          <option value="json">JSON</option>
-          <option value="xlsx">XLSX</option>
-        </select>
-      </label>
-      {!job && (
-        <button
-          disabled={
-            !selectedValid ||
-            !!busy ||
-            submitting ||
-            !workspace.snapshot.available_actions.includes("export")
-          }
-          onClick={() => void submit()}
-        >
-          Request exact-version export
-        </button>
-      )}
-      {!workspace.snapshot.available_actions.includes("export") && (
-        <p>Export unavailable in current backend state.</p>
-      )}
-      {job && (
-        <p>
-          Export request version {job.body.proposal_set_version} / variants{" "}
-          {job.body.variant_ids.join(", ")} / {job.body.format}.
-        </p>
-      )}
-      {submitting && <p role="status">Submitting export request…</p>}
-      {job && !job.resourceId && !submitting && (
-        <>
-          <p>
-            Submission outcome uncertain. Inputs frozen; retry uses the same
-            command.
-          </p>
-          <button disabled={!!busy} onClick={() => void submit(job)}>
-            Retry original export request
-          </button>
+          </ol>
+          {!workspace.history.length && <p>No events yet.</p>}
         </>
       )}
-      {result && (
-        <p role="status">
-          Export {result.status} / {result.export_id}
-        </p>
-      )}
-      {jobError && <p role="alert">{jobError}</p>}
-      {job?.resourceId && jobError && (
-        <button disabled={!!busy} onClick={() => setPollAttempt((v) => v + 1)}>
-          Retry export retrieval
-        </button>
-      )}
-      {download && (
-        <AuthorizedDownload
-          api={api}
-          url={download}
-          filename={`proposal-export-v${job?.body.proposal_set_version}.${job?.body.format ?? "json"}`}
-        />
-      )}
-      {result?.status === "failed" && (
+      <details className="history-tools" open={!compact}>
+        <summary>
+          {compact ? "Versions & exports" : "Proposal history and export"}
+        </summary>
+        <h2>Proposal history and export</h2>
         <p>
-          Backend export failed. No retry endpoint is published; another request
-          creates a new command for this exact selection.
+          History is retrieved from the API. AI proposals, PM selections,
+          approvals, rendering and validation are separate states.
         </p>
-      )}
-      {job &&
-        (result?.status === "ready" || result?.status === "failed") &&
-        !jobError && (
-          <button
-            onClick={() => {
-              updateJob(null);
-              setResult(null);
-              setDownload(null);
+        <label>
+          Inspect proposal version
+          <select
+            value={version ?? ""}
+            onChange={(event) => {
+              focusInspection.current = true;
+              setVersion(Number(event.target.value));
             }}
           >
-            Prepare another export
+            {!versions.length && <option value="">No published version</option>}
+            {versions.map((v) => (
+              <option key={v} value={v}>
+                {v}
+              </option>
+            ))}
+          </select>
+        </label>
+        <button disabled={refreshing || !!busy} onClick={() => void refresh()}>
+          Refresh proposal history
+        </button>
+        {loading && <p role="status">Loading immutable proposal…</p>}
+        {historyError && (
+          <>
+            <p role="alert">{historyError}</p>
+            <button onClick={() => setAttempt((v) => v + 1)}>
+              Retry proposal inspection
+            </button>
+          </>
+        )}
+        {inspection && (
+          <article
+            aria-label={`Immutable proposal version ${inspection.proposal_set_version}`}
+          >
+            <h3 ref={inspectionHeading} tabIndex={-1}>
+              Immutable proposal version {inspection.proposal_set_version}
+            </h3>
+            <p>
+              Read-only server snapshot. Generation{" "}
+              {inspection.wire?.generation_id}; source versions{" "}
+              {inspection.wire?.source_version_ids.join(", ") ||
+                "None supplied"}
+              .
+            </p>
+            {inspection.variants.map((variant) => (
+              <section key={variant.variant_id}>
+                <h4>
+                  {variant.title} / {variant.variant_id}
+                </h4>
+                <p>
+                  Cohort scope:{" "}
+                  {variant.cohort_scope.join(", ") || "No cohorts assigned"}
+                </p>
+                {variant.changes.map((change, index) => (
+                  <details
+                    key={change.change_id}
+                    onToggle={(event) => {
+                      const key = JSON.stringify([
+                        inspection.proposal_set_version,
+                        variant.variant_id,
+                        change.change_id,
+                      ]);
+                      const open = event.currentTarget.open;
+                      setExpanded((old) =>
+                        open
+                          ? [...new Set([...old, key])]
+                          : old.filter((id) => id !== key),
+                      );
+                    }}
+                  >
+                    <summary>
+                      {index + 1}. {change.after} / {change.change_id}
+                    </summary>
+                    {expanded.includes(
+                      JSON.stringify([
+                        inspection.proposal_set_version,
+                        variant.variant_id,
+                        change.change_id,
+                      ]),
+                    ) && (
+                      <ChangeExplanation
+                        api={api}
+                        runId={runId}
+                        proposals={inspection}
+                        variantId={variant.variant_id}
+                        changeId={change.change_id}
+                        onOpen={onOpen}
+                      />
+                    )}
+                  </details>
+                ))}
+              </section>
+            ))}
+          </article>
+        )}
+        <h3>Authoritative export</h3>
+        <p>
+          Exports bind the inspected proposal version and selected variant IDs.
+          Download appears only after matching server manifest verification.
+        </p>
+        <fieldset disabled={locked || submitting || !!busy}>
+          <legend>Export variants</legend>
+          {inspection?.variants.map((variant) => (
+            <label key={variant.variant_id}>
+              <input
+                type="checkbox"
+                checked={variants.includes(variant.variant_id)}
+                onChange={(event) =>
+                  setVariants((old) =>
+                    event.target.checked
+                      ? [...old, variant.variant_id]
+                      : old.filter((id) => id !== variant.variant_id),
+                  )
+                }
+              />
+              {variant.title} / {variant.variant_id}
+            </label>
+          ))}
+        </fieldset>
+        {variants.some(
+          (id) => !inspection?.variants.some((v) => v.variant_id === id),
+        ) && (
+          <p>
+            Selected variant absent from inspected version. Choose an existing
+            variant explicitly before exporting.
+          </p>
+        )}
+        <label>
+          Export format
+          <select
+            value={format}
+            disabled={locked || submitting || !!busy}
+            onChange={(event) =>
+              setFormat(event.target.value as ExportCommand["format"])
+            }
+          >
+            <option value="json">JSON</option>
+            <option value="xlsx">XLSX</option>
+          </select>
+        </label>
+        {!job && (
+          <button
+            disabled={
+              !selectedValid ||
+              !!busy ||
+              submitting ||
+              !workspace.snapshot.available_actions.includes("export")
+            }
+            onClick={() => void submit()}
+          >
+            Request exact-version export
           </button>
         )}
-      <h3>Readable audit</h3>
-      {!workspace.history.length && <p>No audit entries supplied.</p>}
-      <ol>
-        {workspace.history.map((entry) => (
-          <li key={entry.event_id}>
-            {entry.occurred_at} / {entry.actor} / {entry.description} / proposal{" "}
-            {entry.proposal_set_version ?? "Not supplied"}
-            {entry.wire?.rationale && ` / ${entry.wire.rationale}`}
-          </li>
-        ))}
-      </ol>
+        {!workspace.snapshot.available_actions.includes("export") && (
+          <p>Export unavailable in current backend state.</p>
+        )}
+        {job && (
+          <p>
+            Export request version {job.body.proposal_set_version} / variants{" "}
+            {job.body.variant_ids.join(", ")} / {job.body.format}.
+          </p>
+        )}
+        {submitting && <p role="status">Submitting export request…</p>}
+        {job && !job.resourceId && !submitting && (
+          <>
+            <p>
+              Submission outcome uncertain. Inputs frozen; retry uses the same
+              command.
+            </p>
+            <button disabled={!!busy} onClick={() => void submit(job)}>
+              Retry original export request
+            </button>
+          </>
+        )}
+        {result && (
+          <p role="status">
+            Export {result.status} / {result.export_id}
+          </p>
+        )}
+        {jobError && <p role="alert">{jobError}</p>}
+        {job?.resourceId && jobError && (
+          <button
+            disabled={!!busy}
+            onClick={() => setPollAttempt((v) => v + 1)}
+          >
+            Retry export retrieval
+          </button>
+        )}
+        {download && (
+          <AuthorizedDownload
+            api={api}
+            url={download}
+            filename={`proposal-export-v${job?.body.proposal_set_version}.${job?.body.format ?? "json"}`}
+          />
+        )}
+        {result?.status === "failed" && (
+          <p>
+            Backend export failed. No retry endpoint is published; another
+            request creates a new command for this exact selection.
+          </p>
+        )}
+        {job &&
+          (result?.status === "ready" || result?.status === "failed") &&
+          !jobError && (
+            <button
+              onClick={() => {
+                updateJob(null);
+                setResult(null);
+                setDownload(null);
+              }}
+            >
+              Prepare another export
+            </button>
+          )}
+        {!compact && (
+          <>
+            <h3>Readable audit</h3>
+            {!workspace.history.length && <p>No audit entries supplied.</p>}
+            <ol>
+              {workspace.history.map((entry) => (
+                <li key={entry.event_id}>
+                  {entry.occurred_at} / {entry.actor} / {entry.description} /
+                  proposal {entry.proposal_set_version ?? "Not supplied"}
+                  {entry.wire?.rationale && ` / ${entry.wire.rationale}`}
+                </li>
+              ))}
+            </ol>
+          </>
+        )}
+      </details>
     </section>
   );
 }

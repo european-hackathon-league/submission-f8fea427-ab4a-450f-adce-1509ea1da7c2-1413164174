@@ -1,0 +1,72 @@
+name: Backend
+on:
+  pull_request:
+    branches: [backend, main]
+  push:
+    branches: [backend, main, 'be/**']
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
+      - name: Build locked Linux runtime
+        run: docker compose build api worker
+      - name: Start local integration services
+        run: docker compose up -d postgres temporal
+      - name: Migrate empty database, then repeat migration
+        run: |
+          docker compose run --rm api python -m alembic upgrade head
+          docker compose run --rm api python -m alembic upgrade head
+          docker compose run --rm api python -m alembic check
+      - name: Lint and formatting
+        run: |
+          docker compose run --rm api python -m ruff check app tests migrations
+          docker compose run --rm api python -m ruff format --check app tests migrations
+      - name: Type checking
+        run: docker compose run --rm api python -m mypy app
+      - name: Contract drift
+        run: docker compose run --rm api python -m app.contracts --check
+      - name: Behavior and integration tests
+        run: docker compose run --rm api python -m pytest -ra
+      - name: Verify API and worker startup
+        run: |
+          docker compose run --rm api python -m app.seed
+          docker compose up -d api worker
+          docker compose exec -T api python - <<'PY'
+          import asyncio
+          import urllib.request
+          from temporalio.api.enums.v1 import TaskQueueType
+          from temporalio.api.taskqueue.v1 import TaskQueue
+          from temporalio.api.workflowservice.v1 import DescribeTaskQueueRequest
+          from temporalio.client import Client
+          async def check():
+              client = await asyncio.wait_for(Client.connect("temporal:7233"), 5)
+              for _ in range(15):
+                  result = await asyncio.wait_for(client.workflow_service.describe_task_queue(
+                      DescribeTaskQueueRequest(namespace="default", task_queue=TaskQueue(name="vehicle-backend"),
+                                               task_queue_type=TaskQueueType.TASK_QUEUE_TYPE_WORKFLOW)), 3)
+                  if result.pollers:
+                      try:
+                          with urllib.request.urlopen("http://localhost:8000/health", timeout=3) as response:
+                              assert response.status == 200
+                          return
+                      except OSError:
+                          pass
+                  await asyncio.sleep(1)
+              raise AssertionError("API or Temporal worker did not become ready")
+          asyncio.run(check())
+          PY
+      - name: Parser binary compatibility
+        run: docker build --target parser -t backend-parser-check .
+      - name: Service logs
+        if: failure()
+        run: docker compose logs --tail 100 postgres temporal
+      - name: Stop services
+        if: always()
+        run: docker compose down

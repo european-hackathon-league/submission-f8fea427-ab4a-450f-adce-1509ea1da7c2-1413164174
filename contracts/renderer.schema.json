@@ -1,0 +1,275 @@
+{
+  "request": {
+    "$defs": {
+      "ManifestChange": {
+        "additionalProperties": false,
+        "properties": {
+          "change_id": {
+            "title": "Change Id",
+            "type": "string"
+          },
+          "evidence_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Evidence Ids",
+            "type": "array"
+          },
+          "part_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Part Ids",
+            "type": "array"
+          },
+          "preserve_constraints": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Preserve Constraints",
+            "type": "array"
+          },
+          "proposed_outcome": {
+            "title": "Proposed Outcome",
+            "type": "string"
+          },
+          "visual_instruction": {
+            "title": "Visual Instruction",
+            "type": "string"
+          }
+        },
+        "required": [
+          "change_id",
+          "part_ids",
+          "proposed_outcome",
+          "visual_instruction",
+          "preserve_constraints",
+          "evidence_ids"
+        ],
+        "title": "ManifestChange",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "baseline_asset_id": {
+        "title": "Baseline Asset Id",
+        "type": "string"
+      },
+      "changes": {
+        "items": {
+          "$ref": "#/$defs/ManifestChange"
+        },
+        "title": "Changes",
+        "type": "array"
+      },
+      "contract_version": {
+        "const": "1",
+        "default": "1",
+        "title": "Contract Version",
+        "type": "string"
+      },
+      "part_catalog_version": {
+        "title": "Part Catalog Version",
+        "type": "string"
+      },
+      "proposal_set_version": {
+        "minimum": 1,
+        "title": "Proposal Set Version",
+        "type": "integer"
+      },
+      "render_request_id": {
+        "title": "Render Request Id",
+        "type": "string"
+      },
+      "run_id": {
+        "title": "Run Id",
+        "type": "string"
+      },
+      "variant_ids": {
+        "items": {
+          "type": "string"
+        },
+        "minItems": 1,
+        "title": "Variant Ids",
+        "type": "array"
+      }
+    },
+    "required": [
+      "proposal_set_version",
+      "variant_ids",
+      "baseline_asset_id",
+      "render_request_id",
+      "run_id",
+      "part_catalog_version",
+      "changes"
+    ],
+    "title": "RenderManifest",
+    "type": "object"
+  },
+  "result": {
+    "$defs": {
+      "Asset": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "media_type": {
+            "title": "Media Type",
+            "type": "string"
+          },
+          "url": {
+            "title": "Url",
+            "type": "string"
+          }
+        },
+        "required": [
+          "asset_id",
+          "url",
+          "media_type"
+        ],
+        "title": "Asset",
+        "type": "object"
+      },
+      "RenderOutcome": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_ids": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Asset Ids",
+            "type": "array"
+          },
+          "change_id": {
+            "title": "Change Id",
+            "type": "string"
+          },
+          "outcome": {
+            "enum": [
+              "rendered",
+              "annotated",
+              "unsupported",
+              "failed"
+            ],
+            "title": "Outcome",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Reason"
+          }
+        },
+        "required": [
+          "change_id",
+          "outcome",
+          "asset_ids"
+        ],
+        "title": "RenderOutcome",
+        "type": "object"
+      }
+    },
+    "additionalProperties": false,
+    "properties": {
+      "assets": {
+        "items": {
+          "$ref": "#/$defs/Asset"
+        },
+        "title": "Assets",
+        "type": "array"
+      },
+      "baseline_asset_id": {
+        "title": "Baseline Asset Id",
+        "type": "string"
+      },
+      "failure_reason": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Failure Reason"
+      },
+      "job_id": {
+        "anyOf": [
+          {
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Job Id"
+      },
+      "outcomes": {
+        "items": {
+          "$ref": "#/$defs/RenderOutcome"
+        },
+        "title": "Outcomes",
+        "type": "array"
+      },
+      "part_catalog_version": {
+        "title": "Part Catalog Version",
+        "type": "string"
+      },
+      "proposal_set_version": {
+        "title": "Proposal Set Version",
+        "type": "integer"
+      },
+      "render_request_id": {
+        "title": "Render Request Id",
+        "type": "string"
+      },
+      "stale": {
+        "default": false,
+        "title": "Stale",
+        "type": "boolean"
+      },
+      "status": {
+        "enum": [
+          "queued",
+          "rendering",
+          "succeeded",
+          "partial",
+          "failed"
+        ],
+        "title": "Status",
+        "type": "string"
+      },
+      "variant_ids": {
+        "items": {
+          "type": "string"
+        },
+        "title": "Variant Ids",
+        "type": "array"
+      }
+    },
+    "required": [
+      "render_request_id",
+      "proposal_set_version",
+      "variant_ids",
+      "baseline_asset_id",
+      "part_catalog_version",
+      "status",
+      "assets",
+      "outcomes"
+    ],
+    "title": "RenderResult",
+    "type": "object"
+  }
+}

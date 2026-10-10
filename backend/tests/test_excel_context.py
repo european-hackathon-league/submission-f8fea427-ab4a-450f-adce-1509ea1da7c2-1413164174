@@ -88,3 +88,72 @@ def test_changed_study_headers_do_not_guess_a_vehicle_or_market():
     assert result.status == "unsupported"
     assert result.metrics == []
     assert any(issue.code == "mapping_required" for issue in result.coverage)
+
+
+def test_explicit_participant_counts_are_separate_from_proportion_bases():
+    result = parse_excel(
+        workbook(
+            {
+                "US_2025": [
+                    ["Synthetic topic", None, "Model G60"],
+                    ["Number of respondents", "Synthetic topic", 100],
+                    ["Sample total", "Synthetic topic", 1],
+                    ["Satisfied", "Synthetic topic", 0.6],
+                    ["Dissatisfied", "Synthetic topic", 0.4],
+                ]
+            }
+        ),
+        dataset_namespace="study",
+    )
+    assert result.status == "ready"
+    assert len(result.metrics) == 2
+    assert all(metric.denominator == 100 for metric in result.metrics)
+    assert all(metric.proportion_base == 1 for metric in result.metrics)
+    assert result.metrics[0].locator.cells[-1] == "C2"
+    assert result.metrics[0].raw_cells["C2"] == 100
+    assert result.records == []
+
+
+def test_mean_sample_size_is_scoped_to_its_topic_and_not_inherited():
+    result = parse_excel(
+        workbook(
+            {
+                "CN_EU_2025": [
+                    [],
+                    [None, "China"],
+                    ["Synthetic comfort", "Model G68"],
+                    ["Sample size", 50],
+                    ["Mean", 8],
+                    ["Synthetic usability"],
+                    ["Mean", 9],
+                ]
+            }
+        ),
+        dataset_namespace="study",
+    )
+    assert result.metrics[0].topic == "Synthetic comfort"
+    assert result.metrics[0].denominator == 50
+    assert result.metrics[0].locator.cells[-1] == "B4"
+    assert result.metrics[1].denominator is None
+
+
+def test_invalid_participant_count_retains_valid_fraction_and_original_count():
+    result = parse_excel(
+        workbook(
+            {
+                "US_2025": [
+                    ["Synthetic topic", None, "Model G60"],
+                    ["Number of respondents", "Synthetic topic", 3.5],
+                    ["Sample total", "Synthetic topic", 1],
+                    ["Satisfied", "Synthetic topic", 1],
+                ]
+            }
+        ),
+        dataset_namespace="study",
+    )
+    assert result.status == "partial"
+    assert result.metrics[0].value == 1
+    assert result.metrics[0].denominator is None
+    assert result.metrics[0].raw_cells["C2"] == 3.5
+    assert "unknown_sample_size" in result.metrics[0].limitations
+    assert any(issue.code == "invalid_sample_size" for issue in result.coverage)

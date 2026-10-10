@@ -3,7 +3,7 @@
 import math
 import re
 from io import BytesIO
-from typing import Any
+from typing import Any, Literal
 
 import openpyxl
 from openpyxl import load_workbook
@@ -18,7 +18,7 @@ from app.ingest_types import (
 )
 from app.wire import CellLocator, Scope
 
-REVISION = "excel-v2"
+REVISION = "excel-v3"
 HEADERS = {
     "id": "id",
     "source": "source",
@@ -231,6 +231,15 @@ def parse_excel(
                     issue(result, "mapping_required", locator(sheet.title, 1, [1]))
             if not result.metrics:
                 result.status = "unsupported"
+        elif any(is_sales_sheet(sheet) for sheet in book):
+            result.kind = "sales"
+            for sheet in book:
+                if is_sales_sheet(sheet):
+                    sales(sheet, raw_book[sheet.title], reference_year, result)
+                else:
+                    issue(result, "mapping_required", locator(sheet.title, 1, [1]))
+            if not result.metrics:
+                result.status = "unsupported"
         else:
             result.status = "unsupported"
             issue(result, "mapping_required")
@@ -254,7 +263,7 @@ def number(value: Any, result: ParseResult, location: CellLocator) -> float | No
     return float(value)
 
 
-def study_metric(
+def context_metric(
     result: ParseResult,
     sheet: str,
     rows: list[list[Any]],
@@ -265,6 +274,8 @@ def study_metric(
     scope: Scope,
     proportion_base: float | None = None,
     limitations: list[str] | None = None,
+    denominator: float | None = None,
+    source_kind: Literal["study", "sales"] = "study",
 ) -> ContextMetric:
     cells = [f"{get_column_letter(column)}{row}" for row, column in references]
     raw_cells = {}
@@ -274,19 +285,25 @@ def study_metric(
             raw if raw is None or isinstance(raw, (str, int, float, bool)) else str(raw)
         )
     item = ContextMetric(
-        source_kind="study",
+        source_kind=source_kind,
         topic=topic,
         metric=metric,
         value=value,
-        unit="fraction" if metric == "fraction" else None,
-        denominator=None,
+        unit={"fraction": "fraction", "mean": None, "sales_volume": "vehicles"}.get(
+            metric
+        ),
+        denominator=denominator,
         proportion_base=proportion_base,
         raw_cells=raw_cells,
         locator=CellLocator(sheet=sheet, row=references[0][0], cells=cells),
         scope=scope,
         limitations=[
-            "unknown_sample_size",
-            *([] if metric == "fraction" else ["unknown_mean_scale"]),
+            *(
+                ["unknown_sample_size"]
+                if source_kind == "study" and denominator is None
+                else []
+            ),
+            *(["unknown_mean_scale"] if metric == "mean" else []),
             *(limitations or []),
         ],
     )
@@ -343,11 +360,28 @@ def mean_study(
             issue(result, "mapping_required", location)
     topic = ""
     topic_row = header_row + 1
+    samples: dict[int, tuple[float | None, int]] = {}
     for index in range(header_row, len(rows)):
         row = rows[index]
         label = text(row[0]).strip()
+        if label.casefold() in {
+            "sample size",
+            "number of respondents",
+            "respondents (n)",
+        }:
+            samples = {
+                column: (
+                    sample_count(
+                        row[column], result, locator(sheet, index + 1, [column + 1])
+                    ),
+                    index + 1,
+                )
+                for column in columns
+            }
+            continue
         if label and label.casefold() != "mean":
             topic, topic_row = label, index + 1
+            samples.clear()
             continue
         if label.casefold() != "mean":
             continue
@@ -363,8 +397,19 @@ def mean_study(
                 (header_row + 1, column + 1),
                 (header_row, market_column + 1),
             ]
-            study_metric(
-                result, sheet, raw_rows, references, topic, "mean", value, scope
+            count, sample_row = samples.get(column, (None, 0))
+            if sample_row:
+                references.append((sample_row, column + 1))
+            context_metric(
+                result,
+                sheet,
+                raw_rows,
+                references,
+                topic,
+                "mean",
+                value,
+                scope,
+                denominator=count,
             )
 
 
@@ -393,6 +438,7 @@ def fraction_study(
     topic_row = 1
     totals: dict[int, tuple[float | None, int]] = {}
     groups: dict[int, list[ContextMetric]] = {}
+    samples: dict[int, tuple[float | None, int]] = {}
 
     def check_totals() -> None:
         # Published fractions tolerate two percentage points of rounding, never renormalize.
@@ -409,6 +455,21 @@ def fraction_study(
     for index, row in enumerate(rows):
         label = text(row[0]).strip()
         if not any(text(value).strip() for value in row):
+            continue
+        if label.casefold() in {
+            "sample size",
+            "number of respondents",
+            "respondents (n)",
+        }:
+            samples = {
+                column: (
+                    sample_count(
+                        row[column], result, locator(sheet, index + 1, [column + 1])
+                    ),
+                    index + 1,
+                )
+                for column in columns
+            }
             continue
         if label.casefold() == "sample total":
             totals.clear()
@@ -429,6 +490,7 @@ def fraction_study(
             check_totals()
             topic, topic_row = label, index + 1
             totals.clear()
+            samples.clear()
             continue
         if not label or not topic or not totals:
             issue(result, "mapping_required", locator(sheet, index + 1, [1]))
@@ -449,7 +511,10 @@ def fraction_study(
                 (1, column + 1),
                 (base_row, column + 1),
             ]
-            item = study_metric(
+            count, sample_row = samples.get(column, (None, 0))
+            if sample_row:
+                references.append((sample_row, column + 1))
+            item = context_metric(
                 result,
                 sheet,
                 raw_rows,
@@ -460,6 +525,95 @@ def fraction_study(
                 scope,
                 base,
                 limitations,
+                denominator=count,
             )
             groups.setdefault(column, []).append(item)
     check_totals()
+
+
+def sample_count(
+    value: Any, result: ParseResult, location: CellLocator
+) -> float | None:
+    count = number(value, result, location)
+    if count is not None and (count < 0 or not count.is_integer()):
+        issue(result, "invalid_sample_size", location)
+        return None
+    return count
+
+
+def is_sales_sheet(sheet: Any) -> bool:
+    header = next(sheet.values, ())
+    return len(header) >= 2 and [
+        text(value).strip().casefold() for value in header[:2]
+    ] == ["market", "market_code"]
+
+
+def sales(sheet: Any, raw_sheet: Any, reference_year: int, result: ParseResult) -> None:
+    rows = [list(row) for row in sheet.values]
+    raw_rows = [list(row) for row in raw_sheet.values]
+    vehicles = re.findall(r"\b[A-Z]\d{2}\b", sheet.title.replace("_", " "))
+    years: dict[int, int] = {}
+    for column, header in enumerate(rows[0][2:], 2):
+        matches = re.findall(r"(?<!\d)(20\d{2})(?!\d)", text(header))
+        if len(matches) == 1:
+            years[column] = int(matches[0])
+        elif text(header).strip():
+            issue(result, "mapping_required", locator(sheet.title, 1, [column + 1]))
+    if not vehicles or not years or len(set(years.values())) != len(years):
+        issue(result, "mapping_required", locator(sheet.title, 1, [1]))
+        return
+    for index, row in enumerate(rows[1:], 2):
+        if not any(text(value).strip() for value in row):
+            continue
+        code_market = COUNTRIES.get(text(row[1]).strip().casefold())
+        label_market = COUNTRIES.get(text(row[0]).strip().casefold())
+        row_scope = scope_for(
+            row[1] if code_market or not label_market else row[0],
+            " ".join(vehicles),
+            result,
+            locator(sheet.title, index, [1, 2]),
+        )
+        if code_market and label_market and code_market != label_market:
+            issue(
+                result,
+                "conflicting_country_mapping",
+                locator(sheet.title, index, [1, 2]),
+            )
+            row_scope.markets = []
+            row_scope.cohort_ids = []
+        for column, year in years.items():
+            location = locator(sheet.title, index, [column + 1])
+            value = number(row[column], result, location)
+            limitations = []
+            if (
+                raw_rows[index - 1][column] is not None
+                and text(raw_rows[index - 1][column]).startswith("=")
+                and row[column] is None
+            ):
+                issue(result, "missing_formula_cache", location)
+                limitations.append("missing_formula_cache")
+            if value is not None and value < 0:
+                issue(result, "negative_sales_value", location)
+                limitations.append("negative_sales_value")
+                value = None
+            if value is not None and not value.is_integer():
+                issue(result, "noninteger_sales_value", location)
+                limitations.append("noninteger_sales_value")
+                value = None
+            if year > reference_year:
+                limitations.append("future_year_context")
+            scope = row_scope.model_copy(deep=True)
+            scope.year = year
+            references = [(index, column + 1), (index, 1), (index, 2), (1, column + 1)]
+            context_metric(
+                result,
+                sheet.title,
+                raw_rows,
+                references,
+                "Sales volume",
+                "sales_volume",
+                value,
+                scope,
+                limitations=limitations,
+                source_kind="sales",
+            )

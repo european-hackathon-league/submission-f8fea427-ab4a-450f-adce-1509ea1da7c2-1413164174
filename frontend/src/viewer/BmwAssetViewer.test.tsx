@@ -1,6 +1,6 @@
 import {act,cleanup, fireEvent, render, screen, waitFor} from '@testing-library/react';
 import {afterEach, describe, expect, it, vi} from 'vitest';
-import BmwAssetViewer, {BMW_I5_MODEL_UID,normalizeSketchfabNodeMap} from './BmwAssetViewer';
+import BmwAssetViewer, {BMW_I5_MODEL_UID,frameCameraForAspect,normalizeSketchfabNodeMap} from './BmwAssetViewer';
 import {findings} from '../domain/fixtures';
 
 type InitOptions={success:(api:any)=>void;error:()=>void};
@@ -12,6 +12,21 @@ describe('normalizeSketchfabNodeMap',()=>{
     expect(normalizeSketchfabNodeMap([{instanceID:7,name:'Headlamps'}])).toEqual([{instanceID:7,name:'Headlamps'}]);
     expect(normalizeSketchfabNodeMap({nodes:{'8':{name:'Dashboard'}}})).toEqual([{instanceID:8,name:'Dashboard'}]);
     expect(normalizeSketchfabNodeMap({bad:{name:'No instance id'}})).toEqual([]);
+  });
+});
+
+describe('aspect-aware camera framing',()=>{
+  it('pulls back for narrow stages while preserving target and Z-up viewing direction',()=>{
+    const camera={position:[5,3,8],target:[1,-2,2]};
+    const framed=frameCameraForAspect(camera,573/450);
+    const originalDirection=camera.position.map((value,index)=>value-camera.target[index]);
+    const framedDirection=framed.position.map((value,index)=>value-framed.target[index]);
+
+    expect(framed.target).toEqual(camera.target);
+    expect(framed.position[2]-framed.target[2]).toBeGreaterThan(originalDirection[2]);
+    expect(framedDirection[0]/originalDirection[0]).toBeCloseTo(framedDirection[1]/originalDirection[1]);
+    expect(framedDirection[2]/originalDirection[2]).toBeCloseTo(framedDirection[0]/originalDirection[0]);
+    expect(frameCameraForAspect(camera,16/9)).toEqual(camera);
   });
 });
 

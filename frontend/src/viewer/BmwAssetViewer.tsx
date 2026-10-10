@@ -62,6 +62,27 @@ export function normalizeSketchfabNodeMap(payload:SketchfabNodePayload):Sketchfa
   });
 }
 
+const wideCameraAspect=16/9;
+function cameraAspectScale(aspect:number):number{
+  if(!Number.isFinite(aspect)||aspect<=0)return 1;
+  return Math.min(1.8,Math.max(1,wideCameraAspect/aspect));
+}
+
+export function frameCameraForAspect(camera:CameraState,aspect:number):CameraState{
+  const scale=cameraAspectScale(aspect);
+  return {
+    target:[...camera.target],
+    position:camera.position.map((coordinate,index)=>camera.target[index]+(coordinate-camera.target[index])*scale),
+  };
+}
+
+function elementAspect(element:HTMLIFrameElement):number{
+  const rect=element.getBoundingClientRect();
+  const width=rect.width||element.clientWidth;
+  const height=rect.height||element.clientHeight;
+  return width>0&&height>0?width/height:0;
+}
+
 function reducedMotion():boolean{
   return window.matchMedia?.('(prefers-reduced-motion: reduce)').matches??false;
 }
@@ -97,6 +118,28 @@ function useSketchfabViewer(
     setSceneReady(false);
     let disposed=false;
     let viewerIsReady=false;
+    let lastAspect=elementAspect(iframe);
+    const adjustToAspect=(nextAspect:number)=>{
+      if(disposed||!Number.isFinite(nextAspect)||nextAspect<=0)return;
+      if(!viewerIsReady){lastAspect=nextAspect;return;}
+      const previousAspect=lastAspect||nextAspect;
+      lastAspect=nextAspect;
+      if(!initialCameraRef.current)return;
+      const distanceScale=cameraAspectScale(nextAspect)/cameraAspectScale(previousAspect);
+      if(Math.abs(distanceScale-1)<0.035)return;
+      apiRef.current?.getCameraLookAt((error,camera)=>{
+        if(error||disposed)return;
+        const position=camera.position.map((coordinate,index)=>camera.target[index]+(coordinate-camera.target[index])*distanceScale);
+        apiRef.current?.setCameraLookAt(position,camera.target,reducedMotion()?0:.2);
+      });
+    };
+    const resizeObserver=typeof ResizeObserver==='function'?new ResizeObserver(entries=>{
+      const rect=entries[0]?.contentRect;
+      if(rect)adjustToAspect(rect.width/rect.height);
+    }):null;
+    const resizeHandler=()=>adjustToAspect(elementAspect(iframe));
+    if(resizeObserver)resizeObserver.observe(iframe);
+    else window.addEventListener('resize',resizeHandler);
     const loadTimeout=window.setTimeout(()=>{if(!disposed&&!viewerIsReady)callbacksRef.current.onFailure();},20000);
     void loadSketchfabApi().then(()=>{
       if(disposed||!iframe||!window.Sketchfab)return;
@@ -117,7 +160,16 @@ function useSketchfabViewer(
             api.setBackground({color:[0.15,0.16,0.18]});
             setSceneReady(true);
             callbacksRef.current.onReady();
-            api.getCameraLookAt((error,camera)=>{if(!error&&!disposed)initialCameraRef.current=camera;});
+            api.getCameraLookAt((error,camera)=>{
+              if(error||disposed)return;
+              initialCameraRef.current=camera;
+              const aspect=elementAspect(iframe)||lastAspect;
+              if(aspect>0){
+                lastAspect=aspect;
+                const framed=frameCameraForAspect(camera,aspect);
+                if(cameraAspectScale(aspect)!==1)api.setCameraLookAt(framed.position,framed.target,reducedMotion()?0:.2);
+              }
+            });
             api.getNodeMap((error,payload)=>{
               if(error||disposed)return;
               const nodes=normalizeSketchfabNodeMap(payload);
@@ -140,6 +192,8 @@ function useSketchfabViewer(
     return ()=>{
       disposed=true;
       window.clearTimeout(loadTimeout);
+      resizeObserver?.disconnect();
+      window.removeEventListener('resize',resizeHandler);
       apiRef.current?.stop();
       apiRef.current=null;
     };
@@ -149,10 +203,13 @@ function useSketchfabViewer(
     const api=apiRef.current;
     if(!api)return false;
     const camera=initialCameraRef.current;
-    if(camera)api.setCameraLookAt(camera.position,camera.target,reducedMotion()?0:.45);
+    if(camera){
+      const framed=frameCameraForAspect(camera,iframe?elementAspect(iframe):0);
+      api.setCameraLookAt(framed.position,framed.target,reducedMotion()?0:.45);
+    }
     else api.recenterCamera();
     return true;
-  },[]);
+  },[iframe]);
 
   const zoom=useCallback((direction:-1|1)=>{
     const api=apiRef.current;

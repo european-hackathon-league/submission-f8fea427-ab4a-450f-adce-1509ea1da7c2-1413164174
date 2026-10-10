@@ -5,12 +5,13 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import uuid4
 
+from opentelemetry import propagate, trace
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DBSession
 
 from app import wire as w
 from app.auth import Actor, reject
-from app.db import Audit, Command, Event, Run, Session, Workspace
+from app.db import Audit, Command, Event, Membership, Run, Session, Workspace
 
 
 def new_id() -> str:
@@ -63,6 +64,7 @@ def command(
             )
         )
         if previous:
+            trace.get_current_span().set_attribute("command.id", previous.id)
             if previous.body_hash != fingerprint:
                 reject(
                     "idempotency_conflict",
@@ -71,7 +73,12 @@ def command(
                 )
             return previous.result
         command_id = new_id()
+        trace.get_current_span().set_attribute("command.id", command_id)
         result = effect(session, command_id)
+        context: dict[str, str] = {}
+        propagate.inject(context)
+        if result.get("run_id"):
+            trace.get_current_span().set_attribute("run.id", result["run_id"])
         session.add(
             Command(
                 id=command_id,
@@ -82,6 +89,8 @@ def command(
                 body_hash=fingerprint,
                 body=body,
                 result=result,
+                run_id=result.get("run_id"),
+                trace_context=context,
             )
         )
         audit(
@@ -95,6 +104,8 @@ def command(
 
 
 def owned_run(session: DBSession, actor: Actor, run_id: str, lock: bool = False) -> Run:
+    if session.get(Membership, (actor.workspace_id, actor.actor_id)) is None:
+        reject("forbidden", "Workspace membership is no longer active", 403)
     query = select(Run).where(Run.id == run_id, Run.workspace_id == actor.workspace_id)
     if lock:
         query = query.with_for_update()

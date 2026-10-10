@@ -1,7 +1,8 @@
+import asyncio
 import json
 import logging
 import time
-from collections.abc import Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Annotated, Any, NoReturn
 from uuid import uuid4
 
@@ -19,16 +20,18 @@ from fastapi import (
 from fastapi.exceptions import RequestValidationError
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from fastapi.sse import EventSourceResponse, ServerSentEvent
 from sqlalchemy import select
 from sqlalchemy.orm import Session as DBSession
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from starlette.responses import Response
 
+from app import runs
 from app import wire as w
 from app.auth import Actor, actor, reject
-from app.commands import audit, command, new_id
+from app.commands import audit, command, emit, new_id
 from app.config import Settings
-from app.db import Session, Source, SourceVersion
+from app.db import Outbox, Run, RunSource, Session, Source, SourceVersion
 from app.limits import BodyLimit
 from app.storage import digest, inspect_upload, storage
 from app.telemetry import configure, latency, requests, tracer
@@ -140,8 +143,27 @@ def pending() -> NoReturn:
 
 
 @router.get("/vehicles", response_model=w.Page[w.Vehicle])
-def vehicles(limit: Limit = 50, cursor: str | None = None) -> NoReturn:
-    pending()
+def vehicles(limit: Limit = 50, cursor: str | None = None) -> w.Page[w.Vehicle]:
+    catalog = runs.catalog()
+    return w.Page[w.Vehicle](
+        items=[]
+        if cursor
+        else [
+            w.Vehicle(
+                vehicle_id=catalog["vehicle_id"],
+                baseline_asset_ids=[catalog["baseline_asset_id"]],
+                part_catalog_versions=[catalog["part_catalog_version"]],
+                capabilities=sorted(
+                    {
+                        capability
+                        for part in catalog["parts"]
+                        for capability in part["capabilities"]
+                    }
+                ),
+                synthetic=catalog["synthetic"],
+            )
+        ]
+    )
 
 
 @router.post("/uploads", response_model=w.Uploads)
@@ -238,27 +260,100 @@ def source_content(source_id: str, identity: Auth) -> Response:
 
 
 @router.post("/runs", response_model=w.RunAccepted, status_code=202)
-def create_run(body: w.RunConfig, idempotency_key: Key) -> NoReturn:
-    pending()
+def create_run(
+    body: w.RunConfig, idempotency_key: Key, identity: Auth
+) -> w.RunAccepted:
+    catalog = runs.catalog()
+    if (body.vehicle_id, body.baseline_asset_id, body.part_catalog_version) != (
+        catalog["vehicle_id"],
+        catalog["baseline_asset_id"],
+        catalog["part_catalog_version"],
+    ):
+        reject("invalid_catalog", "Vehicle, baseline asset and catalog must match", 422)
+
+    def effect(session: DBSession, command_id: str) -> dict[str, Any]:
+        source_ids = set(body.source_ids)
+        sources = session.scalars(
+            select(Source).where(
+                Source.id.in_(source_ids), Source.workspace_id == identity.workspace_id
+            )
+        ).all()
+        if len(sources) != len(source_ids):
+            reject("not_found", "Source not found", 404)
+        if any(source.status != "ready" for source in sources):
+            reject("source_not_ready", "Runs require ready sources", 422)
+        versions = session.scalars(
+            select(SourceVersion).where(SourceVersion.source_id.in_(source_ids))
+        ).all()
+        if len(versions) != len(source_ids):
+            reject("source_not_ready", "Source version is missing", 422)
+        run = Run(
+            id=new_id(),
+            workspace_id=identity.workspace_id,
+            config=body.model_dump(mode="json"),
+            generation_id=new_id(),
+            analysis_status="queued",
+            stage="queued",
+            revision=1,
+            event_sequence=0,
+            warnings=[],
+        )
+        session.add(run)
+        session.flush()
+        for version in versions:
+            session.add(RunSource(run_id=run.id, source_version_id=version.id))
+        session.add(Outbox(command_id=command_id))
+        emit(session, run, "analysis.updated", "analysis", run.id)
+        return {
+            "run_id": run.id,
+            "snapshot_url": f"/api/v1/runs/{run.id}",
+            "events_url": f"/api/v1/runs/{run.id}/events",
+        }
+
+    return w.RunAccepted.model_validate(
+        command(identity, "runs", idempotency_key, body.model_dump(mode="json"), effect)
+    )
 
 
 @router.get("/runs/{run_id}", response_model=w.Snapshot)
-def snapshot(run_id: str) -> NoReturn:
-    pending()
+def snapshot(run_id: str, identity: Auth) -> w.Snapshot:
+    return runs.snapshot(identity, run_id)
+
+
+def event_cursor(
+    run_id: str,
+    identity: Auth,
+    last_event_id: Annotated[str | None, Header()] = None,
+    after_sequence: Annotated[int | None, Query(ge=0)] = None,
+) -> int:
+    return runs.cursor(identity, run_id, last_event_id, after_sequence)
 
 
 @router.get(
     "/runs/{run_id}/events",
     response_model=None,
+    response_class=EventSourceResponse,
     responses={
         200: {"content": {"text/event-stream": {"schema": {"type": "string"}}}},
         410: {"model": w.Error},
     },
 )
-def events(
-    run_id: str, last_event_id: Annotated[str | None, Header()] = None
-) -> NoReturn:
-    pending()
+async def events(
+    run_id: str,
+    identity: Auth,
+    sequence: Annotated[int, Depends(event_cursor)],
+    follow: bool = True,
+) -> AsyncIterator[ServerSentEvent]:
+    while True:
+        batch = await asyncio.to_thread(runs.backlog, identity, run_id, sequence)
+        for event in batch:
+            yield event
+            sequence = event.data["sequence"]
+        if not follow:
+            if len(batch) < 100:
+                return
+        else:
+            await asyncio.sleep(1)
 
 
 @router.get("/runs/{run_id}/findings", response_model=w.FindingsPage)

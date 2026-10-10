@@ -92,6 +92,7 @@ class Command(Base):
     run_id: Mapped[str | None] = mapped_column(ForeignKey("runs.id"))
     body: Mapped[dict[str, Any]] = mapped_column(JSONB)
     result: Mapped[dict[str, Any]] = mapped_column(JSONB)
+    trace_context: Mapped[dict[str, str]] = mapped_column(JSONB, default=dict)
 
 
 class Outbox(Base):

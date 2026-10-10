@@ -11,7 +11,7 @@
 | F5 | 345 / 29 files | [Scene/render assets](F5-VERIFICATION.md) |
 | F6 | 387 / 34 files | [HTTP integration/browser/clean checkout](F6-VERIFICATION.md) |
 
-Every package passed relevant tests, typecheck, production build, diff checks, applicable native browser checks and separate sub-agent review before dependent implementation. Available GitGuardian PR checks passed for F1–F5; F6 records its check after opening. There is no configured frontend CI workflow. PRs remain open and stacked; no merges authorized or performed.
+Every package passed relevant tests, typecheck, production build, diff checks, applicable native browser checks and separate sub-agent review before dependent implementation. Available GitGuardian PR checks passed for all six PRs, including [F6 #9](https://github.com/indkhan/vehicle-requirements-ai/pull/9). There is no configured frontend CI workflow. PRs remain open and stacked; no merges authorized or performed.
 
 The [requirement ledger](ACCEPTANCE.md) maps every frontend requirement and all ten shared scenarios to code, tests and dependencies. F6 verifies actual HTTP/SSE using the real adapter, not fetch stubs, plus the complete real-mode UI chain and native desktop/mobile browser failure/recovery. Clean checkout installation/test/build/start uses documented commands without secrets.
 

@@ -1,2 +1,7 @@
 .env
 doc\googledrive
+# Frontend local artifacts
+frontend/node_modules
+frontend/dist/
+frontend/*.tsbuildinfo
+frontend/.vite/

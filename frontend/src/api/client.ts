@@ -26,8 +26,13 @@ export type Send = <T>(
 async function readPages<T>(
   send: Send,
   path: string,
-): Promise<{ items: T[]; first: Record<string, unknown> }> {
+): Promise<{
+  items: T[];
+  first: Record<string, unknown>;
+  pages: Record<string, unknown>[];
+}> {
   const items: T[] = [];
+  const pages: Record<string, unknown>[] = [];
   let cursor: string | null = null;
   const seen = new Set<string>();
   let first: Record<string, unknown> | null = null;
@@ -54,12 +59,59 @@ async function readPages<T>(
         true,
       );
     items.push(...page.items);
+    pages.push(page);
     cursor = page.next_cursor ?? null;
     if (cursor && seen.has(cursor))
       throw new ApiError("invalid_cursor", "Repeated pagination cursor");
     if (cursor) seen.add(cursor);
   } while (cursor);
-  return { items, first: first ?? {} };
+  return { items, first: first ?? {}, pages };
+}
+
+function canonical(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(canonical).join(",")}]`;
+  if (value !== null && typeof value === "object") {
+    return `{${Object.entries(value)
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([key, item]) => `${JSON.stringify(key)}:${canonical(item)}`)
+      .join(",")}}`;
+  }
+  return JSON.stringify(value);
+}
+function allPartAggregates(
+  pages: Record<string, unknown>[],
+): Wire.PartAggregate[] {
+  const aggregates = new Map<string, Wire.PartAggregate>();
+  for (const page of pages) {
+    for (const aggregate of (page.part_aggregates ??
+      []) as Wire.PartAggregate[]) {
+      const scope = [...aggregate.cohort_ids].sort();
+      const key = JSON.stringify([aggregate.part_id, scope]);
+      const prior = aggregates.get(key);
+      const comparable = (value: Wire.PartAggregate) => ({
+        ...value,
+        cohort_ids: [...value.cohort_ids].sort(),
+        counts: {
+          ...value.counts,
+          record_ids: [...value.counts.record_ids].sort(),
+        },
+      });
+      if (
+        prior &&
+        canonical(comparable(prior)) !== canonical(comparable(aggregate))
+      ) {
+        throw new ApiError(
+          "incoherent_resources",
+          "Part aggregate changed within the same paginated scope. Retry refresh.",
+          null,
+          null,
+          true,
+        );
+      }
+      if (!prior) aggregates.set(key, aggregate);
+    }
+  }
+  return [...aggregates.values()];
 }
 async function readGraph(send: Send, path: string): Promise<Wire.Graph> {
   let cursor: string | null = null;
@@ -175,6 +227,10 @@ function boundary(
         await send(path, requestBody(path, body), key),
       ) as T;
     },
+    async vehicles() {
+      const result = await readPages<Wire.Vehicle>(send, "/vehicles");
+      return result.items.map(normalize.vehicle);
+    },
     async upload(file) {
       const body = new FormData();
       body.append("files", file);
@@ -217,9 +273,8 @@ function boundary(
           )
             continue;
           const snapshot = normalize.snapshot(before);
-          snapshot.part_aggregates = (
-            (f.first.part_aggregates ?? []) as Wire.PartAggregate[]
-          ).map((a) => ({
+          snapshot.part_aggregates = allPartAggregates(f.pages).map((a) => ({
+            wire: a,
             part_id:
               a.part_id as Workspace["snapshot"]["part_aggregates"][number]["part_id"],
             counts: {
@@ -302,6 +357,29 @@ export function createRealApi(
     new Headers(extra).forEach((value, key) => result.set(key, value));
     return result;
   };
+  const origin =
+    typeof window === "undefined" ? "http://localhost" : window.location.origin;
+  const apiUrl = new URL(base, origin);
+  const sourcePrefix = `${apiUrl.pathname.replace(/\/$/, "")}/sources/`;
+  const sourceAddress = (value: string): URL | null => {
+    try {
+      const address = new URL(value, apiUrl.origin);
+      const suffix = address.pathname.slice(sourcePrefix.length);
+      if (
+        address.origin !== apiUrl.origin ||
+        address.username ||
+        address.password ||
+        address.search ||
+        address.hash ||
+        !address.pathname.startsWith(sourcePrefix) ||
+        !/^[^/]+\/content$/.test(suffix)
+      )
+        return null;
+      return address;
+    } catch {
+      return null;
+    }
+  };
   const send: Send = async <T>(
     path: string,
     body?: unknown,
@@ -328,7 +406,10 @@ export function createRealApi(
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30_000);
       try {
-        const response = await fetch(`${base}${path}`, { ...init, signal: controller.signal });
+        const response = await fetch(`${base}${path}`, {
+          ...init,
+          signal: controller.signal,
+        });
         await checkResponse(response);
         return await response.json();
       } catch (error) {
@@ -338,9 +419,18 @@ export function createRealApi(
           (body === undefined || key)
         )
           continue;
-        if (controller.signal.aborted) throw new ApiError("request_timeout", "Request timed out. Retry the same command; its result may already exist.", null, null, true);
+        if (controller.signal.aborted)
+          throw new ApiError(
+            "request_timeout",
+            "Request timed out. Retry the same command; its result may already exist.",
+            null,
+            null,
+            true,
+          );
         throw error;
-      } finally { clearTimeout(timeout); }
+      } finally {
+        clearTimeout(timeout);
+      }
     }
     throw new ApiError("request_failed", "Request interrupted.");
   };
@@ -348,6 +438,39 @@ export function createRealApi(
     sessionNamespace: options.sessionNamespace ?? base,
     sourceUrl: (sourceId) =>
       `${base}/sources/${encodeURIComponent(sourceId)}/content`,
+    canReadSource: (url) => sourceAddress(url) !== null,
+    async readSource(url, signal) {
+      const address = sourceAddress(url);
+      if (!address)
+        throw new ApiError(
+          "unsupported_source_url",
+          "This link is not an application source-content URL.",
+        );
+      const timeoutController = new AbortController();
+      const timeout = setTimeout(() => timeoutController.abort(), 30_000);
+      try {
+        const response = await fetch(address.href, {
+          credentials: "include",
+          headers: await headers(),
+          signal: AbortSignal.any([signal, timeoutController.signal]),
+          redirect: "error",
+        });
+        await checkResponse(response);
+        return await response.blob();
+      } catch (error) {
+        if (timeoutController.signal.aborted && !signal.aborted)
+          throw new ApiError(
+            "source_timeout",
+            "Source download timed out. Retry opening the source.",
+            null,
+            null,
+            true,
+          );
+        throw error;
+      } finally {
+        clearTimeout(timeout);
+      }
+    },
     async events(runId, sequence, lastEventId, signal) {
       const establishment = new AbortController();
       const timeout = setTimeout(() => establishment.abort(), 30_000);
@@ -371,7 +494,9 @@ export function createRealApi(
           throw new ApiError(
             "event_connection_timeout",
             "Event connection timed out. Reconnect from the last coherent snapshot.",
-            null, null, true,
+            null,
+            null,
+            true,
           );
         }
         throw error;

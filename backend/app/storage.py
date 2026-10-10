@@ -66,7 +66,7 @@ def _inspect_upload(
                 stream_decoding_work_maximum_length=settings.max_archive_bytes,
             )
             pdf = PdfReader(BytesIO(data))
-            if pdf.is_encrypted:
+            if pdf.is_encrypted and not pdf.decrypt(""):
                 return kind, "password_required"
             if len(pdf.pages) > settings.max_pdf_pages:
                 return kind, "page_limit"

@@ -71,6 +71,43 @@ def test_upload_preflight_enforces_limits_and_rejects_encrypted_and_image_pdfs()
     )
 
 
+@pytest.mark.parametrize(
+    ("password", "text", "reason"),
+    [
+        ("", True, None),
+        ("synthetic-password", True, "password_required"),
+        ("", False, "image_only_pdf"),
+    ],
+)
+def test_pdf_permissions_encryption_only_rejects_required_passwords(
+    password, text, reason
+):
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    writer = PdfWriter()
+    page = writer.add_blank_page(width=100, height=100)
+    if text:
+        font = DictionaryObject(
+            {
+                NameObject("/Type"): NameObject("/Font"),
+                NameObject("/Subtype"): NameObject("/Type1"),
+                NameObject("/BaseFont"): NameObject("/Helvetica"),
+            }
+        )
+        page[NameObject("/Resources")] = DictionaryObject(
+            {NameObject("/Font"): DictionaryObject({NameObject("/F1"): font})}
+        )
+        stream = DecodedStreamObject()
+        stream.set_data(b"BT /F1 12 Tf 10 50 Td (Synthetic option text) Tj ET")
+        page[NameObject("/Contents")] = writer._add_object(stream)
+    writer.encrypt(password, owner_password="synthetic-owner-password")
+    buffer = BytesIO()
+    writer.write(buffer)
+    assert inspect_upload(
+        "permissions.pdf", buffer.getvalue(), Settings(_env_file=None)
+    ) == ("pdf", reason)
+
+
 def test_s3_adapter_uses_private_encrypted_immutable_write_and_exact_read(monkeypatch):
     client = boto3.client(
         "s3",

@@ -240,6 +240,11 @@ code: `5263454`. Real provider calls used the private environment file mounted
 as a Docker secret. Private inputs, passages and reference answers remain ignored.
 Full PDF corpus ingestion is still running; this is an interim evidence record.
 
+Fresh-image regressions passed in both environments: **218 tests in 105.60s**
+in the API image and **218 tests in 130.94s** in the parser image. Ruff lint,
+formatting (91 files), strict mypy (38 source files), generated contracts,
+repeatable Alembic upgrade/no-drift and `git diff --check` passed.
+
 ### Separately committed corrections
 
 | Commit | Reproduced defect and correction |
@@ -276,6 +281,12 @@ Live AI completion establishes connectivity and the listed contracts, not semant
 correctness for every customer statement. The sample uses the demo vehicle/part/
 asset catalog, so actual derivative equipment applicability is still a gate.
 Research's live opposing-evidence quality remains open despite controlled tests.
+Manual review of the six-record live sample found the nine extracted observations
+faithful to their source texts: positive strengths, the negative paper-manual
+complaint and overlapping annotations were preserved without invented physical
+part mappings. The two live research claims were checked against the selected
+manufacturer passage; they distinguish a qualified comfort claim from a described
+seat feature and do not claim proven sustained comfort or current market fit.
 
 ### Cleaning, source integrity and recovery
 

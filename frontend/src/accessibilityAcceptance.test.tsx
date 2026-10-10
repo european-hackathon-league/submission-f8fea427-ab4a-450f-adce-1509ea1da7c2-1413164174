@@ -201,6 +201,39 @@ it("retains a keyboard destination when an unactivated focused graph node disapp
   );
   expect(p.onSelect).not.toHaveBeenCalled();
 });
+it("retains keyboard focus when asynchronous graph inserts displace a focused node beyond progressive detail", async () => {
+  const w = workspace();
+  const template = w.graph.nodes[0];
+  w.graph.nodes = Array.from({ length: 20 }, (_, index) => ({
+    ...template,
+    node_id: `stable-node-${index}`,
+  }));
+  const props = { workspace: w, onSelect: vi.fn() };
+  const { rerender } = render(<GraphPanel {...props} />);
+  const focused = w.graph.nodes[19];
+  screen
+    .getByRole("button", {
+      name: `Inspect ${focused.entity_type} ${focused.node_id}`,
+    })
+    .focus();
+  const next = structuredClone(w);
+  next.graph.nodes.unshift({ ...template, node_id: "new-first-node" });
+  rerender(<GraphPanel {...props} workspace={next} />);
+  expect(
+    next.graph.nodes.some((node) => node.node_id === focused.node_id),
+  ).toBe(true);
+  expect(
+    screen.queryByRole("button", {
+      name: `Inspect ${focused.entity_type} ${focused.node_id}`,
+    }),
+  ).not.toBeInTheDocument();
+  await waitFor(() =>
+    expect(
+      screen.getByRole("heading", { name: "Evidence graph" }),
+    ).toHaveFocus(),
+  );
+  expect(props.onSelect).not.toHaveBeenCalled();
+});
 it("ships reduced-motion overrides for page transitions and hosted-viewer loading motion", () => {
   const global = mediaStyles(
     workspaceCss,

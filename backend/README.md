@@ -69,8 +69,17 @@ PDF inference requires pinned offline models in `PDF_MODEL_DIRECTORY` (default
 `python -m app.parser_models --directory /models --download` setup command;
 parsing never downloads models. Missing artifacts produce source-specific
 coverage rather than blocking valid companion workbooks. PDF execution uses
-two-page checkpoints and bounded concurrency; committed batches are reused
-after worker failure. See `PDF_EVALUATION.md` for the private reference gate.
+two-page checkpoints and bounded concurrency; exhausted pairs fall back to
+single pages, and committed batches are reused after worker failure. Native
+inference defaults to 180 CPU seconds per subprocess, a 190-second wall deadline,
+and 4 GiB address space. `PDF_TIMEOUT_SECONDS` accepts 1 through 600 and controls
+both the CPU budget and the wall deadline (budget plus ten seconds). Dense pages
+can exceed the default even with single-page fallback. Configure the API and
+worker consistently before uploading a new source version; parser settings are
+frozen in source bindings, so changing the environment does not alter existing
+runs or silently replace their cached evidence. Higher budgets can recover text
+without resolving ambiguous table cells. See `PDF_EVALUATION.md` for the private
+reference gate and `TESTING_HANDOFF.md` for measured corpus limits.
 PostgreSQL, Temporal history, and private original files persist in the Compose
 volumes. `docker compose down` preserves them; deleting volumes deletes local data.
 Upload preflight runs in an isolated Linux process with a 512 MiB address-space

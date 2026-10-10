@@ -181,6 +181,10 @@ main {
   padding-bottom: 22px;
   border-bottom: 1px solid var(--line);
 }
+.saved-config-summary,
+.mobile-vehicle-toggle {
+  display: none;
+}
 .section-title {
   display: flex;
   align-items: center;
@@ -351,6 +355,33 @@ main {
 .vehicle-column,
 .analysis-column {
   min-width: 0;
+}
+.analysis-column {
+  container-type: inline-size;
+}
+.reimagine-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--line);
+}
+.reimagine-context {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.reimagine-context p {
+  flex-basis: 100%;
+  margin: 0;
+}
+.reimagine-toolbar > button {
+  flex-shrink: 0;
+  min-height: 44px;
 }
 .vehicle-column > .section-title {
   min-height: 44px;
@@ -568,6 +599,38 @@ dialog blockquote {
   padding: 20px 0;
   border-bottom: 1px solid var(--line);
 }
+.proposal-review {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+}
+.proposal-editor,
+.proposal-evidence {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.proposal-evidence .evidence-section {
+  padding-top: 12px;
+}
+.proposal-evidence .evidence-card button {
+  min-height: 44px;
+}
+.proposal-evidence .evidence-card blockquote {
+  margin: 8px 0;
+}
+@container (min-width: 700px) {
+  .proposal-review {
+    grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  }
+}
+.proposal-review.is-evidence-hidden {
+  grid-template-columns: minmax(0, 1fr);
+}
+@media (min-width: 1200px) {
+  .work-area.is-reviewing {
+    grid-template-columns: minmax(300px, 0.65fr) minmax(0, 1.6fr);
+  }
+}
 .proposal-item h3 {
   display: flex;
   align-items: center;
@@ -691,6 +754,54 @@ summary {
   }
 }
 @media (max-width: 760px) {
+  .saved-config-summary {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+  }
+  .saved-config-summary > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .saved-config-summary button {
+    flex-shrink: 0;
+  }
+  .saved-config-fields {
+    display: none;
+  }
+  .saved-config-fields.is-expanded {
+    display: block;
+    margin-top: 16px;
+  }
+  .vehicle-column.has-run > .section-title {
+    margin-bottom: 0;
+  }
+  .vehicle-column.has-run > .section-title > .check-field {
+    display: none;
+  }
+  .vehicle-column.has-run .mobile-vehicle-toggle {
+    display: inline-flex;
+  }
+  .vehicle-column.has-run:not(.is-expanded) > .vehicle-content {
+    display: none;
+  }
+  .vehicle-column.has-run.is-expanded > .vehicle-content {
+    margin-top: 16px;
+  }
+  .vehicle-column.has-run.is-expanded > .section-title > .check-field {
+    display: flex;
+  }
+  .vehicle-column.has-run.is-expanded > .section-title {
+    flex-wrap: wrap;
+  }
+  .analysis-column .panel-tabs {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    background: #f3f5f5;
+  }
   .app-header {
     padding: 14px 16px;
   }
@@ -773,4 +884,64 @@ summary {
     transition: none !important;
     scroll-behavior: auto !important;
   }
+}
+
+/* First-run setup follows the order in which inputs become usable. */
+.setup-intro {
+  max-width: 76ch;
+  margin-bottom: 24px;
+}
+.demo-notice {
+  color: #425a62;
+  font-weight: 600;
+}
+.setup-step {
+  font-size: 15px;
+  margin-bottom: 12px;
+}
+.setup-help {
+  margin: 12px 0 24px;
+}
+.setup-help p {
+  margin-bottom: 4px;
+}
+.upload-zone {
+  margin-top: 8px;
+}
+.start-run-action {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+.start-run-action p {
+  margin: 0;
+}
+.start-run-action > .primary {
+  flex-shrink: 0;
+  min-height: 44px;
+}
+.run-setup .upload-error {
+  margin-top: 12px;
+}
+@media (max-width: 760px) {
+  .start-run-action {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+.vehicle-load-error {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+  color: #982e3b;
+}
+.vehicle-load-error p {
+  margin: 0;
 }

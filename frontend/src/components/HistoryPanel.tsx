@@ -5,6 +5,7 @@ import type { Accepted, ExportCommand, ExportResult } from "../api/wire";
 import { exportLink, readExportJob, saveExportJob } from "./exportJob";
 import type { ExportJob } from "./exportJob";
 import ChangeExplanation from "./ChangeExplanation";
+import AuthorizedDownload from "./AuthorizedDownload";
 export interface HistoryPanelProps {
   api: Api;
   workspace: Workspace;
@@ -516,9 +517,11 @@ export default function HistoryPanel({
         </button>
       )}
       {download && (
-        <a href={download} target="_blank" rel="noreferrer">
-          Download authorized export
-        </a>
+        <AuthorizedDownload
+          api={api}
+          url={download}
+          filename={`proposal-export-v${job?.body.proposal_set_version}.${job?.body.format ?? "json"}`}
+        />
       )}
       {result?.status === "failed" && (
         <p>

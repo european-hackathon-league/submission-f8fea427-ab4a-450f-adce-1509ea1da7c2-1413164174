@@ -69,7 +69,7 @@ PDF inference requires pinned offline models in `PDF_MODEL_DIRECTORY` (default
 `python -m app.parser_models --directory /models --download` setup command;
 parsing never downloads models. Missing artifacts produce source-specific
 coverage rather than blocking valid companion workbooks. PDF execution uses
-ten-page checkpoints and bounded concurrency; committed batches are reused
+two-page checkpoints and bounded concurrency; committed batches are reused
 after worker failure. See `PDF_EVALUATION.md` for the private reference gate.
 PostgreSQL, Temporal history, and private original files persist in the Compose
 volumes. `docker compose down` preserves them; deleting volumes deletes local data.

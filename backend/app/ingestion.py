@@ -73,6 +73,7 @@ def parser_binding(source: Source) -> dict[str, Any]:
         "model_versions": model_versions,
         "pdf_timeout_seconds": settings.pdf_timeout_seconds,
         "pdf_memory_mb": settings.pdf_memory_mb,
+        "pdf_batch_pages": 2,
     }
 
 
@@ -428,9 +429,10 @@ def ingest_source(args: list[str]) -> str:
             reader = PdfReader(BytesIO(data))
             if reader.is_encrypted and not reader.decrypt(""):
                 raise ValueError("Original source requires a password")
+            batch_pages = binding.get("pdf_batch_pages", 10)
             batches = [
-                (first, min(first + 9, len(reader.pages)))
-                for first in range(1, len(reader.pages) + 1, 10)
+                (first, min(first + batch_pages - 1, len(reader.pages)))
+                for first in range(1, len(reader.pages) + 1, batch_pages)
             ]
         else:
             batches = [(0, 0)]

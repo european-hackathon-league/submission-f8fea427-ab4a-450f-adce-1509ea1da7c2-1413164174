@@ -14,6 +14,62 @@ from app.dispatch import dispatch_once
 from app.workflows import AnalysisWorkflow
 
 
+def test_pdf_checkpoints_bound_cpu_work_and_preserve_every_page(client, monkeypatch):
+    from test_storage import text_pdf
+
+    from app.ingest_types import ParsedPassage, ParseResult
+    from app.ingestion import ingest_source
+    from app.wire import PDFLocator
+
+    uploaded = client.post(
+        "/api/v1/uploads",
+        files={"files": ("synthetic-report.pdf", text_pdf(7))},
+        headers={"Idempotency-Key": str(uuid4())},
+    ).json()
+    run_id = client.post(
+        "/api/v1/runs",
+        json={
+            "vehicle_id": "vehicle_demo",
+            "baseline_asset_id": "asset_demo_v1",
+            "part_catalog_version": "catalog_demo_v1",
+            "source_ids": [uploaded["sources"][0]["source_id"]],
+        },
+        headers={"Idempotency-Key": str(uuid4())},
+    ).json()["run_id"]
+    with Session() as session:
+        generation = session.get(Run, run_id).generation_id
+        member = session.scalar(select(RunSource).where(RunSource.run_id == run_id))
+        version, revision = member.source_version_id, member.binding["parser_revision"]
+        model_versions = member.binding["model_versions"]
+    calls = []
+
+    def parse(data, filename, **options):
+        first, last = options["page_range"]
+        assert last - first + 1 <= 2
+        calls.append((first, last))
+        return ParseResult(
+            kind="strategy",
+            parser_revision=revision,
+            parser_versions=model_versions,
+            passages=[
+                ParsedPassage(
+                    source_kind="strategy",
+                    text=f"Synthetic page {page}",
+                    locator=PDFLocator(page=page),
+                )
+                for page in range(first, last + 1)
+            ],
+        )
+
+    monkeypatch.setattr("app.ingestion.parse_pdf", parse)
+    ingest_source([run_id, generation, version])
+    ingest_source([run_id, generation, version])
+    assert [page for first, last in calls for page in range(first, last + 1)] == list(
+        range(1, 8)
+    )
+    assert len(client.get(f"/api/v1/runs/{run_id}/evidence").json()["items"]) == 7
+
+
 def test_ingestion_reuses_committed_parsing_for_identical_sources(client, monkeypatch):
     from test_ingestion_cache import feedback, frozen_run
     from test_uploads import workbook as source_workbook

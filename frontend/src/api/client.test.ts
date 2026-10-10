@@ -80,6 +80,9 @@ describe("application API boundary", () => {
       { ...command, base_proposal_set_version: 2 },
       "reconciled-edit",
     );
+    const processing = await api.workspace(run.run_id);
+    expect(processing.snapshot.analysis_status).toBe("processing");
+    expect(processing.proposals.proposal_set_version).toBe(2);
     expect(
       (await api.workspace(run.run_id)).proposals.proposal_set_version,
     ).toBe(3);
@@ -115,9 +118,12 @@ describe("application API boundary", () => {
     expect(await api.request(`${root}/renders`, body, "render-2")).toEqual(
       first,
     );
-    const result = await api.request<RenderResult>(
-      `${root}/renders/${first.render_request_id}`,
+    const renderPath = `${root}/renders/${first.render_request_id}`;
+    expect((await api.request<RenderResult>(renderPath)).status).toBe("queued");
+    expect((await api.request<RenderResult>(renderPath)).status).toBe(
+      "rendering",
     );
+    const result = await api.request<RenderResult>(renderPath);
     expect(result.proposal_set_version).toBe(1);
     expect(result.status).toBe("partial");
     expect(

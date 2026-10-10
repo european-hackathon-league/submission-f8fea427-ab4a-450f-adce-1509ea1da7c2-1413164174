@@ -22,6 +22,7 @@ export type Send = <T>(
   path: string,
   body?: unknown,
   key?: string,
+  signal?: AbortSignal,
 ) => Promise<T>;
 async function readPages<T>(
   send: Send,
@@ -290,7 +291,12 @@ function boundary(
   return {
     ...extras,
     mode,
-    async request<T>(path: string, body?: unknown, key?: string) {
+    async request<T>(
+      path: string,
+      body?: unknown,
+      key?: string,
+      signal?: AbortSignal,
+    ) {
       if (body !== undefined && !key)
         throw new ApiError(
           "missing_idempotency_key",
@@ -299,7 +305,7 @@ function boundary(
       return project(
         path,
         body,
-        await send(path, requestBody(path, body), key),
+        await send(path, requestBody(path, body), key, signal),
       ) as T;
     },
     async vehicles() {
@@ -344,7 +350,8 @@ function boundary(
             before.current_proposal_set_version !==
               after.current_proposal_set_version ||
             (p &&
-              p.proposal_set_version !== before.current_proposal_set_version)
+              (p.run_id !== runId ||
+                p.proposal_set_version !== before.current_proposal_set_version))
           )
             continue;
           const snapshot = normalize.snapshot(before);
@@ -456,10 +463,67 @@ export function createRealApi(
       return null;
     }
   };
+  const assetAddress = (value: string): URL | null => {
+    try {
+      const address = new URL(value, apiUrl.origin);
+      const prefix = `${apiUrl.pathname.replace(/\/$/, "")}/runs/`;
+      if (
+        address.origin !== apiUrl.origin ||
+        address.username ||
+        address.password ||
+        address.search ||
+        address.hash ||
+        !address.pathname.startsWith(prefix)
+      )
+        return null;
+      const suffix = address.pathname.slice(prefix.length);
+      return /^[^/]+\/(?:renders\/[^/]+\/assets\/[^/]+|exports\/[^/]+\/download)$/.test(
+        suffix,
+      )
+        ? address
+        : null;
+    } catch {
+      return null;
+    }
+  };
+  async function readProtectedFile(
+    address: URL,
+    signal: AbortSignal,
+    kind: "source" | "asset",
+  ): Promise<Blob> {
+    signal.throwIfAborted();
+    const timeoutController = new AbortController();
+    const timeout = setTimeout(() => timeoutController.abort(), 30_000);
+    try {
+      const response = await fetch(address.href, {
+        credentials: "include",
+        headers: await headers(),
+        signal: AbortSignal.any([signal, timeoutController.signal]),
+        redirect: "error",
+      });
+      await checkResponse(response);
+      return await response.blob();
+    } catch (error) {
+      if (timeoutController.signal.aborted && !signal.aborted)
+        throw new ApiError(
+          `${kind}_timeout`,
+          kind === "source"
+            ? "Source download timed out. Retry opening the source."
+            : "Authorized file download timed out. Retry opening the file.",
+          null,
+          null,
+          true,
+        );
+      throw error;
+    } finally {
+      clearTimeout(timeout);
+    }
+  }
   const send: Send = async <T>(
     path: string,
     body?: unknown,
     key?: string,
+    signal?: AbortSignal,
   ): Promise<T> => {
     const multipart = body instanceof FormData;
     const init: RequestInit = {
@@ -478,17 +542,21 @@ export function createRealApi(
             ? body
             : JSON.stringify(body),
     };
+    signal?.throwIfAborted();
     for (let attempt = 0; attempt < 2; attempt++) {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 30_000);
       try {
         const response = await fetch(`${base}${path}`, {
           ...init,
-          signal: controller.signal,
+          signal: signal
+            ? AbortSignal.any([signal, controller.signal])
+            : controller.signal,
         });
         await checkResponse(response);
         return await response.json();
       } catch (error) {
+        if (signal?.aborted) throw signal.reason;
         if (
           attempt === 0 &&
           (error instanceof TypeError || controller.signal.aborted) &&
@@ -520,9 +588,31 @@ export function createRealApi(
   };
   return boundary("real", send, {
     sessionNamespace: options.sessionNamespace ?? base,
+    linkUrl(value) {
+      try {
+        const url = new URL(value, apiUrl.origin);
+        return ["http:", "https:"].includes(url.protocol) &&
+          !url.username &&
+          !url.password
+          ? url.href
+          : null;
+      } catch {
+        return null;
+      }
+    },
     sourceUrl: (sourceId) =>
       `${base}/sources/${encodeURIComponent(sourceId)}/content`,
     canReadSource: (url) => sourceAddress(url) !== null,
+    canReadAsset: (url) => assetAddress(url) !== null,
+    async readAsset(url, signal) {
+      const address = assetAddress(url);
+      if (!address)
+        throw new ApiError(
+          "unsupported_asset_url",
+          "This link is not a protected application asset or export URL.",
+        );
+      return readProtectedFile(address, signal, "asset");
+    },
     async readSource(url, signal) {
       const address = sourceAddress(url);
       if (!address)
@@ -530,30 +620,7 @@ export function createRealApi(
           "unsupported_source_url",
           "This link is not an application source-content URL.",
         );
-      const timeoutController = new AbortController();
-      const timeout = setTimeout(() => timeoutController.abort(), 30_000);
-      try {
-        const response = await fetch(address.href, {
-          credentials: "include",
-          headers: await headers(),
-          signal: AbortSignal.any([signal, timeoutController.signal]),
-          redirect: "error",
-        });
-        await checkResponse(response);
-        return await response.blob();
-      } catch (error) {
-        if (timeoutController.signal.aborted && !signal.aborted)
-          throw new ApiError(
-            "source_timeout",
-            "Source download timed out. Retry opening the source.",
-            null,
-            null,
-            true,
-          );
-        throw error;
-      } finally {
-        clearTimeout(timeout);
-      }
+      return readProtectedFile(address, signal, "source");
     },
     async events(runId, sequence, lastEventId, signal) {
       const establishment = new AbortController();

@@ -31,11 +31,7 @@ export interface Snapshot {
   contract_version: "1";
   config: RunConfig;
   analysis_status:
-    | "queued"
-    | "processing"
-    | "waiting_for_pm"
-    | "proposals_ready"
-    | "failed";
+    "queued" | "processing" | "waiting_for_pm" | "proposals_ready" | "failed";
   stage: string;
   revision: number;
   last_event_sequence: number;
@@ -86,12 +82,7 @@ export interface Research {
   wire?: Wire.Research;
   finding_id: string;
   status:
-    | "queued"
-    | "searching"
-    | "checking"
-    | "ready"
-    | "partial"
-    | "unavailable";
+    "queued" | "searching" | "checking" | "ready" | "partial" | "unavailable";
   competitor_scope: string;
   claims: Array<{
     type: "fact" | "opinion" | "inference";
@@ -223,11 +214,20 @@ export interface Api {
     signal: AbortSignal,
   ): Promise<Response>;
   sourceUrl?(sourceId: string): string;
+  linkUrl?(value: string): string | null;
   vehicles?(): Promise<Vehicle[]>;
   canReadSource?(url: string): boolean;
   readSource?(url: string, signal: AbortSignal): Promise<Blob>;
+  /** Protected application render assets and authoritative export bytes only. */
+  canReadAsset?(url: string): boolean;
+  readAsset?(url: string, signal: AbortSignal): Promise<Blob>;
   dispose?(): void;
-  request<T>(path: string, body?: unknown, key?: string): Promise<T>;
+  request<T>(
+    path: string,
+    body?: unknown,
+    key?: string,
+    signal?: AbortSignal,
+  ): Promise<T>;
   upload(file: File): Promise<Upload>;
   workspace(runId: string): Promise<Workspace>;
 }

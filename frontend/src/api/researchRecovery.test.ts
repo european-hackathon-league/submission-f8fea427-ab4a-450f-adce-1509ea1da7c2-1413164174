@@ -258,9 +258,8 @@ it("continued checkpoint remains auditable and later edits do not reopen PM wait
     },
     "edit",
   );
-  expect((await api.workspace(runId)).snapshot.analysis_status).toBe(
-    "proposals_ready",
-  );
+  expect((await api.workspace(runId)).snapshot.analysis_status).toBe("processing");
+  expect((await api.workspace(runId)).snapshot.analysis_status).toBe("proposals_ready");
 });
 it("does not hide research pagination revision conflicts", async () => {
   vi.stubGlobal(

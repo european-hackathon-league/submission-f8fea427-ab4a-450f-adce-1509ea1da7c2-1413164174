@@ -10,17 +10,13 @@ import type { CSSProperties, ReactNode } from "react";
 import {
   ArrowRight,
   BookOpen,
-  Download,
   GitBranch,
   History,
   LoaderCircle,
   Network,
   Plus,
   RefreshCw,
-  Save,
-  Trash2,
   Upload as UploadIcon,
-  WandSparkles,
   X,
 } from "lucide-react";
 import { ApiError, commandKey, createApi, createRealApi } from "./api/client";
@@ -31,17 +27,18 @@ import GraphPanel from "./components/GraphPanel";
 import SourceDialog from "./components/SourceDialog";
 import ResearchPanel from "./components/ResearchPanel";
 import ConflictPanel from "./components/ConflictPanel";
+import ProposalWorkspace from "./components/ProposalWorkspace";
+import HistoryPanel from "./components/HistoryPanel";
+import RenderPanel from "./components/RenderPanel";
+import ChangeExplanation from "./components/ChangeExplanation";
 import { recoverRun } from "./runRecovery";
 import { readSession, saveSession, clearSession } from "./session";
-import type { PendingRun } from "./session";
+import type { PendingRun, ProposalSelection } from "./session";
 import type {
   Api,
-  Change,
   Evidence,
   Finding,
-  Instruction,
   Page,
-  RenderResult,
   RunConfig,
   Upload,
   Vehicle,
@@ -177,9 +174,9 @@ function WorkspaceApp({
   const [view, setView] = useState<VehicleView>(
     restored?.view === "interior" ? "interior" : "exterior",
   );
-  const [variantId, setVariantId] = useState(
-    restored?.variantId ?? "variant-digital",
-  );
+  const [variantId, setVariantId] = useState(restored?.variantId ?? "");
+  const [proposalSelection, setProposalSelection] =
+    useState<ProposalSelection | null>(restored?.proposalSelection ?? null);
   const [heatmap, setHeatmap] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -187,13 +184,6 @@ function WorkspaceApp({
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const [findingFocusRequest, setFindingFocusRequest] = useState(0);
   const [source, setSource] = useState<Evidence | null>(null);
-  const [renderResult, setRenderResult] = useState<RenderResult | null>(null);
-  const [exportJob, setExportJob] = useState<{
-    export_id: string;
-    proposal_set_version: number;
-    status: string;
-    download_url?: string;
-  } | null>(null);
   const lock = useRef(false);
   const proposalDrafts = useRef(
     new Map<string, ProposalDraft>(
@@ -211,7 +201,9 @@ function WorkspaceApp({
   const [savedConfigExpanded, setSavedConfigExpanded] = useState(false);
   const [vehicleExpanded, setVehicleExpanded] = useState(false);
   const [ideaDraft, setIdeaDraft] = useState(restored?.ideaDraft ?? "");
-  const hasUnsavedWork = dirtyDrafts.size > 0 || !!ideaDraft.trim();
+  const [proposalDirty, setProposalDirty] = useState<boolean | null>(null);
+  const hasUnsavedWork =
+    proposalDirty ?? (dirtyDrafts.size > 0 || !!ideaDraft.trim());
   const rememberDirty = useCallback((key: string, dirty: boolean) => {
     setDirtyDrafts((old) => {
       if (old.has(key) === dirty) return old;
@@ -251,10 +243,16 @@ function WorkspaceApp({
       : selectedFindingId
         ? workspace?.findings.find((f) => f.finding_id === selectedFindingId)
         : workspace?.findings[0];
-  const variant =
-    workspace?.proposals.variants.find((v) => v.variant_id === variantId) ??
-    workspace?.proposals.variants[0];
-  const version = workspace?.proposals.proposal_set_version ?? 0;
+  const variant = variantId
+    ? workspace?.proposals.variants.find((v) => v.variant_id === variantId)
+    : workspace?.proposals.variants[0];
+  const activeVariantId = variant?.variant_id ?? variantId;
+  useEffect(() => {
+    if (!variantId && workspace?.proposals.variants[0])
+      setVariantId(workspace.proposals.variants[0].variant_id);
+    if (selectedFindingId === "" && workspace?.findings[0])
+      setSelectedFindingId(workspace.findings[0].finding_id);
+  }, [workspace, variantId, selectedFindingId]);
   const readySourceIds = [
     ...new Set(
       uploads.filter((u) => u.status === "ready").map((u) => u.source_id!),
@@ -360,6 +358,7 @@ function WorkspaceApp({
       selectedComponent: selectedComponent ?? "",
       view,
       variantId,
+      proposalSelection,
       ideaDraft,
       proposalDrafts: [...proposalDrafts.current],
     });
@@ -373,6 +372,7 @@ function WorkspaceApp({
     selectedComponent,
     view,
     variantId,
+    proposalSelection,
     ideaDraft,
   ]);
   useEffect(persistSession, [persistSession]);
@@ -383,58 +383,6 @@ function WorkspaceApp({
       window.removeEventListener("pagehide", persistSession);
     };
   }, [persistSession]);
-
-  useEffect(() => {
-    if (
-      !runId ||
-      !renderResult ||
-      !["queued", "rendering"].includes(renderResult.status)
-    )
-      return;
-    let cancelled = false;
-    const timer = setInterval(() => {
-      api
-        .request<RenderResult>(
-          `/runs/${encodeURIComponent(runId!)}/renders/${encodeURIComponent(renderResult.render_request_id)}`,
-        )
-        .then((result) => {
-          if (!cancelled) setRenderResult(result);
-        })
-        .catch((e) => {
-          if (!cancelled) setError(e.message);
-        });
-    }, 2000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [api, runId, renderResult]);
-
-  useEffect(() => {
-    if (
-      !runId ||
-      !exportJob ||
-      !["queued", "processing"].includes(exportJob.status)
-    )
-      return;
-    let cancelled = false;
-    const timer = setInterval(() => {
-      api
-        .request<{ export_id: string; status: string; download_url?: string }>(
-          `/runs/${encodeURIComponent(runId!)}/exports/${encodeURIComponent(exportJob.export_id)}`,
-        )
-        .then((result) => {
-          if (!cancelled) setExportJob((old) => old && { ...old, ...result });
-        })
-        .catch((e) => {
-          if (!cancelled) setError(e.message);
-        });
-    }, 2000);
-    return () => {
-      cancelled = true;
-      clearInterval(timer);
-    };
-  }, [api, runId, exportJob]);
 
   async function act(action: () => Promise<void>) {
     if (lock.current) return false;
@@ -509,7 +457,8 @@ function WorkspaceApp({
         if (
           error instanceof ApiError &&
           !error.retryable &&
-          error.status !== null
+          error.status !== null &&
+          error.status < 500
         )
           setPendingRun(null);
         throw error;
@@ -522,6 +471,7 @@ function WorkspaceApp({
   }
 
   function selectFinding(next: Finding) {
+    setProposalSelection(null);
     setFindingFocusRequest((old) => old + 1);
     setSelectedFindingId(next.finding_id);
     const mapped =
@@ -547,6 +497,7 @@ function WorkspaceApp({
   }
 
   function selectPart(id: ComponentId) {
+    setProposalSelection(null);
     setTab("Evidence");
     setSelectedComponent(id);
     const matches =
@@ -573,19 +524,6 @@ function WorkspaceApp({
       setSelectedComponent(null);
   }, [baselineAvailable, finding, selectedFindingId, selectedComponent]);
 
-  async function submitInstruction(instruction: Instruction) {
-    let savedVersion: number | null = null;
-    await act(async () => {
-      await api.request(
-        `/runs/${encodeURIComponent(runId!)}/instructions`,
-        instruction,
-        commandKey(),
-      );
-      savedVersion = (await refresh(runId!)).proposals.proposal_set_version;
-    });
-    return savedVersion;
-  }
-
   const reset = () => {
     activeRunId.current = null;
     runEpoch.current++;
@@ -593,6 +531,7 @@ function WorkspaceApp({
     proposalDrafts.current.clear();
     scopeDrafts.current.clear();
     setDirtyDrafts(new Set());
+    setProposalDirty(null);
     setConfirmNewRun(false);
     setSavedConfigExpanded(false);
     setVehicleExpanded(false);
@@ -602,8 +541,6 @@ function WorkspaceApp({
     setWorkspace(null);
     setRunId(null);
     setUploads([]);
-    setRenderResult(null);
-    setExportJob(null);
     setSource(null);
     setError("");
     setConnection("");
@@ -611,7 +548,8 @@ function WorkspaceApp({
     setMode("autonomous");
     setSelectedFindingId("");
     setSelectedComponent(null);
-    setVariantId("variant-digital");
+    setVariantId("");
+    setProposalSelection(null);
     if (api.mode === "mock") {
       api.dispose?.();
       setApi(createApi());
@@ -985,42 +923,17 @@ function WorkspaceApp({
             <div id="reimagine-context" className="reimagine-context">
               <span className="muted">Selected variant</span>
               <strong>{variant?.title ?? "No variant available"}</strong>
-              <span>Saved proposal version {version}</span>
+              <span>
+                {run.current_proposal_set_version === null
+                  ? "Proposal version not yet published"
+                  : `Saved proposal version ${run.current_proposal_set_version}`}
+              </span>
               {hasUnsavedWork && (
                 <p className="muted">
                   Uses saved proposals; unsaved edits are excluded.
                 </p>
               )}
             </div>
-            <button
-              className="primary"
-              aria-describedby="reimagine-context"
-              disabled={!can("reimagine") || !variant}
-              onClick={() =>
-                void act(async () => {
-                  const job = await api.request<{
-                    render_request_id: string;
-                  }>(
-                    `/runs/${encodeURIComponent(runId!)}/renders`,
-                    {
-                      proposal_set_version: version,
-                      variant_ids: [variant!.variant_id],
-                      baseline_asset_id: run.config.baseline_asset_id,
-                    },
-                    commandKey(),
-                  );
-                  setRenderResult(
-                    await api.request<RenderResult>(
-                      `/runs/${encodeURIComponent(runId!)}/renders/${encodeURIComponent(job.render_request_id)}`,
-                    ),
-                  );
-                  await refresh(runId!);
-                })
-              }
-            >
-              <WandSparkles size={16} />
-              Reimagine
-            </button>
           </div>
         )}
         <div
@@ -1084,64 +997,22 @@ function WorkspaceApp({
                   </p>
                 </div>
               )}
-              {run && (
-                <div className="render-section">
-                  <div className="section-title">
-                    <h2>Visualization</h2>
-                  </div>
-                  {renderResult ? (
-                    <>
-                      <h3>
-                        Render proposal version{" "}
-                        {renderResult.proposal_set_version}
-                      </h3>
-                      <span className="status">{renderResult.status}</span>
-                      {renderResult.proposal_set_version !== version && (
-                        <p className="notice">
-                          Older render. Current proposal version {version};
-                          baseline remains selected.
-                        </p>
-                      )}
-                      <p className="muted">Not validated or approved</p>
-                      {renderResult.outcomes.map((o) => (
-                        <p key={o.change_id}>
-                          <strong>
-                            {o.change_id}: {o.status}
-                          </strong>
-                          <br />
-                          {o.reason}
-                        </p>
-                      ))}
-                      {renderResult.proposal_set_version === version &&
-                        renderResult.variant_ids.includes(
-                          variant?.variant_id ?? "",
-                        ) &&
-                        renderResult.assets.map((asset) =>
-                          safeUrl(asset.url) ? (
-                            <a
-                              key={asset.asset_id}
-                              href={asset.url}
-                              target="_blank"
-                              rel="noreferrer"
-                            >
-                              Open variant asset {asset.asset_id}
-                            </a>
-                          ) : null,
-                        )}
-                    </>
-                  ) : (
-                    <p className="muted">
-                      No render requested for this proposal set.
-                    </p>
-                  )}
-                </div>
-              )}
             </div>
             {run?.warnings.map((w) => (
               <p className="coverage-note" key={w}>
                 {w}
               </p>
             ))}
+            {workspace && (
+              <RenderPanel
+                api={api}
+                workspace={workspace}
+                variantId={activeVariantId}
+                busy={busy}
+                onRefresh={() => refresh(runId!)}
+                onOpen={setSource}
+              />
+            )}
           </section>
           <section className="analysis-column" aria-label="Analysis panels">
             <div
@@ -1344,6 +1215,30 @@ function WorkspaceApp({
                           />
                         )}
                       </>
+                    ) : proposalSelection ? (
+                      <>
+                        <p>
+                          No available finding is linked to this proposal.
+                          Customer findings remain separate from PM ideas.
+                        </p>
+                        {proposalSelection.proposalVersion ===
+                        workspace.proposals.proposal_set_version ? (
+                          <ChangeExplanation
+                            api={api}
+                            runId={runId!}
+                            proposals={workspace.proposals}
+                            variantId={proposalSelection.variantId}
+                            changeId={proposalSelection.changeId}
+                            onOpen={setSource}
+                          />
+                        ) : (
+                          <p>
+                            Selected proposal version{" "}
+                            {proposalSelection.proposalVersion} has changed.
+                            Inspect that exact immutable version in History.
+                          </p>
+                        )}
+                      </>
                     ) : (
                       <div className="empty-state">
                         {selectedFindingId
@@ -1351,222 +1246,51 @@ function WorkspaceApp({
                           : "No finding mapped to this part. Vehicle-wide findings remain available in Findings."}
                       </div>
                     ))}
-                  {tab === "Proposals" && (
-                    <>
-                      <div className="section-title">
-                        <h2>Proposal version {version}</h2>
-                        <span className="status">{run?.analysis_status}</span>
-                      </div>
-                      <label className="stacked-label">
-                        Variant
-                        <select
-                          value={variant?.variant_id ?? ""}
-                          onChange={(e) => setVariantId(e.target.value)}
-                        >
-                          {workspace.proposals.variants.map((v) => (
-                            <option key={v.variant_id} value={v.variant_id}>
-                              {v.title}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-                      {workspace.proposals.unresolved_conflicts.map((c) => (
-                        <p className="notice" key={c}>
-                          {c}
-                        </p>
-                      ))}
-                      {variant && (
-                        <>
-                          <p>
-                            <strong>Scope:</strong>{" "}
-                            {variant.cohort_scope.join(", ")}
-                          </p>
-                          {variant.assumptions.map((text) => (
-                            <p className="muted" key={text}>
-                              {text}
-                            </p>
-                          ))}
-                          <details>
-                            <summary>Regroup variant scope</summary>
-                            <ScopeEditor
-                              key={variant.variant_id}
-                              scope={variant.cohort_scope}
-                              initialDraft={scopeDrafts.current.get(
-                                variant.variant_id,
-                              )}
-                              rememberDraft={(draft, dirty) => {
-                                scopeDrafts.current.set(
-                                  variant.variant_id,
-                                  draft,
-                                );
-                                rememberDirty(
-                                  `scope:${variant.variant_id}`,
-                                  dirty,
-                                );
-                              }}
-                              disabled={!can("edit")}
-                              onSave={(cohort_scope) =>
-                                submitInstruction({
-                                  operation: "regroup_variants",
-                                  variant_id: variant.variant_id,
-                                  base_proposal_set_version: version,
-                                  fields: { cohort_scope },
-                                })
-                              }
-                            />
-                          </details>
-                          {variant.changes.map((change, index) => (
-                            <ProposalEditor
-                              initialDraft={proposalDrafts.current.get(
-                                variant.variant_id + ":" + change.change_id,
-                              )}
-                              rememberDraft={(draft) => {
-                                proposalDrafts.current.set(
-                                  variant.variant_id + ":" + change.change_id,
-                                  draft,
-                                );
-                                rememberDirty(
-                                  variant.variant_id + ":" + change.change_id,
-                                  draft.dirty,
-                                );
-                                persistSession();
-                              }}
-                              key={variant.variant_id + ":" + change.change_id}
-                              change={change}
-                              number={index + 1}
-                              version={version}
-                              disabled={!can("edit")}
-                              evidence={
-                                <ProposalEvidence
-                                  api={api}
-                                  runId={runId!}
-                                  change={change}
-                                  finding={workspace.findings.find(
-                                    (f) => f.finding_id === change.finding_id,
-                                  )}
-                                  onOpen={setSource}
-                                />
-                              }
-                              onSave={async (
-                                operation,
-                                fields,
-                                baseVersion,
-                              ) => {
-                                const saved = await submitInstruction({
-                                  operation,
-                                  change_id: change.change_id,
-                                  variant_id: variant.variant_id,
-                                  base_proposal_set_version: baseVersion,
-                                  fields,
-                                });
-                                if (
-                                  saved !== null &&
-                                  operation === "remove_change"
-                                ) {
-                                  const key =
-                                    variant.variant_id + ":" + change.change_id;
-                                  proposalDrafts.current.delete(key);
-                                  rememberDirty(key, false);
-                                }
-                                return saved;
-                              }}
-                            />
-                          ))}
-                          <AddProposal
-                            idea={ideaDraft}
-                            setIdea={setIdeaDraft}
-                            disabled={!can("edit")}
-                            onAdd={(after) =>
-                              submitInstruction({
-                                operation: "add_change",
-                                variant_id: variant.variant_id,
-                                base_proposal_set_version: version,
-                                fields: { after },
-                              })
-                            }
-                          />
-                        </>
-                      )}
-                    </>
-                  )}
-                  {tab === "History" && (
-                    <>
-                      <div className="section-title">
-                        <h2>Run history</h2>
-                        <button
-                          disabled={!can("export") || !variant}
-                          onClick={() =>
-                            void act(async () => {
-                              const job = await api.request<{
-                                export_id: string;
-                              }>(
-                                `/runs/${encodeURIComponent(runId!)}/exports`,
-                                {
-                                  proposal_set_version: version,
-                                  variant_ids: [variant!.variant_id],
-                                  format: "json",
-                                },
-                                commandKey(),
-                              );
-                              setExportJob({
-                                export_id: job.export_id,
-                                proposal_set_version: version,
-                                status: "queued",
-                              });
-                              const result = await api.request<{
-                                export_id: string;
-                                status: string;
-                                download_url?: string;
-                              }>(
-                                `/runs/${encodeURIComponent(runId!)}/exports/${encodeURIComponent(job.export_id)}`,
-                              );
-                              setExportJob({
-                                ...result,
-                                proposal_set_version: version,
-                              });
-                              await refresh(runId!);
-                            })
-                          }
-                        >
-                          <Download size={16} />
-                          Request export
-                        </button>
-                      </div>
-                      {exportJob && (
-                        <p>
-                          Export proposal version{" "}
-                          {exportJob.proposal_set_version}: {exportJob.status}{" "}
-                          {exportJob.status === "ready" &&
-                            exportJob.download_url &&
-                            safeUrl(
-                              exportJob.download_url,
-                              api.mode === "mock",
-                            ) && (
-                              <a
-                                download="vehicle-requirements.json"
-                                href={exportJob.download_url}
-                              >
-                                Download export
-                              </a>
-                            )}
-                        </p>
-                      )}
-                      <ol className="audit-list">
-                        {workspace.history.map((event) => (
-                          <li key={event.event_id}>
-                            <span>
-                              {event.actor} / proposal v
-                              {event.proposal_set_version}
-                            </span>
-                            <strong>{event.description}</strong>
-                            <time dateTime={event.occurred_at}>
-                              {new Date(event.occurred_at).toLocaleString()}
-                            </time>
-                          </li>
-                        ))}
-                      </ol>
-                    </>
-                  )}
+                  <div hidden={tab !== "Proposals"}>
+                    <ProposalWorkspace
+                      api={api}
+                      workspace={workspace}
+                      variantId={activeVariantId}
+                      onVariantChange={setVariantId}
+                      busy={busy}
+                      onRefresh={() => refresh(runId!)}
+                      sessionNamespace={sessionNamespace}
+                      legacyDrafts={[...proposalDrafts.current]}
+                      legacyIdea={ideaDraft}
+                      onOpen={setSource}
+                      onDirtyChange={setProposalDirty}
+                      onEvidence={(change) => {
+                        const linked = workspace.findings.find((f) =>
+                          (
+                            change.wire?.finding_ids ?? [change.finding_id]
+                          ).includes(f.finding_id),
+                        );
+                        if (linked) selectFinding(linked);
+                        else {
+                          setSelectedFindingId(null);
+                          setSelectedComponent(null);
+                          setProposalSelection({
+                            proposalVersion:
+                              workspace.proposals.proposal_set_version,
+                            variantId: activeVariantId,
+                            changeId: change.change_id,
+                          });
+                          setFindingFocusRequest((old) => old + 1);
+                        }
+                        setTab("Evidence");
+                      }}
+                    />
+                  </div>
+                  <div hidden={tab !== "History"}>
+                    <HistoryPanel
+                      api={api}
+                      workspace={workspace}
+                      variantId={activeVariantId}
+                      busy={busy}
+                      onRefresh={() => refresh(runId!)}
+                      onOpen={setSource}
+                    />
+                  </div>
                 </>
               )}
             </div>
@@ -1595,314 +1319,6 @@ function WorkspaceApp({
     </div>
   );
 }
-
-function ProposalEvidence({
-  api,
-  runId,
-  change,
-  finding,
-  onOpen,
-}: {
-  api: Api;
-  runId: string;
-  change: Change;
-  finding?: Finding;
-  onOpen: (e: Evidence) => void;
-}) {
-  if (change.origin === "pm" && !change.evidence_ids.length)
-    return <p className="muted">No evidence linked to this PM idea.</p>;
-  const supporting = finding?.supporting_evidence_ids ?? [];
-  const opposing = finding?.opposing_evidence_ids ?? [];
-  const otherLinked = change.evidence_ids.filter(
-    (id) => !supporting.includes(id) && !opposing.includes(id),
-  );
-  return (
-    <>
-      {finding ? (
-        <>
-          <h4>{finding.title}</h4>
-          <p>{finding.customer_need}</p>
-          <p>
-            <strong>
-              {finding.counts.negative_records} of{" "}
-              {finding.counts.total_records} negative feedback records
-            </strong>
-            {finding.provisional ? " / provisional" : ""}
-            {finding.counts.low_evidence ? " / low evidence" : ""}
-          </p>
-          <p className="muted">
-            {finding.cohort_ids.join(", ")} · {finding.coverage}
-          </p>
-          <p className="muted">{finding.applicability}</p>
-          <EvidenceList
-            api={api}
-            runId={runId}
-            ids={supporting}
-            title="Supporting observations"
-            onOpen={onOpen}
-          />
-          <EvidenceList
-            api={api}
-            runId={runId}
-            ids={opposing}
-            title="Opposing observations"
-            onOpen={onOpen}
-          />
-        </>
-      ) : (
-        <p className="muted">No customer finding linked to this proposal.</p>
-      )}
-      {otherLinked.length > 0 && (
-        <EvidenceList
-          api={api}
-          runId={runId}
-          ids={otherLinked}
-          title="Linked proposal evidence"
-          onOpen={onOpen}
-        />
-      )}
-    </>
-  );
-}
-
-function ProposalEditor({
-  change,
-  number,
-  version,
-  disabled,
-  onSave,
-  evidence,
-  initialDraft,
-  rememberDraft,
-}: {
-  change: Change;
-  number: number;
-  version: number;
-  disabled: boolean;
-  onSave: (
-    operation: Instruction["operation"],
-    fields: Instruction["fields"],
-    baseVersion: number,
-  ) => Promise<number | null>;
-  evidence: ReactNode;
-  initialDraft?: ProposalDraft;
-  rememberDraft: (draft: ProposalDraft) => void;
-}) {
-  const [text, setText] = useState(initialDraft?.text ?? change.after);
-  const [target, setTarget] = useState(initialDraft?.target ?? change.target);
-  const [baseVersion, setBaseVersion] = useState(
-    initialDraft?.baseVersion ?? version,
-  );
-  const [confirmRemoval, setConfirmRemoval] = useState(false);
-  const [showEvidence, setShowEvidence] = useState(true);
-  useEffect(() => {
-    rememberDraft({
-      text,
-      target,
-      baseVersion,
-      dirty: text !== change.after || target !== change.target,
-    });
-  }, [text, target, baseVersion, change.after, change.target, rememberDraft]);
-  const stale = version !== baseVersion;
-  async function save(
-    operation: Instruction["operation"],
-    fields: Instruction["fields"],
-  ) {
-    const saved = await onSave(operation, fields, baseVersion);
-    if (saved !== null) setBaseVersion(saved);
-    return saved !== null;
-  }
-  return (
-    <article className="proposal-item">
-      <h3>
-        <span className="change-number">{number}</span>
-        {change.origin === "pm" ? "PM idea" : "AI proposal"}{" "}
-        <small>{change.decision_state}</small>
-      </h3>
-      <div
-        className={`proposal-review${showEvidence ? "" : " is-evidence-hidden"}`}
-      >
-        <div className="proposal-editor">
-          <p>
-            <strong>Before:</strong> {change.before}
-          </p>
-          <p>{change.rationale}</p>
-          <label className="stacked-label">
-            Proposal text
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              disabled={disabled}
-            />
-          </label>
-          <label className="stacked-label">
-            Target
-            <textarea
-              value={target}
-              onChange={(e) => setTarget(e.target.value)}
-              disabled={disabled}
-            />
-          </label>
-          <p className="muted">Target maturity: {change.target_maturity}</p>
-          {change.assumptions.map((a) => (
-            <p className="muted" key={a}>
-              {a}
-            </p>
-          ))}
-          {stale && (
-            <div className="notice">
-              <strong>
-                Draft based on version {baseVersion}; current version {version}.
-              </strong>
-              <p>Current proposal: {change.after}</p>
-              <button onClick={() => setBaseVersion(version)}>
-                <RefreshCw size={15} />
-                Use current version with my draft
-              </button>
-            </div>
-          )}
-          <div className="action-row">
-            <button
-              disabled={disabled || stale || !text.trim()}
-              onClick={() => void save("edit_change", { after: text })}
-            >
-              <Save size={15} />
-              Save edit
-            </button>
-            <button
-              disabled={disabled || stale || !target.trim()}
-              onClick={() => void save("edit_target", { target })}
-            >
-              <Save size={15} />
-              Save target
-            </button>
-            <button
-              aria-expanded={showEvidence}
-              aria-controls={`proposal-evidence-${change.change_id}`}
-              onClick={() => setShowEvidence(!showEvidence)}
-            >
-              <BookOpen size={15} />
-              {showEvidence ? "Hide evidence" : "View evidence"}
-            </button>
-            <button
-              className="icon-button"
-              aria-label={`Remove change ${number}`}
-              title="Remove change"
-              disabled={disabled || stale}
-              onClick={() => setConfirmRemoval(true)}
-            >
-              <Trash2 size={16} />
-            </button>
-          </div>
-        </div>
-        <section
-          id={`proposal-evidence-${change.change_id}`}
-          className="proposal-evidence"
-          aria-label={`Evidence for proposal ${number}`}
-          hidden={!showEvidence}
-        >
-          <h3>Evidence</h3>
-          {evidence}
-        </section>
-      </div>
-      {confirmRemoval && (
-        <ConfirmDialog
-          title="Remove proposal?"
-          description="This removes this proposal from the selected variant, including its unsaved edits. Removal cannot be undone here. Customer evidence stays unchanged."
-          confirmLabel="Remove proposal"
-          disabled={disabled || stale}
-          onCancel={() => setConfirmRemoval(false)}
-          onConfirm={() => save("remove_change", {})}
-        />
-      )}
-    </article>
-  );
-}
-
-function AddProposal({
-  disabled,
-  onAdd,
-  idea,
-  setIdea,
-}: {
-  disabled: boolean;
-  onAdd: (after: string) => Promise<number | null>;
-  idea: string;
-  setIdea: (idea: string) => void;
-}) {
-  return (
-    <section className="add-proposal">
-      <h3>Add PM idea</h3>
-      <label className="stacked-label">
-        PM instruction
-        <textarea
-          value={idea}
-          onChange={(e) => setIdea(e.target.value)}
-          disabled={disabled}
-        />
-      </label>
-      <button
-        disabled={disabled || !idea.trim()}
-        onClick={async () => {
-          if ((await onAdd(idea)) !== null) setIdea("");
-        }}
-      >
-        <Plus size={16} />
-        Add proposal
-      </button>
-    </section>
-  );
-}
-
-function ScopeEditor({
-  scope,
-  initialDraft,
-  rememberDraft,
-  disabled,
-  onSave,
-}: {
-  scope: string[];
-  initialDraft?: string;
-  rememberDraft: (draft: string, dirty: boolean) => void;
-  disabled: boolean;
-  onSave: (scope: string[]) => Promise<number | null>;
-}) {
-  const [draft, setDraft] = useState(initialDraft ?? scope.join(", "));
-  const currentScope = scope.join(", ");
-  useEffect(() => {
-    rememberDraft(draft, draft !== currentScope);
-  }, [draft, currentScope, rememberDraft]);
-  return (
-    <div className="scope-editor">
-      <label className="stacked-label">
-        Cohort scope
-        <input
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          disabled={disabled}
-        />
-      </label>
-      <button
-        disabled={disabled || !draft.trim()}
-        onClick={async () => {
-          const next = draft
-            .split(",")
-            .map((s) => s.trim())
-            .filter(Boolean);
-          if ((await onSave(next)) !== null) setDraft(next.join(", "));
-        }}
-      >
-        <Save size={15} />
-        Save grouping
-      </button>
-      <p className="muted">
-        Scope changes require recomputation; overlapping cohorts are not added
-        together.
-      </p>
-    </div>
-  );
-}
-
 function ConfirmDialog({
   title,
   description,
@@ -1976,16 +1392,4 @@ function ConfirmDialog({
       </div>
     </dialog>
   );
-}
-
-function safeUrl(value: string, allowBlob = false) {
-  try {
-    const url = new URL(value, window.location.href);
-    return (
-      ["http:", "https:"].includes(url.protocol) ||
-      (allowBlob && url.protocol === "blob:")
-    );
-  } catch {
-    return false;
-  }
 }

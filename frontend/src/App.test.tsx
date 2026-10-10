@@ -8,7 +8,7 @@ import {
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import App from "./App";
-import { createMockApi } from "./api/client";
+import { ApiError, createMockApi } from "./api/client";
 import type { Api } from "./api/contracts";
 
 afterEach(() => { cleanup(); sessionStorage.clear(); });
@@ -252,14 +252,23 @@ describe("frontend plan workspace", () => {
   });
 
   it("keeps Reimagine bound to the visible variant and proposal version across tabs", async () => {
-    const user = await createRun();
+    const api = createMockApi();
+    const request = api.request;
+    const renderCommands: unknown[] = [];
+    api.request = (path, body, key, signal) => {
+      if (path.endsWith("/renders") && body !== undefined) renderCommands.push(body);
+      return request(path, body, key, signal);
+    };
+    const user = await createRun({ api });
     await user.click(screen.getByRole("tab", { name: "Proposals" }));
     await user.selectOptions(
       screen.getByLabelText("Variant"),
       "variant-physical",
     );
     await user.click(screen.getByRole("button", { name: "Save edit" }));
-    await screen.findByText("Proposal version 2");
+    await screen.findByText(/Waiting for backend recomputation/);
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    await screen.findByRole("heading", { name: "Proposals / version 2" });
     await user.click(screen.getByRole("tab", { name: "History" }));
     const target = screen.getByRole("group", { name: "Reimagine target" });
     expect(
@@ -268,12 +277,14 @@ describe("frontend plan workspace", () => {
     expect(
       within(target).getByText("Saved proposal version 2"),
     ).toBeInTheDocument();
-    await user.click(within(target).getByRole("button", { name: "Reimagine" }));
+    await user.click(screen.getByRole("button", { name: "Reimagine" }));
+    expect(renderCommands).toHaveLength(1);
+    expect(renderCommands[0]).toMatchObject({ proposal_set_version: 2, variant_ids: ["variant-physical"] });
     expect(
       await screen.findByText("Render proposal version 2"),
     ).toBeInTheDocument();
-    expect(screen.getByText(/change-physical:/)).toBeInTheDocument();
-  });
+    expect(await screen.findByText(/change-physical:/, {}, { timeout: 7000 })).toBeInTheDocument();
+  }, 12000);
 
   it("does not attribute customer evidence to a PM idea without linked evidence", async () => {
     const user = await createRun();
@@ -283,7 +294,9 @@ describe("frontend plan workspace", () => {
       "Investigate cabin lighting",
     );
     await user.click(screen.getByRole("button", { name: "Add proposal" }));
-    await screen.findByText("Proposal version 2");
+    await screen.findByText(/Waiting for backend recomputation/);
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    await screen.findByRole("heading", { name: "Proposals / version 2" });
     const evidence = screen.getByRole("region", {
       name: "Evidence for proposal 2",
     });
@@ -347,7 +360,7 @@ describe("frontend plan workspace", () => {
       }),
     );
     expect(screen.getByRole("button", { name: "Start run" })).toBeDisabled();
-    expect(screen.queryByText("Proposal version 1")).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Proposals / version 1" })).not.toBeInTheDocument();
   });
 
   it("requires confirmation before removing a proposal and retains its draft on cancel", async () => {
@@ -369,7 +382,9 @@ describe("frontend plan workspace", () => {
         screen.getByRole("dialog", { name: "Remove proposal?" }),
       ).getByRole("button", { name: "Remove proposal" }),
     );
-    await screen.findByText("Proposal version 2");
+    await screen.findByText(/Waiting for backend recomputation/);
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    await screen.findByRole("heading", { name: "Proposals / version 2" });
     expect(screen.queryByLabelText("Proposal text")).not.toBeInTheDocument();
   });
 
@@ -383,7 +398,9 @@ describe("frontend plan workspace", () => {
     expect(unsavedExit.defaultPrevented).toBe(true);
     await user.click(screen.getByRole("tab", { name: "Proposals" }));
     await user.click(screen.getByRole("button", { name: "Save edit" }));
-    await screen.findByText("Proposal version 2");
+    await screen.findByText(/Waiting for backend recomputation/);
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    await screen.findByRole("heading", { name: "Proposals / version 2" });
     await waitFor(() => {
       const savedExit = new Event("beforeunload", { cancelable: true });
       window.dispatchEvent(savedExit);
@@ -394,11 +411,11 @@ describe("frontend plan workspace", () => {
   it("retains unsaved grouping while inspecting evidence and warns before browser exit", async () => {
     const user = await createRun();
     await user.click(screen.getByRole("tab", { name: "Proposals" }));
-    await user.clear(screen.getByLabelText("Cohort scope"));
-    await user.type(screen.getByLabelText("Cohort scope"), "Germany");
+    await user.click(screen.getByText("Regroup variant scope"));
+    await user.click(screen.getByLabelText("Europe"));
     await user.click(screen.getByRole("tab", { name: "Evidence" }));
     await user.click(screen.getByRole("tab", { name: "Proposals" }));
-    expect(screen.getByLabelText("Cohort scope")).toHaveValue("Germany");
+    expect(screen.getByLabelText("Europe")).not.toBeChecked();
     const exit = new Event("beforeunload", { cancelable: true });
     window.dispatchEvent(exit);
     expect(exit.defaultPrevented).toBe(true);
@@ -529,7 +546,9 @@ describe("frontend plan workspace", () => {
       "Keep climate controls visible.",
     );
     await user.click(screen.getByRole("button", { name: "Save edit" }));
-    expect(await screen.findByText("Proposal version 2")).toBeInTheDocument();
+    expect(await screen.findByText(/Waiting for backend recomputation/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    expect(await screen.findByRole("heading", { name: "Proposals / version 2" })).toBeInTheDocument();
     expect(screen.getByLabelText("Proposal text")).toHaveValue(
       "Keep climate controls visible.",
     );
@@ -544,10 +563,10 @@ describe("frontend plan workspace", () => {
       await screen.findByText(/Render proposal version 1/),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/Annotation only/),
+      await screen.findByText(/Annotation only/, {}, { timeout: 7000 }),
     ).toBeInTheDocument();
-    expect(screen.getByText(/Not validated or approved/)).toBeInTheDocument();
-  });
+    expect(screen.getByText(/Rendering does not mean validated or approved/)).toBeInTheDocument();
+  }, 12000);
 
   it("retains an unsaved proposal when hiding and reopening evidence", async () => {
     const user = await createRun();
@@ -591,7 +610,9 @@ describe("frontend plan workspace", () => {
       }),
     );
     await user.click(screen.getByRole("button", { name: "Save edit" }));
-    expect(await screen.findByText("Proposal version 3")).toBeInTheDocument();
+    await screen.findByText(/Waiting for backend recomputation/);
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    expect(await screen.findByRole("heading", { name: "Proposals / version 3" })).toBeInTheDocument();
   });
 
   it("continues a guided checkpoint in a panel and records the PM selection", async () => {
@@ -604,7 +625,7 @@ describe("frontend plan workspace", () => {
       screen.queryByRole("button", { name: "Continue checkpoint checkpoint-comfort" }),
     ).not.toBeInTheDocument();
     await user.click(screen.getByRole("tab", { name: "History" }));
-    expect(screen.getByText("PM selected continue")).toBeInTheDocument();
+    expect(screen.getByText(/PM selected continue/)).toBeInTheDocument();
   });
 
   it("keeps an older render labeled after proposal edits", async () => {
@@ -616,9 +637,11 @@ describe("frontend plan workspace", () => {
       expect(screen.getByRole("button", { name: "Save edit" })).toBeEnabled(),
     );
     await user.click(screen.getByRole("button", { name: "Save edit" }));
-    await screen.findByText("Proposal version 2");
+    await screen.findByText(/Waiting for backend recomputation/);
+    await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+    await screen.findByRole("heading", { name: "Proposals / version 2" });
     expect(
-      screen.getByText(/Older render. Current proposal version 2/),
+      screen.getByText(/Older render or earlier attempt.*Current selected proposal version 2/),
     ).toBeInTheDocument();
     expect(screen.getByText("Render proposal version 1")).toBeInTheDocument();
   });
@@ -702,14 +725,14 @@ it("creates server-supported configurations even when local visual asset is unav
   expect(screen.getByRole("button", { name: "New run" })).toBeEnabled();
 });
 
-it("retries an uncertain accepted run with original frozen command and key", async () => {
+it.each([new TypeError("Response interrupted"), new ApiError("server_error", "Response interrupted", null, 500, false)])("retries an uncertain accepted run with original frozen command and key (%s)", async (failure) => {
   const base = createMockApi();
   const commands: Array<{ key?: string; body: unknown }> = [];
   const api = { ...base, mode: "real" as const, sessionNamespace: "uncertain-create", request: async <T,>(path: string, body?: unknown, key?: string): Promise<T> => {
     const result = await base.request<T>(path, body, key);
     if (path === "/runs") {
       commands.push({ key, body });
-      if (commands.length === 1) throw new TypeError("Response interrupted");
+      if (commands.length === 1) throw failure;
     }
     return result;
   } };
@@ -900,4 +923,63 @@ it("discards late research refresh after New run", async () => {
   expect(screen.getByRole("heading", { name: "Vehicle evidence workspace" })).toBeInTheDocument();
   expect(screen.getByText(/Findings and proposals will appear here after you start a run/)).toBeInTheDocument();
   expect(screen.queryByText("Research offline")).not.toBeInTheDocument();
+});
+
+it("retains an explicitly selected missing variant across reload without binding commands to another variant", async () => {
+  const base = createMockApi(); let removed = false;
+  const api = { ...base, mode: "real" as const, sessionNamespace: "removed-variant", workspace: async (id: string) => {
+    const w = await base.workspace(id);
+    if (removed) w.proposals.variants = w.proposals.variants.filter(v => v.variant_id !== "variant-physical");
+    return w;
+  } };
+  const user = userEvent.setup(); const first = render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("tab", { name: "Proposals" }));
+  await user.selectOptions(screen.getByRole("combobox", { name: /^Variant$/ }), "variant-physical");
+  await user.clear(screen.getByLabelText("Proposal text")); await user.type(screen.getByLabelText("Proposal text"), "Retain physical variant draft");
+  first.unmount(); removed = true; render(<App api={api} />);
+  await screen.findByText(/Selected variant unavailable in current proposal version/);
+  expect(screen.getByRole("button", { name: /^Reimagine$/ })).toBeDisabled();
+  expect(screen.queryByRole("button", { name: "Save edit" })).not.toBeInTheDocument();
+  await user.selectOptions(screen.getByRole("combobox", { name: /^Variant$/ }), "variant-digital");
+  expect(await screen.findByRole("button", { name: "Save edit" })).toBeEnabled();
+  expect(screen.getByLabelText("Proposal text")).not.toHaveValue("Retain physical variant draft");
+});
+
+it("preserves initially defaulted finding and variant identities when backend resources reorder", async () => {
+  const base = createMockApi(); let reordered = false;
+  const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id);
+    if (reordered) { w.proposals.variants.reverse(); w.findings.reverse(); w.snapshot.revision++; }
+    return w;
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Start run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("tab", { name: "Proposals" }));
+  expect(screen.getByRole("combobox", { name: /^Variant$/ })).toHaveValue("variant-digital");
+  reordered = true; await user.click(screen.getByRole("button", { name: "Reimagine" }));
+  await waitFor(() => expect(within(screen.getByRole("combobox", { name: /^Variant$/ })).getAllByRole("option")[0]).toHaveValue("variant-physical"));
+  expect(screen.getByRole("combobox", { name: /^Variant$/ })).toHaveValue("variant-digital");
+  await user.click(screen.getByRole("tab", { name: "Findings" }));
+  expect(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ })).toHaveAttribute("aria-pressed", "true");
+});
+
+it("opens exact PM proposal evidence without substituting the previously selected customer finding", async () => {
+  const user = await createRun();
+  await user.click(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ }));
+  await user.click(screen.getByRole("tab", { name: "Proposals" }));
+  await user.type(screen.getByLabelText("PM instruction"), "Investigate a new PM-originated idea");
+  await user.click(screen.getByRole("button", { name: "Add proposal" }));
+  await screen.findByText(/Waiting for backend recomputation/);
+  await user.click(screen.getByRole("button", { name: "Refresh proposals" }));
+  await screen.findByRole("heading", { name: "Proposals / version 2" });
+  await user.click(screen.getAllByRole("button", { name: "Inspect finding evidence" }).at(-1)!);
+  expect(screen.getByRole("tabpanel", { name: "Evidence" })).toBeInTheDocument();
+  expect(screen.getByText(/No available finding is linked to this proposal/)).toBeInTheDocument();
+  const explanation = screen.getByRole("region", { name: /Change explanation pm-change-/ });
+  expect(within(explanation).getByText("Investigate a new PM-originated idea")).toBeInTheDocument();
+  expect(screen.queryByRole("heading", { name: "Comfort controls" })).not.toBeInTheDocument();
+  expect(screen.getByRole("tabpanel", { name: "Evidence" })).toHaveFocus();
 });

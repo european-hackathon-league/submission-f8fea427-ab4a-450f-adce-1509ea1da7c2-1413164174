@@ -12,3 +12,10 @@ it("ignores malformed/foreign session data and unavailable browser storage", () 
   sessionStorage.setItem("vehicle-workspace:real:/api/v1", '{"runId":12}');
   expect(readSession("real:/api/v1")).toBeNull();
 });
+it("restores only a valid exact proposal explanation identity", () => {
+  const session = {runId:"r",tab:"Evidence",selectedFindingId:null,selectedComponent:"",view:"exterior",variantId:"v",ideaDraft:"",proposalDrafts:[]};
+  saveSession("proposal", {...session,proposalSelection:{proposalVersion:7,variantId:"opaque/v",changeId:"opaque/c"}});
+  expect(readSession("proposal")?.proposalSelection).toEqual({proposalVersion:7,variantId:"opaque/v",changeId:"opaque/c"});
+  sessionStorage.setItem("vehicle-workspace:proposal", JSON.stringify({...session,proposalSelection:{proposalVersion:0,variantId:"v",changeId:"c"}}));
+  expect(readSession("proposal")).toBeNull();
+});

@@ -9,6 +9,14 @@ export function createMockTransport(scenario: string): {
 } {
   let snapshot: Wire.Snapshot | null = null;
   let proposals = structuredClone(wireFixtures.proposals);
+  const proposalVersions = new Map<number, Wire.Proposals>();
+  const publishProposal = () =>
+    proposalVersions.set(
+      proposals.proposal_set_version,
+      structuredClone(proposals),
+    );
+  let pendingProposal: Wire.Proposals | null = null;
+  let recomputeReads = 0;
   let checkpoint: Wire.Checkpoint | null = null;
   const conflicts: Wire.Conflict[] = [
     {
@@ -28,6 +36,8 @@ export function createMockTransport(scenario: string): {
   const contents = new Map<string, string>();
   const commands = new Map<string, { input: string; result: unknown }>();
   const renders = new Map<string, Wire.RenderResult>();
+  const renderPolls = new Map<string, number>();
+  const renderOutcomes = new Map<string, Wire.RenderResult["outcomes"]>();
   const exports = new Map<string, Wire.ExportResult>();
   const blobUrls = new Set<string>();
   let pending = false;
@@ -201,6 +211,7 @@ export function createMockTransport(scenario: string): {
         ],
         resource_links: { proposals: "/api/v1/runs/run-synthetic/proposals" },
       };
+      publishProposal();
       pending = true;
       record("Run created with saved configuration");
       result = {
@@ -213,6 +224,29 @@ export function createMockTransport(scenario: string): {
         throw new ApiError("not_found", "Run not found.", null, 404);
       const resource = pathname.slice(`/runs/${snapshot.run_id}`.length);
       if (resource === "") {
+        if (pendingProposal && recomputeReads > 0) recomputeReads--;
+        else if (pendingProposal) {
+          if (scenario === "proposal_recompute_failed") {
+            snapshot.analysis_status = "failed";
+            snapshot.stage = "Proposal recomputation failed";
+            snapshot.warnings.push(
+              "Synthetic proposal recomputation failed; previous published proposal retained.",
+            );
+            snapshot.available_actions = [];
+            record("Proposal recomputation failed");
+          } else {
+            proposals = pendingProposal;
+            publishProposal();
+            snapshot.current_proposal_set_version =
+              proposals.proposal_set_version;
+            snapshot.analysis_status = "proposals_ready";
+            snapshot.stage = "Proposals complete";
+            snapshot.available_actions = ["edit", "reimagine", "export"];
+            record("Accepted proposal recomputation published");
+          }
+          pendingProposal = null;
+          touch();
+        }
         if (pending) {
           pending = false;
           snapshot.analysis_status =
@@ -271,8 +305,18 @@ export function createMockTransport(scenario: string): {
           conflicts,
           checkpoints: checkpoint ? [checkpoint] : [],
         } satisfies Wire.Conflicts;
-      else if (resource === "/proposals") result = proposals;
-      else if (resource === "/history") result = page(history);
+      else if (resource === "/proposals") {
+        const version = url.searchParams.get("proposal_set_version");
+        result =
+          version === null ? proposals : proposalVersions.get(Number(version));
+        if (!result)
+          throw new ApiError(
+            "not_found",
+            "Proposal version unavailable.",
+            null,
+            404,
+          );
+      } else if (resource === "/history") result = page(history);
       else if (resource.startsWith("/evidence/")) {
         result = wireFixtures.evidence.find(
           (e) => e.evidence_id === decodeURIComponent(resource.slice(10)),
@@ -291,6 +335,7 @@ export function createMockTransport(scenario: string): {
         if (scenario === "pm_edit_stale" && !staleInjected) {
           staleInjected = true;
           proposals.proposal_set_version++;
+          publishProposal();
           snapshot.current_proposal_set_version =
             proposals.proposal_set_version;
           touch();
@@ -305,19 +350,36 @@ export function createMockTransport(scenario: string): {
             409,
           );
         const next = structuredClone(proposals);
-        const variant = next.variants.find((v) =>
-          command.target_ids.includes(v.variant_id),
-        );
         const change = next.changes.find((c) =>
           command.target_ids.includes(c.change_id),
         );
+        const variant =
+          next.variants.find((v) =>
+            command.target_ids.includes(v.variant_id),
+          ) ??
+          next.variants.find(
+            (v) => change && v.change_ids.includes(change.change_id),
+          );
         if (!variant)
           throw new ApiError("not_found", "Variant not found.", null, 404);
         if (command.operation === "regroup_variants") {
           const groups =
             command.changed_fields.cohort_scope ??
             command.changed_fields.cohort_ids;
-          if (!Array.isArray(groups))
+          const knownCohorts = new Set([
+            ...wireFixtures.findings.items.flatMap((f) => f.cohort_ids),
+            ...next.variants.flatMap((v) => v.cohort_ids),
+            ...conflicts.flatMap((c) =>
+              c.alternatives.flatMap((scope) => scope.cohort_ids ?? []),
+            ),
+          ]);
+          if (
+            !Array.isArray(groups) ||
+            groups.some(
+              (id) => typeof id !== "string" || !knownCohorts.has(id),
+            ) ||
+            new Set(groups).size !== groups.length
+          )
             throw new ApiError(
               "invalid_input",
               "Cohort IDs required.",
@@ -325,12 +387,28 @@ export function createMockTransport(scenario: string): {
               422,
             );
           variant.cohort_ids = groups;
+          for (const member of next.changes.filter((c) =>
+            variant.change_ids.includes(c.change_id),
+          )) {
+            member.scope = { ...member.scope, cohort_ids: [...groups] };
+            member.version++;
+          }
         } else if (command.operation === "remove_change") {
           if (!change)
             throw new ApiError("not_found", "Change not found.", null, 404);
           variant.change_ids = variant.change_ids.filter(
             (id) => id !== change.change_id,
           );
+          if (
+            !next.changes.some(
+              (c) =>
+                variant.change_ids.includes(c.change_id) &&
+                c.requirement_id === change.requirement_id,
+            )
+          )
+            variant.requirement_ids = variant.requirement_ids.filter(
+              (id) => id !== change.requirement_id,
+            );
           if (
             !next.variants.some((v) => v.change_ids.includes(change.change_id))
           )
@@ -360,6 +438,7 @@ export function createMockTransport(scenario: string): {
               ? command.changed_fields.part_ids
               : [],
             before: null,
+            scope: { cohort_ids: [...variant.cohort_ids] },
             after: command.changed_fields.after.trim(),
             outcome: "PM instruction; not customer evidence.",
             target: null,
@@ -401,14 +480,13 @@ export function createMockTransport(scenario: string): {
           change.version++;
         }
         next.proposal_set_version++;
-        proposals = next;
-        snapshot.current_proposal_set_version = next.proposal_set_version;
+        pendingProposal = next;
+        recomputeReads = 2;
         snapshot.analysis_status = "processing";
         snapshot.stage = "Recomputing proposals";
         snapshot.available_actions = [];
-        pending = true;
         touch();
-        record("PM instruction accepted; proposals recomputed", "pm");
+        record("PM instruction accepted; recomputation pending", "pm");
         result = accepted(
           `instruction-${history.length}`,
           `/api/v1/runs/${snapshot.run_id}/proposals`,
@@ -516,6 +594,7 @@ export function createMockTransport(scenario: string): {
         );
         next.proposal_set_version++;
         proposals = next;
+        publishProposal();
         snapshot.current_proposal_set_version = proposals.proposal_set_version;
         conflicts.forEach((conflict) => {
           if (checkpoint!.conflict_ids.includes(conflict.conflict_id)) {
@@ -575,7 +654,7 @@ export function createMockTransport(scenario: string): {
             variant_ids: command.variant_ids,
             baseline_asset_id: command.baseline_asset_id,
             part_catalog_version: snapshot.config.part_catalog_version,
-            status: "partial",
+            status: "queued",
             assets: [],
             outcomes: proposals.changes
               .filter((c) => changeIds.has(c.change_id))
@@ -590,14 +669,49 @@ export function createMockTransport(scenario: string): {
             failure_reason: null,
             job_id: null,
           });
+          renderOutcomes.set(id, structuredClone(renders.get(id)!.outcomes));
+          renders.get(id)!.outcomes = [];
+          renderPolls.set(id, 0);
           record(
             `Render requested for proposal version ${command.proposal_set_version}`,
           );
           touch();
         }
         result = accepted(id, `/api/v1/runs/${snapshot.run_id}/renders/${id}`);
+      } else if (
+        resource.startsWith("/renders/") &&
+        resource.endsWith("/retry") &&
+        body
+      ) {
+        const id = decodeURIComponent(resource.slice(9, -6));
+        const render = renders.get(id);
+        if (!render)
+          throw new ApiError(
+            "not_found",
+            "Render request not found.",
+            null,
+            404,
+          );
+        if (!["partial", "failed"].includes(render.status))
+          throw new ApiError(
+            "action_unavailable",
+            "Only failed or partial renders support retry.",
+            null,
+            409,
+          );
+        render.status = "queued";
+        render.outcomes = [];
+        render.failure_reason = null;
+        renderPolls.set(id, 0);
+        record(`Retry requested for render ${id}`);
+        touch();
+        result = accepted(
+          id,
+          `/api/v1/runs/${snapshot.run_id}/renders/${encodeURIComponent(id)}`,
+        );
       } else if (resource.startsWith("/renders/")) {
-        result = renders.get(decodeURIComponent(resource.slice(9)));
+        const id = decodeURIComponent(resource.slice(9));
+        result = renders.get(id);
         if (!result)
           throw new ApiError(
             "not_found",
@@ -605,6 +719,34 @@ export function createMockTransport(scenario: string): {
             null,
             404,
           );
+        const render = result as Wire.RenderResult;
+        render.stale =
+          render.proposal_set_version !== proposals.proposal_set_version;
+        result = structuredClone(render);
+        const polls = renderPolls.get(id) ?? 0;
+        renderPolls.set(id, polls + 1);
+        if (render.status === "queued") render.status = "rendering";
+        else if (
+          render.status === "rendering" &&
+          (scenario !== "render_late" || polls >= 3)
+        ) {
+          render.status =
+            scenario === "render_failed"
+              ? "failed"
+              : scenario === "render_success"
+                ? "succeeded"
+                : "partial";
+          render.outcomes = structuredClone(renderOutcomes.get(id) ?? []);
+          if (render.status === "failed") {
+            render.failure_reason =
+              "Synthetic renderer failure; no generated geometry available.";
+            render.outcomes = render.outcomes.map((outcome) => ({
+              ...outcome,
+              outcome: "failed",
+              reason: render.failure_reason,
+            }));
+          }
+        }
       } else if (resource === "/exports" && body) {
         const command = body as Wire.ExportCommand;
         if (!snapshot.available_actions.includes("export"))
@@ -614,17 +756,21 @@ export function createMockTransport(scenario: string): {
             null,
             409,
           );
-        if (command.proposal_set_version !== proposals.proposal_set_version)
+        const exportedProposals = proposalVersions.get(
+          command.proposal_set_version,
+        );
+        if (!exportedProposals)
           throw new ApiError(
-            "stale_version",
-            "Refresh proposals before exporting.",
-            proposals.proposal_set_version,
-            409,
+            "not_found",
+            "Proposal version unavailable for export.",
+            null,
+            404,
           );
         if (
           !command.variant_ids.length ||
           command.variant_ids.some(
-            (id) => !proposals.variants.some((v) => v.variant_id === id),
+            (id) =>
+              !exportedProposals.variants.some((v) => v.variant_id === id),
           )
         )
           throw new ApiError(
@@ -633,14 +779,21 @@ export function createMockTransport(scenario: string): {
             null,
             422,
           );
-        const id = `export-${command.proposal_set_version}-${command.variant_ids.join("-")}`;
+        const id = `export-${command.proposal_set_version}-${command.variant_ids.join("-")}-${command.format}-${commandKey()}`;
+        if (command.format !== "json")
+          throw new ApiError(
+            "unsupported_format",
+            "Synthetic fixture supports JSON only; spreadsheet export requires the application API.",
+            null,
+            422,
+          );
         if (!exports.has(id)) {
           const artifact = {
             synthetic: true,
             run_id: snapshot.run_id,
             ...command,
-            proposals: structuredClone(proposals),
-            source_version_ids: proposals.source_version_ids,
+            proposals: structuredClone(exportedProposals),
+            source_version_ids: exportedProposals.source_version_ids,
           };
           const download_url = URL.createObjectURL(
             new Blob([JSON.stringify(artifact, null, 2)], {
@@ -650,13 +803,13 @@ export function createMockTransport(scenario: string): {
           blobUrls.add(download_url);
           exports.set(id, {
             export_id: id,
-            status: "ready",
+            status: "queued",
             download_url,
             manifest: {
               run_id: snapshot.run_id,
               proposal_set_version: command.proposal_set_version,
               variant_ids: command.variant_ids,
-              source_version_ids: proposals.source_version_ids,
+              source_version_ids: exportedProposals.source_version_ids,
             },
           });
           record(
@@ -669,6 +822,11 @@ export function createMockTransport(scenario: string): {
         result = exports.get(decodeURIComponent(resource.slice(9)));
         if (!result)
           throw new ApiError("not_found", "Export not found.", null, 404);
+        const job = result as Wire.ExportResult;
+        result = structuredClone(job);
+        if (job.status === "queued") job.status = "processing";
+        else if (job.status === "processing")
+          job.status = scenario === "export_failed" ? "failed" : "ready";
       } else
         throw new ApiError(
           "not_found",

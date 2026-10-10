@@ -472,3 +472,23 @@ it("never asks autonomous runs to continue unexpected backend checkpoints", asyn
   expect(screen.queryByRole("button", { name: /Choose approach|Continue checkpoint|Submit checkpoint/ })).not.toBeInTheDocument();
   expect(screen.getByRole("radio", { name: "Autonomous" })).toBeChecked();
 });
+
+
+it("discards late research refresh after New run", async () => {
+  const base = createMockApi(); let paused = false; let release!: () => void; let started = false;
+  const api = { ...base, workspace: async (id: string) => {
+    const w = await base.workspace(id);
+    if (paused) { started = true; await new Promise<void>(resolve => { release = resolve; }); }
+    return { ...w, research: [], resourceErrors: { research: "Research offline" } };
+  } };
+  const user = userEvent.setup(); render(<App api={api} />);
+  await user.click(screen.getByRole("checkbox", { name: "Deep Dive" }));
+  await user.upload(screen.getByLabelText("Upload files"), new File(["f"], "f.pdf")); await screen.findByText("ready");
+  await user.click(screen.getByRole("button", { name: "Create run" })); await screen.findByText("proposals_ready");
+  await user.click(screen.getByRole("button", { name: /Comfort controls.*172 of 400/ }));
+  paused = true; await user.click(screen.getByRole("button", { name: /Retry research/ })); await waitFor(() => expect(started).toBe(true));
+  await user.click(screen.getByRole("button", { name: "New run" }));
+  release(); await waitFor(() => expect(screen.queryByText("proposals_ready")).not.toBeInTheDocument());
+  expect(screen.getByRole("heading", { name: "New analysis run" })).toBeInTheDocument();
+  expect(screen.getByText("No analysis run yet.")).toBeInTheDocument();
+});

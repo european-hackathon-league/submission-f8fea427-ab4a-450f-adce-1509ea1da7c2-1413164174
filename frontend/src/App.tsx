@@ -93,6 +93,8 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   const [uploads, setUploads] = useState<UploadRow[]>([]);
   const [workspace, setWorkspace] = useState<Workspace | null>(null);
   const [runId, setRunId] = useState<string | null>(restored?.runId ?? null);
+  const activeRunId = useRef(runId);
+  const runEpoch = useRef(0);
   const [tab, setTab] = useState<Tab>(tabs.some(t => t.title === restored?.tab) ? restored!.tab as Tab : "Findings");
   const [selectedFindingId, setSelectedFindingId] =
     useState<string | null>(restored ? restored.selectedFindingId : "");
@@ -161,7 +163,9 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
 
   const refresh = useCallback(
     async (id: string) => {
+      const epoch = runEpoch.current;
       const next = await api.workspace(id);
+      if (activeRunId.current !== id || runEpoch.current !== epoch) return next;
       setWorkspace((old) =>
         old?.snapshot.run_id === id &&
         old.snapshot.revision > next.snapshot.revision
@@ -315,6 +319,7 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
         if (error instanceof ApiError && !error.retryable && error.status !== null) setPendingRun(null);
         throw error;
       }
+      activeRunId.current = result.run_id;
       setRunId(result.run_id);
       setPendingRun(null);
       await refresh(result.run_id);
@@ -360,6 +365,8 @@ function WorkspaceApp({ api: suppliedApi, onDisconnect }: { api: Api; onDisconne
   }
 
   const reset = () => {
+    activeRunId.current = null;
+    runEpoch.current++;
     clearSession(sessionNamespace);
     proposalDrafts.current.clear();
     setIdeaDraft("");

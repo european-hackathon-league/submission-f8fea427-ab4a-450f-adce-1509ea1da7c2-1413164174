@@ -190,37 +190,42 @@ it("retains accepted export identity after GET failure and retries GET without a
   );
   expect(request.mock.calls.filter((c) => c[1] !== undefined)).toHaveLength(1);
 });
-it("retries uncertain submission using same key/body and freezes inputs", async () => {
-  const request = vi.fn(async (path: string, body?: unknown, _key?: string) => {
-    if (path.includes("/proposals")) return proposal();
-    if (body)
-      throw new ApiError(
-        "network_error",
-        "Outcome uncertain",
-        null,
-        null,
-        true,
-      );
-    return jobResult();
-  });
-  render(<HistoryPanel {...props(request)} />);
-  await screen.findByText("Immutable proposal version 1");
-  fireEvent.click(
-    screen.getByRole("button", { name: "Request exact-version export" }),
-  );
-  await screen.findByText("Outcome uncertain");
-  expect(screen.getByLabelText("Export format")).toBeDisabled();
-  fireEvent.click(
-    screen.getByRole("button", { name: "Retry original export request" }),
-  );
-  await waitFor(() =>
-    expect(request.mock.calls.filter((c) => c[1] !== undefined)).toHaveLength(
-      2,
-    ),
-  );
-  const commands = request.mock.calls.filter((c) => c[1] !== undefined);
-  expect(commands[0]).toEqual(commands[1]);
-});
+it.each([null, 500])(
+  "retries uncertain submission using same key/body and freezes inputs (status %s)",
+  async (status) => {
+    const request = vi.fn(
+      async (path: string, body?: unknown, _key?: string) => {
+        if (path.includes("/proposals")) return proposal();
+        if (body)
+          throw new ApiError(
+            "network_error",
+            "Outcome uncertain",
+            null,
+            status,
+            status === null,
+          );
+        return jobResult();
+      },
+    );
+    render(<HistoryPanel {...props(request)} />);
+    await screen.findByText("Immutable proposal version 1");
+    fireEvent.click(
+      screen.getByRole("button", { name: "Request exact-version export" }),
+    );
+    await screen.findByText("Outcome uncertain");
+    expect(screen.getByLabelText("Export format")).toBeDisabled();
+    fireEvent.click(
+      screen.getByRole("button", { name: "Retry original export request" }),
+    );
+    await waitFor(() =>
+      expect(request.mock.calls.filter((c) => c[1] !== undefined)).toHaveLength(
+        2,
+      ),
+    );
+    const commands = request.mock.calls.filter((c) => c[1] !== undefined);
+    expect(commands[0]).toEqual(commands[1]);
+  },
+);
 it("withholds download on mismatched manifest and offers retrieval recovery", async () => {
   const request = vi.fn(async (path: string, body?: unknown, _key?: string) =>
     path.includes("/proposals")

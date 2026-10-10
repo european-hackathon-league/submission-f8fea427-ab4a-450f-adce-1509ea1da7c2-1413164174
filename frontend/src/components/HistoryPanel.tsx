@@ -211,7 +211,8 @@ export default function HistoryPanel({
       if (
         error instanceof ApiError &&
         !error.retryable &&
-        error.status !== null
+        error.status !== null &&
+        error.status < 500
       )
         updateJob(null);
     } finally {

@@ -1,0 +1,32 @@
+{
+  "source_sha256": "108ae933b9b36c8b4189109458a390f75b8cc6a16f67a1c6abd75b6ade0f5195",
+  "blender_version": "5.2.2 LTS",
+  "splits": [
+    {
+      "mesh_ref": "Mesh_32",
+      "new_mesh_ref": "SeatPassenger",
+      "component_ids": [
+        20574,
+        20639,
+        20718,
+        20909,
+        21071,
+        21319,
+        21577
+      ]
+    },
+    {
+      "mesh_ref": "Mesh_32",
+      "new_mesh_ref": "SeatDriver",
+      "component_ids": [
+        25951,
+        26016,
+        26095,
+        26286,
+        26448,
+        26696,
+        26954
+      ]
+    }
+  ]
+}

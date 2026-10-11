@@ -43,6 +43,11 @@ function workspace(version = 1): Workspace {
     history: [],
   };
 }
+it("requires saving or discarding edits before Reimagine", () => {
+  render(<RenderPanel api={{ mode: "mock" } as Api} workspace={workspace()} variantId="variant-digital" hasUnsavedWork onRefresh={async () => workspace()} onOpen={() => {}} />);
+  expect(screen.getByRole("button", { name: "Reimagine" })).toBeDisabled();
+  expect(screen.getByText(/Save or discard unsaved edits/)).toBeVisible();
+});
 function result(
   id = "job-1",
   version = 1,
@@ -240,7 +245,7 @@ it("keeps late old renders separate from current-version assets and fetches immu
       });
     if (path.endsWith("/renders/job-2")) return result("job-2", 2);
   });
-  const base = props(api);
+  const base = { ...props(api), compact: true };
   const { rerender } = render(<RenderPanel {...base} />);
   await user.click(screen.getByRole("button", { name: "Reimagine" }));
   rerender(<RenderPanel {...base} workspace={workspace(2)} />);
@@ -252,7 +257,7 @@ it("keeps late old renders separate from current-version assets and fetches immu
   expect(current).not.toHaveTextContent("asset-1");
   expect(
     screen.getByText(/Older render.*proposal version 1/),
-  ).toBeInTheDocument();
+  ).toBeVisible();
   expect(request).toHaveBeenCalledWith(
     "/runs/run-synthetic/proposals?proposal_set_version=1",
     undefined,

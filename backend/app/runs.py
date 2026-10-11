@@ -58,6 +58,7 @@ def snapshot(identity: Actor, run_id: str) -> w.Snapshot:
                         "proposals",
                         "evidence",
                         "history",
+                        "geometry",
                     )
                 },
             }

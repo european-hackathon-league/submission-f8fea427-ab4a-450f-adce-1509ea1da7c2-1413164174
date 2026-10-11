@@ -166,6 +166,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -235,17 +236,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -266,14 +273,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "succeeded",
         "variant_ids": [
@@ -531,6 +547,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -599,17 +616,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -630,14 +653,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "succeeded",
         "variant_ids": [
@@ -862,6 +894,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -929,17 +962,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -960,14 +999,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "succeeded",
         "variant_ids": [
@@ -1274,6 +1322,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -1342,17 +1391,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -1373,14 +1428,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "succeeded",
         "variant_ids": [
@@ -1570,6 +1634,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -1636,17 +1701,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -1667,14 +1738,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "succeeded",
         "variant_ids": [
@@ -1875,6 +1955,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -1941,17 +2022,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -1972,14 +2059,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "succeeded",
         "variant_ids": [
@@ -2160,6 +2256,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -2226,17 +2323,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -2257,14 +2360,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": true,
         "status": "succeeded",
         "variant_ids": [
@@ -2445,6 +2557,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -2502,6 +2615,7 @@
             "part_ids": [
               "part_unmapped"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_unsupported",
             "scope": {
               "cohort_ids": [
@@ -2568,27 +2682,39 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           },
           {
+            "assumptions": [],
             "change_id": "change_unsupported",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [],
+            "geometry": null,
             "part_ids": [
               "part_unmapped"
             ],
             "preserve_constraints": [],
+            "proposal_change_version": 1,
             "proposed_outcome": "Explore a PM concept without a scene mapping",
+            "requested_wording": null,
             "visual_instruction": "Unsupported concept"
           }
         ],
@@ -2617,20 +2743,36 @@
             "asset_ids": [
               "asset_concept"
             ],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "rendered",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           },
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_unsupported",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "unsupported",
-            "reason": "No semantic scene mapping"
+            "reason": "No semantic scene mapping",
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "partial",
         "variant_ids": [
@@ -2811,6 +2953,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -2877,17 +3020,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -2908,14 +3057,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "succeeded",
         "variant_ids": [
@@ -3132,6 +3290,7 @@
             "part_ids": [
               "part_seat"
             ],
+            "preservation_constraints": [],
             "requirement_id": "requirement_demo",
             "scope": {
               "cohort_ids": [
@@ -3198,17 +3357,23 @@
         "baseline_asset_id": "asset_demo_v1",
         "changes": [
           {
+            "assumptions": [],
             "change_id": "change_demo",
+            "conflicts": [],
+            "dependencies": [],
             "evidence_ids": [
               "evidence_demo"
             ],
+            "geometry": null,
             "part_ids": [
               "part_seat"
             ],
             "preserve_constraints": [
               "Preserve all other parts"
             ],
+            "proposal_change_version": 1,
             "proposed_outcome": "Improve long-journey seat comfort",
+            "requested_wording": null,
             "visual_instruction": "Annotate synthetic concept"
           }
         ],
@@ -3229,14 +3394,23 @@
         "outcomes": [
           {
             "asset_ids": [],
+            "assumptions": [],
             "change_id": "change_demo",
+            "engineering_validity": "not_assessed",
+            "geometry_produced": false,
+            "measurements": null,
+            "number": null,
             "outcome": "annotated",
-            "reason": null
+            "reason": null,
+            "visual_review": "not_run",
+            "warnings": []
           }
         ],
         "part_catalog_version": "catalog_demo_v1",
         "proposal_set_version": 1,
         "render_request_id": "render_demo",
+        "scene_catalog": null,
+        "stage": null,
         "stale": false,
         "status": "succeeded",
         "variant_ids": [

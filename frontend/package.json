@@ -7,6 +7,7 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "test": "vitest run",
+    "test:e2e": "playwright test",
     "test:live": "vitest run --mode live testing/liveBackend.test.ts",
     "dev:mock": "vite --mode mock --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
@@ -20,6 +21,7 @@
     "three": "0.186.1"
   },
   "devDependencies": {
+    "@playwright/test": "^1.64.0",
     "@testing-library/jest-dom": "7.0.1",
     "@testing-library/react": "16.3.3",
     "@testing-library/user-event": "14.6.7",

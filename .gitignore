@@ -15,3 +15,5 @@ frontend/*.tsbuildinfo
 frontend/.vite/
 frontend/.env.local
 frontend/.env.*.local
+frontend/test-results/
+frontend/playwright-report/

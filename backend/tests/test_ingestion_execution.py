@@ -127,13 +127,23 @@ def test_ingestion_reuses_committed_parsing_for_identical_sources(client, monkey
 
 
 def test_transient_parser_failure_does_not_poison_next_run(client, monkeypatch):
+    from io import BytesIO
+
+    from openpyxl import load_workbook
     from test_ingestion_cache import feedback, frozen_run
     from test_uploads import workbook as source_workbook
 
     from app.ingest_types import CoverageIssue, ParseResult
     from app.ingestion import ingest_source
 
-    data = source_workbook()
+    book = load_workbook(BytesIO(source_workbook()))
+    # Each test invocation must exercise the parser, even if an earlier test
+    # cached the same workbook within the ZIP timestamp's two-second bucket.
+    book.properties.identifier = str(uuid4())
+    output = BytesIO()
+    book.save(output)
+    book.close()
+    data = output.getvalue()
     first, second = frozen_run(client, data=data), frozen_run(client, data=data)
     calls = []
 

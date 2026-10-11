@@ -763,7 +763,7 @@ describe("frontend plan workspace", () => {
   });
 });
 
-it("restores real-mode run identity, spatial selection, selected panel and unsaved versioned proposal after remount", async () => {
+it("restores real-mode run identity, selected panel and unsaved versioned proposal after remount", async () => {
   const api = { ...createMockApi(), mode: "real" as const };
   const user = userEvent.setup();
   const first = render(<App api={api} />);
@@ -774,7 +774,6 @@ it("restores real-mode run identity, spatial selection, selected panel and unsav
   await screen.findByText("ready");
   await user.click(screen.getByRole("button", { name: "Start analysis" }));
   await screen.findByText("proposals ready");
-  await user.click(await screen.findByRole("button", { name: /^Body/ }));
   await chooseView(user, "Proposals");
   await user.clear(screen.getByLabelText("Proposal text"));
   await user.type(
@@ -786,12 +785,6 @@ it("restores real-mode run identity, spatial selection, selected panel and unsav
   await screen.findByText("Workshop");
   expect(await screen.findByLabelText("Proposal text")).toHaveValue(
     "Retain across reload",
-  );
-  await waitFor(() =>
-    expect(screen.getByRole("button", { name: /^Body/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    ),
   );
   expect(screen.getByText("run-synthetic")).toBeInTheDocument();
   sessionStorage.clear();
@@ -1013,8 +1006,8 @@ it("keeps unknown semantic parts accessible without selecting an unrelated spati
     screen.getByRole("heading", { name: "Non-geometric subscription" }),
   ).toBeInTheDocument();
   expect(
-    screen.getAllByText(/No spatial part selected/)[0],
-  ).toBeInTheDocument();
+    screen.queryByRole("button", { name: /^Body/ }),
+  ).not.toBeInTheDocument();
 });
 
 it("does not replace an explicit finding selection when refreshed findings remove it", async () => {
@@ -1098,7 +1091,7 @@ it("uses saved run asset and catalog identity before exposing local spatial mapp
   ).toBeInTheDocument();
 });
 
-it("keeps catalog hierarchy-only IDs out of spatial part selection", async () => {
+it("keeps catalog hierarchy-only IDs out of evidence review", async () => {
   const base = createMockApi();
   const api = {
     ...base,
@@ -1120,8 +1113,11 @@ it("keeps catalog hierarchy-only IDs out of spatial part selection", async () =>
   await chooseView(user, "Findings");
   await user.click(screen.getByRole("button", { name: /Comfort controls/ }));
   expect(
-    screen.getAllByText(/No spatial part selected/).length,
-  ).toBeGreaterThan(0);
+    screen.getByRole("heading", { name: "Comfort controls" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.queryByRole("button", { name: /^Body/ }),
+  ).not.toBeInTheDocument();
 });
 
 it("treats finding IDs as opaque even when resembling old UI sentinel IDs", async () => {
@@ -1177,7 +1173,6 @@ it("preserves selected finding when several findings map to one component", asyn
   await screen.findByText("proposals ready");
   await chooseView(user, "Findings");
   await user.click(screen.getByRole("button", { name: /Chosen body finding/ }));
-  await user.click(screen.getByRole("button", { name: /^Body.*Cohorts/ }));
   expect(
     screen.getByRole("heading", { name: "Chosen body finding" }),
   ).toBeInTheDocument();
@@ -1193,7 +1188,7 @@ it("moves keyboard focus into evidence after choosing a finding", async () => {
   expect(screen.getByRole("tabpanel", { name: "Evidence" })).toHaveFocus();
 });
 
-it("clears obsolete spatial selection when current finding mapping changes on refresh", async () => {
+it("keeps the reviewed finding visible when current finding mapping changes on refresh", async () => {
   const base = createMockApi();
   let unmapped = false;
   const api = {
@@ -1220,24 +1215,23 @@ it("clears obsolete spatial selection when current finding mapping changes on re
     }),
   );
   expect(
-    screen.getByRole("button", { name: /^Body.*Cohorts/ }),
-  ).toHaveAttribute("aria-pressed", "true");
+    screen.getByRole("heading", { name: "Trunk gesture reliability" }),
+  ).toBeInTheDocument();
   unmapped = true;
   await refreshWorkspace(user);
-  await waitFor(() =>
-    expect(
-      screen.getByRole("button", { name: /^Body.*Cohorts/ }),
-    ).toHaveAttribute("aria-pressed", "false"),
-  );
   expect(
     screen.getByRole("heading", { name: "Trunk gesture reliability" }),
   ).toBeInTheDocument();
 });
 
-it("opens linked suggestion from a keyboard component tag", async () => {
+it("opens linked suggestion from a keyboard finding", async () => {
   const user = await createRun();
-  await screen.findByRole("button", { name: /^Body.*Cohorts/ });
-  await user.click(screen.getByRole("button", { name: /^Body.*Cohorts/ }));
+  await chooseView(user, "Findings");
+  await user.click(
+    screen.getByRole("button", {
+      name: /Trunk gesture reliability.*88 of 400/,
+    }),
+  );
   expect(
     screen.getByRole("tabpanel", { name: "Evidence" }),
   ).toBeInTheDocument();

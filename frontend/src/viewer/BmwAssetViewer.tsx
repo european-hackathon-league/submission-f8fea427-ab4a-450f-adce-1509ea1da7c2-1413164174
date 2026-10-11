@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   ComponentId,
   VehicleView,
@@ -11,7 +11,6 @@ import {
 } from "./modelMapping";
 import { RotateCcw, RotateCw, ZoomIn, ZoomOut } from "lucide-react";
 import "./bmw-asset-viewer.css";
-import RegionTags from "./RegionTags";
 
 export const BMW_I5_MODEL_UID = supportedSceneCatalog.baseline_asset.model_id;
 const SKETCHFAB_API_SRC =
@@ -482,7 +481,7 @@ export default function BmwAssetViewer({
   const reportFailure = useCallback(() => {
     setApiFailed(true);
     setLiveMessage(
-      "3D model unavailable. Use the component list or retry visual assets.",
+      "3D model unavailable. Retry visual assets.",
     );
     onStatusChange?.("fallback");
   }, [onStatusChange]);
@@ -496,20 +495,6 @@ export default function BmwAssetViewer({
     if (view === "interior") pause();
     else resume();
   }, [view, pause, resume, sceneReady]);
-
-  const components = useMemo(
-    () => (view === "exterior" ? exteriorComponents : interiorComponents),
-    [view],
-  );
-  const heatLabel = heatmap ? "Negative feedback records" : "Feedback tags off";
-  const currentSample =
-    selectedComponent === null
-      ? "Findings remain available in the analysis panels."
-      : metricSummary(findings, selectedComponent);
-  const selectedLabel =
-    selectedComponent === null
-      ? "No spatial part selected"
-      : labels[selectedComponent];
 
   const handleReset = () => {
     if (resetCamera()) setResetMessage("Exterior camera reset.");
@@ -628,7 +613,7 @@ export default function BmwAssetViewer({
                 )}
                 <span>
                   {previewFailed
-                    ? "Component list remains available. Check your connection and retry either asset."
+                    ? "Check your connection and retry either asset."
                     : "Local preview stays available. Check your connection and try again."}
                 </span>
                 <button type="button" onClick={retryModel}>
@@ -645,21 +630,12 @@ export default function BmwAssetViewer({
               <div className="bmw-asset-viewer__failure" role="status">
                 <strong>Exterior preview unavailable.</strong>
                 <span>
-                  Use the component list or the hosted model when available.
+                  Use the hosted model when available.
                 </span>
                 <button type="button" onClick={retryPreview}>
                   Retry exterior preview
                 </button>
               </div>
-            )}
-            {heatmap && (
-              <RegionTags
-                api={apiRef}
-                ready={sceneReady && !apiFailed}
-                findings={findings}
-                onSelect={onSelectComponent}
-                selected={selectedComponent}
-              />
             )}
             <div
               className="bmw-asset-viewer__camera-controls"
@@ -733,7 +709,7 @@ export default function BmwAssetViewer({
                   <div className="bmw-asset-viewer__failure" role="status">
                     <strong>Cabin reference image unavailable.</strong>
                     <span>
-                      Component findings remain accessible in the list.
+                      Findings remain accessible in the analysis panels.
                     </span>
                     <button type="button" onClick={retryInterior}>
                       Retry cabin image
@@ -792,82 +768,6 @@ export default function BmwAssetViewer({
             </div>
           )}
         </div>
-
-        <aside
-          className="bmw-asset-viewer__inspector"
-          aria-label="Vehicle component feedback"
-        >
-          <div className="bmw-asset-viewer__inspector-top">
-            <span>
-              {view === "exterior" ? "Exterior components" : "Cabin components"}
-            </span>
-            <span className="bmw-asset-viewer__heat-label">
-              <i /> {heatLabel}
-            </span>
-          </div>
-          {heatmap && (
-            <div
-              className="bmw-asset-viewer__legend"
-              aria-label="Negative feedback volume"
-            >
-              <span>Negative volume: low to high</span>
-              <span className="volume-scale" />
-              <span>Gray: no finding</span>
-            </div>
-          )}
-          <div
-            className="bmw-asset-viewer__parts"
-            role="group"
-            aria-label={`${view} components`}
-          >
-            {components.map((id) => {
-              const color = heatmap ? severityFor(findings, id) : "#a7adb4";
-              return (
-                <button
-                  key={id}
-                  type="button"
-                  className={`bmw-asset-viewer__part ${selectedComponent === id ? "is-selected" : ""}`}
-                  aria-pressed={selectedComponent === id}
-                  onClick={() => onSelectComponent(id)}
-                >
-                  <span
-                    className="bmw-asset-viewer__part-dot"
-                    style={{ "--heat": color } as React.CSSProperties}
-                  />
-                  <span className="bmw-asset-viewer__part-copy">
-                    <strong>{labels[id]}</strong>
-                    <small>{metricSummary(findings, id)}</small>
-                  </span>
-                  <span
-                    className="bmw-asset-viewer__part-arrow"
-                    aria-hidden="true"
-                  >
-                    ↗
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-          <div className="bmw-asset-viewer__selection" aria-live="polite">
-            <span className="bmw-asset-viewer__selection-label">
-              Selected component
-            </span>
-            <strong>{selectedLabel}</strong>
-            <span>{currentSample}</span>
-          </div>
-          {view === "exterior" && (
-            <p className="bmw-asset-viewer__photo-note">
-              Tags mark fixed reference regions; exact component meshes are
-              unverified.
-            </p>
-          )}
-          {view === "interior" && (
-            <p className="bmw-asset-viewer__photo-note">
-              Detailed 3D cabin not verified in source asset. This is a separate
-              G60 520i cabin reference.
-            </p>
-          )}
-        </aside>
       </div>
 
       {view === "interior" && (
@@ -919,7 +819,7 @@ export default function BmwAssetViewer({
         <span>Creator-uploaded model · not an official BMW asset</span>
       </footer>
       <div className="bmw-asset-viewer__sr-only" aria-live="polite">
-        {selectedLabel}. {currentSample}. {liveMessage} {resetMessage}
+        {liveMessage} {resetMessage}
       </div>
     </section>
   );

@@ -74,67 +74,6 @@ describe("aspect-aware camera framing", () => {
 });
 
 describe("BmwAssetViewer", () => {
-  it("shows every cohort aggregate for a shared part without summing counts or choosing one heat color", () => {
-    const scoped = [
-      {
-        id: "body" as const,
-        cohort_ids: ["urban", "premium"],
-        counts: {
-          negative_records: 3,
-          total_records: 10,
-          negative_share: 0.3,
-          intensity_value: 0.8,
-          intensity_scale_id: "backend-volume-v1",
-          low_evidence: false,
-          provisional: false,
-        },
-      },
-      {
-        id: "body" as const,
-        cohort_ids: ["rural"],
-        counts: {
-          negative_records: 2,
-          total_records: 4,
-          negative_share: 0.5,
-          intensity_value: 0.2,
-          intensity_scale_id: "backend-volume-v1",
-          low_evidence: true,
-          provisional: true,
-        },
-      },
-    ];
-    const props = {
-      selectedComponent: "body" as const,
-      onSelectComponent: vi.fn(),
-      view: "exterior" as const,
-      onViewChange: vi.fn(),
-      heatmap: true,
-    };
-    const { rerender } = render(
-      <BmwAssetViewer {...props} findings={scoped} />,
-    );
-    const body = screen.getByRole("button", { name: /Body.*urban/ });
-    expect(body).toHaveTextContent(
-      "Cohorts urban, premium: 3/10 negative feedback records",
-    );
-    expect(body).toHaveTextContent(
-      "Cohorts rural: 2/4 negative feedback records / provisional / low evidence",
-    );
-    expect(body).not.toHaveTextContent("5/14");
-    expect(body.querySelector(".bmw-asset-viewer__part-dot")).toHaveStyle({
-      "--heat": "#8a909b",
-    });
-    rerender(<BmwAssetViewer {...props} findings={[scoped[1]]} />);
-    expect(
-      screen.getByRole("button", { name: /Body.*rural/ }),
-    ).toHaveTextContent("Cohorts rural: 2/4");
-    expect(
-      screen
-        .getByRole("button", { name: /Body.*rural/ })
-        .querySelector(".bmw-asset-viewer__part-dot"),
-    ).not.toHaveStyle({ "--heat": "#8a909b" });
-  });
-
   it("keeps selected component inside the active view when switching presets", () => {
     const onSelectComponent = vi.fn();
     const onViewChange = vi.fn();
@@ -155,7 +94,7 @@ describe("BmwAssetViewer", () => {
     expect(onSelectComponent).toHaveBeenCalledWith("steering");
   });
 
-  it("shows real-asset attribution and keeps parent-controlled component selection usable", () => {
+  it("shows real-asset attribution and keeps parent-controlled selection state", () => {
     const onSelectComponent = vi.fn();
     const props = {
       onSelectComponent,
@@ -181,17 +120,12 @@ describe("BmwAssetViewer", () => {
       "https://creativecommons.org/licenses/by/4.0/",
     );
     expect(
-      screen
-        .getByRole("button", { name: /Headlamps/ })
-        .querySelector(".bmw-asset-viewer__part-dot"),
-    ).toHaveStyle({ "--heat": "#8a909b" });
-    fireEvent.click(screen.getByRole("button", { name: /Headlamps/ }));
-    expect(onSelectComponent).toHaveBeenCalledWith("lighting");
+      screen.queryByRole("group", { name: "exterior components" }),
+    ).not.toBeInTheDocument();
     rerender(<BmwAssetViewer {...props} selectedComponent="lighting" />);
-    expect(screen.getByRole("button", { name: /Headlamps/ })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
+    expect(
+      screen.getByRole("region", { name: "BMW i5 M60 vehicle viewer" }),
+    ).toBeInTheDocument();
   });
 
   it("uses a licensed real G60 cabin photograph instead of claiming an unverified 3D interior", () => {
@@ -217,9 +151,6 @@ describe("BmwAssetViewer", () => {
     ).toContainElement(
       container.querySelector(".bmw-asset-viewer__photo-markers"),
     );
-    expect(
-      screen.getByText(/Detailed 3D cabin not verified/i),
-    ).toBeInTheDocument();
     fireEvent.click(
       screen.getByRole("button", { name: /Dashboard feedback marker/ }),
     );
@@ -287,8 +218,6 @@ describe("BmwAssetViewer", () => {
     expect(onSelectComponent).not.toHaveBeenCalled();
     events.click({ instanceID: 78 });
     expect(onSelectComponent).not.toHaveBeenCalled();
-    fireEvent.click(screen.getByRole("button", { name: /Headlamps/ }));
-    expect(onSelectComponent).toHaveBeenCalledWith("lighting");
   });
 
   it("keeps hosted camera and iframe when switching views or refreshing aggregate data", async () => {
@@ -508,7 +437,7 @@ describe("BmwAssetViewer", () => {
     setItem.mockRestore();
   });
 
-  it("keeps vehicle-wide findings spatially unselected across view changes", () => {
+  it("keeps the exterior free of static part shortcuts and preserves view switching", () => {
     const onSelectComponent = vi.fn();
     render(
       <BmwAssetViewer
@@ -520,7 +449,11 @@ describe("BmwAssetViewer", () => {
         findings={findings}
       />,
     );
-    expect(screen.getByText("No spatial part selected")).toBeInTheDocument();
+    expect(
+      screen.queryByRole("group", { name: "exterior components" }),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Headlamps/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Body/ })).not.toBeInTheDocument();
     expect(screen.getAllByRole("button", { pressed: true })).toHaveLength(1);
     fireEvent.click(screen.getByRole("button", { name: "Interior photo" }));
     expect(onSelectComponent).not.toHaveBeenCalled();
@@ -549,10 +482,10 @@ describe("BmwAssetViewer", () => {
       screen.queryByRole("button", { name: /Dashboard feedback marker/ }),
     ).not.toBeInTheDocument();
     expect(
-      screen.getByRole("button", {
+      screen.queryByRole("button", {
         name: /Dashboard.*negative feedback records/,
       }),
-    ).toBeEnabled();
+    ).not.toBeInTheDocument();
     screen.getByRole("button", { name: "Retry cabin image" }).focus();
     fireEvent.click(screen.getByRole("button", { name: "Retry cabin image" }));
     expect(

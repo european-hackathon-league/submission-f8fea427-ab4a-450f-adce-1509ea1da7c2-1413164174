@@ -3,9 +3,26 @@ import App from './App';
 import Journey from './collection/Journey.jsx';
 import { models } from './collection/journeyData.js';
 import type { Api } from './api/contracts';
+import { createMockApi, createRealApi } from './api/client';
 
 type Model = (typeof models)[number];
+
+// Demo mode: skip the manual API-connect screen and go straight from
+// Explore -> Workshop using seeded development access. Explicit `api`
+// props (tests, harnesses) still win; mock mode still uses the synthetic API.
+function demoApi(): Api {
+  if (import.meta.env.VITE_API_MODE === 'mock') {
+    return createMockApi(import.meta.env.VITE_MOCK_SCENARIO);
+  }
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+  const workspace = import.meta.env.VITE_DEMO_WORKSPACE_ID || 'workspace_demo';
+  const token = import.meta.env.VITE_DEMO_API_TOKEN || 'development:pm_demo';
+  const headers = { Authorization: `Bearer ${token}`, 'X-Workspace-ID': workspace };
+  return createRealApi(base, { headers: () => headers, sessionNamespace: `${base}|${workspace}` });
+}
 export default function FrontendApp({ api }: { api?: Api }) {
+  const [fallbackApi] = useState<Api>(() => api ?? demoApi());
+  const resolvedApi = api ?? fallbackApi;
   const [workspace, setWorkspace] = useState(() => window.location.hash === '#workspace');
   const [selected, setSelected] = useState<Model | null>(() =>
     models.find(model => model.id === window.sessionStorage.getItem('collection-model')) ?? null,
@@ -42,7 +59,7 @@ export default function FrontendApp({ api }: { api?: Api }) {
   return <>
     {!workspace && <Journey onOpen={open} initialModel={selected} />}
     {opened && <div hidden={!workspace}>
-      <App api={api} initialModel={selected} onBack={back} />
+      <App api={resolvedApi} initialModel={selected} onBack={back} />
     </div>}
   </>;
 }

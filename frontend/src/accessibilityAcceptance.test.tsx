@@ -87,7 +87,7 @@ it("does not steal keyboard focus from search when a previously inspected graph 
   expect(search).toHaveFocus();
 });
 
-it("supports keyboard-only component selection with text equivalents for provisional feedback and live reduced-motion camera controls", async () => {
+it("supports keyboard-only camera controls with live reduced-motion handling", async () => {
   const { act } = await import("@testing-library/react");
   const { default: Viewer } = await import("./viewer/BmwAssetViewer");
   let reduced = false;
@@ -150,15 +150,9 @@ it("supports keyboard-only component selection with text equivalents for provisi
     );
     await waitFor(() => expect(events.viewerready).toBeTypeOf("function"));
     act(() => events.viewerready());
-    const body = screen.getByRole("button", {
-      name: /Body.*2\/5 negative feedback records.*provisional.*low evidence/,
-    });
-    expect(body).toHaveTextContent("Cohorts scope/exact");
-    const lamps = screen.getByRole("button", { name: /Headlamps.*No sample/ });
-    lamps.focus();
-    await user.keyboard("{Enter}");
-    expect(select).toHaveBeenCalledWith("lighting");
-    expect(lamps).toHaveFocus();
+    expect(
+      screen.queryByRole("group", { name: "exterior components" }),
+    ).not.toBeInTheDocument();
     const zoom = screen.getByRole("button", { name: "Zoom in" });
     zoom.focus();
     await user.keyboard(" ");

@@ -41,6 +41,17 @@ def catalog():
     )
 
 
+def test_renderer_loads_private_local_configuration(tmp_path, monkeypatch):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / ".local").mkdir()
+    (tmp_path / ".local/geometry.env").write_text(
+        "GEOMETRY_TOKEN=synthetic-private-token\nGEOMETRY_AI_ENABLED=false\n"
+    )
+    settings = RendererSettings()
+    assert settings.token.get_secret_value() == "synthetic-private-token"
+    assert not settings.ai_enabled
+
+
 def manifest():
     return RenderManifest(
         render_request_id="request",

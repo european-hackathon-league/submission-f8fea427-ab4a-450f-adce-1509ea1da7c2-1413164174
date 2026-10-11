@@ -30,7 +30,9 @@ from app.wire import (
 
 
 class RendererSettings(BaseSettings):
-    model_config = SettingsConfigDict(env_prefix="GEOMETRY_", extra="ignore")
+    model_config = SettingsConfigDict(
+        env_prefix="GEOMETRY_", env_file=".local/geometry.env", extra="ignore"
+    )
     token: SecretStr = SecretStr("")
     jobs_path: Path = Path(".local/geometry-jobs")
     baseline_path: Path | None = None

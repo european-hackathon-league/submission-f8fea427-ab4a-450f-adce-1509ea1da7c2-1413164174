@@ -18,7 +18,7 @@ from app.config import Settings
 from app.db import EvidenceArtifact, Run, RunEvidence, Session
 from app.ingestion import stable_id
 
-PROMPT_REVISION = "findings-v6"
+PROMPT_REVISION = "findings-v7"
 SCALE_ID = "negative-share-v1"
 MAX_BATCH_CHARACTERS = 40000
 MAX_TOPICS = 200
@@ -99,8 +99,8 @@ class NeedAssessment(w.Wire):
     )
     inference: str = Field(
         min_length=1,
-        max_length=1500,
-        description="Distinguish reported facts from interpretation. Qualify every inferred need, preservation priority or classification in this text itself (e.g. may suggest), not only in uncertainty. Praise is not an explicit request; ambiguous feedback can establish no specific need.",
+        max_length=3000,
+        description="Complete, concise sentences within 3000 characters. Distinguish reported facts from interpretation. Qualify every inferred need, preservation priority or classification in this text itself (e.g. may suggest), not only in uncertainty. Praise is not an explicit request; ambiguous feedback can establish no specific need. Omit irrelevant other-model study context rather than truncating relevant evidence and caveats.",
     )
     basis_evidence_ids: list[str] = Field(min_length=1, max_length=100)
     uncertainty: list[str] = Field(min_length=1, max_length=20)
@@ -879,7 +879,7 @@ def establish_baselines(args: list[str]) -> str:
                 try:
                     assessed, outcome = _call(
                         NeedAssessment,
-                        "Establish the customer's underlying need and relevant current baseline using only supplied evidence. Preserve positive strengths relevant to this finding; exclude unrelated strengths from the same record. Mark inferred needs, preservation priorities and classifications explicitly tentative in the inference itself, not only the uncertainty list: praise may suggest preservation but is not an explicit request. Ambiguous feedback can establish no specific need. Separate capability, usability, offering and service issues from isolated possible defects; a single complaint is not a population-wide need. Equipment establishes availability, feedback reports experience, studies provide scoped aggregate context, and sales/strategy provide broader context; never combine incompatible metrics into corroboration or respondents. If using study ratings, account for all supplied relevant rating categories, including positive and negative counterevidence, retaining scope and unknown sample-size/denominator caveats without transferring unrelated metrics. Select only relevant equipment claims from claim_evidence_ids with exact original quotes; availability cannot be stronger than parsed source availability. Missing information is unknown, never absent. Do not launch competitor research. Name the basis and uncertainty of every inference. Future assumptions must be explicit assumptions for the configured planning horizon. Do not claim US availability from a German source. The finding is immutable: positive feedback opposes a negative-state improvement in its evidence-link contract, yet can support preserving a strength; never reinterpret its link label as negative sentiment or request changing its links. Repair all previously recorded validation objections in the previous assessment while retaining its supported content.",
+                        "Establish the customer's underlying need and relevant current baseline using only supplied evidence. Preserve positive strengths relevant to this finding; exclude unrelated strengths from the same record. Mark inferred needs, preservation priorities and classifications explicitly tentative in the inference itself, not only the uncertainty list: praise may suggest preservation but is not an explicit request. Ambiguous feedback can establish no specific need. Separate capability, usability, offering and service issues from isolated possible defects; a single complaint is not a population-wide need. Equipment establishes availability, feedback reports experience, studies provide scoped aggregate context, and sales/strategy provide broader context; never combine incompatible metrics into corroboration or respondents. If using study ratings, account for all supplied relevant rating categories, including positive and negative counterevidence, retaining scope and unknown sample-size/denominator caveats without transferring unrelated metrics. Select only relevant equipment claims from claim_evidence_ids with exact original quotes; availability cannot be stronger than parsed source availability. Missing information is unknown, never absent. Do not launch competitor research. Name the basis and uncertainty of every inference. Future assumptions must be explicit assumptions for the configured planning horizon. Do not claim US availability from a German source. The finding is immutable: positive feedback opposes a negative-state improvement in its evidence-link contract, yet can support preserving a strength; never reinterpret its link label as negative sentiment or request changing its links. Repair all previously recorded validation objections in the previous assessment while retaining its supported content. Keep inference complete and concise within 3000 characters, finishing every sentence and relevant scoped rating distribution. Omit irrelevant other-model study context rather than truncating relevant evidence or caveats.",
                         {
                             "finding": finding,
                             "evidence": supplied,

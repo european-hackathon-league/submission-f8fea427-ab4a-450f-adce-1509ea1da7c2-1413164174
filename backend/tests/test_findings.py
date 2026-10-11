@@ -364,6 +364,46 @@ def test_baseline_equipment_software_and_date_conditions_remain_visible():
     }
 
 
+def test_baseline_inference_accepts_complete_scoped_context_but_remains_bounded():
+    summary = (
+        "One fictional customer praises existing physical controls while describing complex electronics. "
+        "This may suggest a tentative usability need for understandable access to vehicle functions and "
+        "preservation of appreciated controls. Praise does not establish an explicit retention request, "
+        "and the hypothetical removal of controls is not an actual failure or a measured distraction effect. "
+        "The source provides one experience despite three duplicate annotations; these must not be counted "
+        "as three respondents or interpreted as independent corroboration. The individual electronics "
+        "complaint does not establish a population-wide capability gap, offering issue, service issue, "
+        "or confirmed defect, and it must remain separate from unrelated praise for ride quality and space. "
+        "Scoped fictional vehicle-A study context has seven control-usability categories: I Hate It 4%, "
+        "A Failure 1%, Unsatisfactory 4%, Satisfactory 22%, Excellent 26%, Delightful 23%, and I Love It 20%. "
+        "These mixed ratings describe broad control usability, not manual controls or entertainment alone. "
+        "The favorable and unfavorable categories qualify any generalization while neither confirming "
+        "nor disproving this individual's experience. Their respondent denominator and sample size are "
+        "unknown, so fractions must not become feedback-record counts or a quantified defect rate. "
+        "Study evidence for vehicle B is outside this assessment and is not pooled with vehicle A. "
+        "No relevant supplied equipment claim establishes physical-control availability for the target "
+        "configuration. Foreign-market option listings cannot confirm the customer's equipment, software, "
+        "model year, or local availability. Missing documentation remains unknown rather than absent. "
+        "A future preservation priority would be a planning assumption requiring vehicle-specific usability "
+        "research and engineering validation; this evidence alone establishes no required redesign."
+    )
+    assert 1500 < len(summary) <= 3000
+    payload = {
+        "finding_id": "synthetic-finding",
+        "need_kind": "usability",
+        "baseline_claims": [],
+        "preserve_strengths": ["Appreciated existing physical controls"],
+        "inference": summary,
+        "basis_evidence_ids": ["synthetic-feedback", "synthetic-study"],
+        "uncertainty": ["Sample size and target applicability unknown"],
+        "future_assumptions": [],
+    }
+    assessed = module.NeedAssessment.model_validate(payload)
+    assert assessed.inference == summary
+    with pytest.raises(ValueError):
+        module.NeedAssessment.model_validate({**payload, "inference": "x" * 3001})
+
+
 def test_missing_provider_credentials_publish_explicit_failure_without_fake_findings(
     monkeypatch,
 ):

@@ -475,7 +475,7 @@ def draft_changes(
                     },
                     ensure_ascii=False,
                 )
-                if len(review_payload) > MAX_BATCH_CHARACTERS * 4:
+                if len(review_payload) > MAX_BATCH_CHARACTERS * 8:
                     raise ValueError(
                         "Proposal semantic review input budget exhausted; keep the draft concise without dropping required evidence or caveats"
                     )
@@ -510,7 +510,7 @@ def draft_changes(
                     if review_response is not None
                     else None,
                     "policy": {
-                        "prompt_revision": "proposal-review-v1",
+                        "prompt_revision": "proposal-review-v2",
                         "model": review_response.model
                         if review_response is not None
                         else None,

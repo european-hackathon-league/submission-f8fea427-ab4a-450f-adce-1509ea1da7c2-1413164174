@@ -363,7 +363,15 @@ def test_uncertain_proposal_timeout_is_not_automatically_repeated(client, monkey
 
 @pytest.mark.parametrize(
     "outcome",
-    ["repaired", "rejected", "malformed", "interrupted", "uncertain", "oversize"],
+    [
+        "repaired",
+        "rejected",
+        "malformed",
+        "interrupted",
+        "uncertain",
+        "oversize",
+        "large_context",
+    ],
 )
 def test_semantic_proposal_review_repairs_false_opposition_and_checkpoints_each_call(
     client,
@@ -411,6 +419,11 @@ def test_semantic_proposal_review_repairs_false_opposition_and_checkpoints_each_
                         "topic": "Console ergonomics",
                         "rating": "uncomfortable",
                         "fraction": 0.3,
+                        **(
+                            {"notes": "Scoped study caveat. " * 4500}
+                            if outcome == "large_context"
+                            else {}
+                        ),
                     },
                     locator=w.CellLocator(sheet="Study", row=2, cells=["A2"]),
                     scope=w.Scope(markets=["DE"]),
@@ -483,6 +496,11 @@ def test_semantic_proposal_review_repairs_false_opposition_and_checkpoints_each_
             study = next(e for e in data["evidence"] if e["evidence_id"] == study_id)
             assert study["details"]["value"] == 0.3
             assert study["limitations"] == ["Unknown sample size"]
+            if outcome == "large_context":
+                assert 160000 < len(options["input"][1]["content"]) <= 320000
+                assert study["details"]["raw_cells"]["notes"] == (
+                    "Scoped study caveat. " * 4500
+                )
             assert all(e["scope"]["markets"] == ["DE"] for e in data["evidence"])
             if outcome == "uncertain":
                 raise APITimeoutError(
@@ -490,7 +508,7 @@ def test_semantic_proposal_review_repairs_false_opposition_and_checkpoints_each_
                 )
             if outcome == "malformed" and review_count == 1:
                 return Review.model_validate_json('{"accepted":')
-            accepted = outcome == "interrupted" or (
+            accepted = outcome in {"interrupted", "large_context"} or (
                 review_count == 2 and outcome != "rejected"
             )
             return SimpleNamespace(
@@ -520,7 +538,7 @@ def test_semantic_proposal_review_repairs_false_opposition_and_checkpoints_each_
             finding_ids=[f.finding_id for f in findings],
             supporting_evidence_ids=[negative_id],
             opposing_evidence_ids=[positive_id]
-            if draft_count == 1 and outcome != "interrupted"
+            if draft_count == 1 and outcome not in {"interrupted", "large_context"}
             else [],
             scope=w.Scope(markets=["DE"]).model_dump(),
             metric=None,
@@ -529,7 +547,7 @@ def test_semantic_proposal_review_repairs_false_opposition_and_checkpoints_each_
             target_basis=None,
         )
         if outcome == "oversize":
-            change["after"] = "x" * 160001
+            change["after"] = "x" * 320001
         return SimpleNamespace(
             output_parsed=Draft.model_validate({"changes": [change], "gaps": []}),
             model="synthetic",
@@ -582,11 +600,13 @@ def test_semantic_proposal_review_repairs_false_opposition_and_checkpoints_each_
             result = proposals.draft_changes(run_id, generation, findings, [])
             assert result.changes[0].opposing_evidence_ids == []
     assert calls == (
-        [Draft, Review] if outcome == "interrupted" else [Draft, Review, Draft, Review]
+        [Draft, Review]
+        if outcome in {"interrupted", "large_context"}
+        else [Draft, Review, Draft, Review]
     )
     reviewed = get_stage(run_id, generation, "proposal_semantic_review:0")
     assert reviewed is not None
-    assert reviewed["policy"]["prompt_revision"] == "proposal-review-v1"
+    assert reviewed["policy"]["prompt_revision"] == "proposal-review-v2"
     assert reviewed["policy"]["model"] == (
         None if outcome == "malformed" else "synthetic"
     )

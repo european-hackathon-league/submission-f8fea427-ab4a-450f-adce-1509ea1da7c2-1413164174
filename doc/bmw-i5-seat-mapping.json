@@ -1,0 +1,51 @@
+{
+  "asset_id": "i5-m60-exterior-v1",
+  "part_catalog_version": "g60-parts-v1",
+  "geometry_verified": true,
+  "parts": [
+    {
+      "part_id": "seat-passenger",
+      "mesh_refs": [
+        "SeatPassenger"
+      ],
+      "anchor_mesh_ref": "SeatPassenger",
+      "anchor_local": [
+        3.71333909034729,
+        0.41001616418361664,
+        0.8669660836458206
+      ],
+      "operations": [],
+      "edit_origin_local": null,
+      "axis_labels": [
+        "length",
+        "width",
+        "height"
+      ]
+    },
+    {
+      "part_id": "seats",
+      "mesh_refs": [
+        "SeatDriver"
+      ],
+      "anchor_mesh_ref": "SeatDriver",
+      "anchor_local": [
+        3.71333909034729,
+        -0.4399365112185478,
+        0.8669660836458206
+      ],
+      "operations": [
+        "resize_local"
+      ],
+      "edit_origin_local": [
+        3.71333909034729,
+        -0.4399365112185478,
+        0.42446210980415344
+      ],
+      "axis_labels": [
+        "length",
+        "width",
+        "height"
+      ]
+    }
+  ]
+}

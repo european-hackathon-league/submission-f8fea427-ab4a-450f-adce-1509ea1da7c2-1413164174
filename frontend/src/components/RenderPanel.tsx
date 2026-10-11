@@ -10,6 +10,9 @@ import type {
 import type { Accepted } from "../api/wire";
 import ChangeExplanation from "./ChangeExplanation";
 import RenderAssets from "./RenderAssets";
+import GeometryViewer from "../viewer/GeometryViewer";
+import GeometryAttribution from "../viewer/GeometryAttribution";
+import type { GeometryCatalog } from "../viewer/geometryCatalog";
 import {
   bindingKey,
   readRenderJobs,
@@ -23,6 +26,8 @@ export interface RenderPanelProps {
   workspace: Workspace;
   variantId: string;
   busy?: boolean;
+  hasUnsavedWork?: boolean;
+  requestReimagine?: number;
   onRefresh: () => Promise<Workspace>;
   onOpen: (e: Evidence) => void;
 }
@@ -214,6 +219,8 @@ function Job({
   const assetIds = new Set(outcomes.flatMap((outcome) => outcome.asset_ids));
   const assets =
     result?.wire?.assets.filter((asset) => assetIds.has(asset.asset_id)) ?? [];
+  const sceneCatalog = (result?.wire as { scene_catalog?: GeometryCatalog | null } | undefined)?.scene_catalog;
+  const geometryAsset = sceneCatalog && result?.wire?.assets.find(asset => asset.asset_id === sceneCatalog.asset_id && asset.media_type === "model/gltf-binary");
   const assetList = (
     <div className="render-assets">
       <RenderAssets
@@ -234,6 +241,8 @@ function Job({
       aria-label={`Render job ${job.requestId ?? job.localId}`}
     >
       <h3>Render proposal version {job.binding.proposalVersion}</h3>
+      {!current && <p className="notice">Older render or earlier attempt: proposal version {job.binding.proposalVersion}. Current selected proposal version {workspace.proposals.proposal_set_version}; baseline remains selected.</p>}
+      {stale && <p className="notice">Backend marks this render stale. It cannot supply current-version assets.</p>}
       <details open={!props.compact}>
         <summary>Render details</summary>
         <p>
@@ -241,20 +250,6 @@ function Job({
           / baseline {job.binding.baselineAssetId} / catalog{" "}
           {job.binding.partCatalogVersion}
         </p>
-        {!current && (
-          <p className="notice">
-            Older render or earlier attempt: proposal version{" "}
-            {job.binding.proposalVersion}. Current selected proposal version{" "}
-            {workspace.proposals.proposal_set_version}; baseline remains
-            selected.
-          </p>
-        )}
-        {stale && (
-          <p className="notice">
-            Backend marks this render stale. It cannot supply current-version
-            assets.
-          </p>
-        )}
         <p>Rendering does not mean validated or approved.</p>
       </details>
       {job.submission && (
@@ -273,7 +268,17 @@ function Job({
       {result && (
         <>
           <span className="status">{result.status}</span>
+          {result.wire?.stage && <span className="status">{result.wire.stage}</span>}
           {result.wire?.failure_reason && <p>{result.wire.failure_reason}</p>}
+          {outcomes.map(outcome => {
+            const validation = outcome as typeof outcome & { number?: number; geometry_produced?: boolean; visual_review?: string; engineering_validity?: string; assumptions?: string[]; warnings?: string[] };
+            return validation.visual_review && <div key={`validation:${outcome.change_id}`}><p>
+              Change {validation.number ?? outcome.change_id}: geometry {validation.geometry_produced ? "produced" : "not produced"}; visual review {validation.visual_review.replaceAll("_", " ")}; engineering validity {validation.engineering_validity?.replaceAll("_", " ") ?? "not assessed"}.
+            </p>
+            {!!validation.warnings?.length && <details><summary>Warnings for change {validation.number ?? outcome.change_id} ({validation.warnings.length})</summary><ul>{validation.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></details>}
+            {!!validation.assumptions?.length && <details><summary>Assumptions for change {validation.number ?? outcome.change_id}</summary><ul>{validation.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul></details>}
+            </div>;
+          })}
           {props.compact ? (
             <div className={props.compact ? "render-outcomes" : undefined}>
               {(
@@ -320,7 +325,16 @@ function Job({
             ))
           )}
           {current && !stale ? (
-            <section aria-label="Current render assets">{assetList}</section>
+            <section aria-label="Current render assets">
+              {geometryAsset && sceneCatalog && <GeometryViewer api={api} url={geometryAsset.url} catalog={sceneCatalog} originalUrl={sceneCatalog.baseline_url} attribution={<GeometryAttribution baselineId={sceneCatalog.baseline_asset_id} />}
+                markers={(renderedVariant?.changes ?? []).flatMap((change, index) => {
+                  const outcome = outcomes.find(item => item.change_id === change.change_id);
+                  const partId = change.part_ids.find(id => Array.isArray(sceneCatalog.parts) && sceneCatalog.parts.some(part => part?.part_id === id));
+                  return outcome?.outcome === "rendered" && partId ? [{ id: change.change_id, partId, number: (outcome as typeof outcome & { number?: number }).number ?? index + 1, label: change.after }] : [];
+                })}
+                onMarker={id => setExplained(id)} />}
+              {assetList}
+            </section>
           ) : (
             <details
               onToggle={(event) =>
@@ -470,6 +484,7 @@ function RunRenderPanel(props: RenderPanelProps) {
   function create(retry?: RenderJob) {
     if (
       busy ||
+      props.hasUnsavedWork ||
       !workspace.snapshot.available_actions.includes("reimagine") ||
       (!retry &&
         (!variant ||
@@ -515,6 +530,12 @@ function RunRenderPanel(props: RenderPanelProps) {
     saveRenderJobs(storageKey, next, api, runId);
     setJobs(next);
   }
+  const observedRequest = useRef(props.requestReimagine);
+  useEffect(() => {
+    if (observedRequest.current === props.requestReimagine) return;
+    observedRequest.current = props.requestReimagine;
+    create();
+  }, [props.requestReimagine]);
   return (
     <section aria-label="Visualization">
       <div className="section-title">
@@ -523,6 +544,7 @@ function RunRenderPanel(props: RenderPanelProps) {
           className="primary"
           disabled={
             busy ||
+            props.hasUnsavedWork ||
             !workspace.snapshot.available_actions.includes("reimagine") ||
             !variant ||
             !!latest ||
@@ -534,6 +556,7 @@ function RunRenderPanel(props: RenderPanelProps) {
           Reimagine
         </button>
       </div>
+      {props.hasUnsavedWork && <p className="notice">Save or discard unsaved edits before Reimagine. Only selected saved suggestions are used.</p>}
       {!variant && (
         <p>
           Selected variant unavailable. Choose an existing variant before

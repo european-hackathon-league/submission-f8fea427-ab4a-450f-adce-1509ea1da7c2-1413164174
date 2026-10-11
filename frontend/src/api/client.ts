@@ -484,7 +484,7 @@ export function createRealApi(
       )
         return null;
       const suffix = address.pathname.slice(prefix.length);
-      return /^[^/]+\/(?:renders\/[^/]+\/assets\/[^/]+|exports\/[^/]+\/download)$/.test(
+      return /^[^/]+\/(?:renders\/[^/]+\/assets\/[^/]+|exports\/[^/]+\/download|geometry\/asset)$/.test(
         suffix,
       )
         ? address

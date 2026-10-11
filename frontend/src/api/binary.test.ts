@@ -6,6 +6,17 @@ afterEach(() => {
 });
 const base = "https://api.example.test/api/v1";
 const exportUrl = "/api/v1/runs/run-1/exports/export-1/download";
+it("retrieves verified baseline geometry through the authorized application route", async () => {
+  const fetcher = vi.fn(async (_url: string, _init: RequestInit) => new Response("glb", { headers: { "Content-Type": "model/gltf-binary" } }));
+  vi.stubGlobal("fetch", fetcher);
+  const api = createRealApi(base, { headers: () => ({ Authorization: "Bearer runtime-token" }) });
+  const url = "/api/v1/runs/run-1/geometry/asset";
+  expect(api.canReadAsset?.(url)).toBe(true);
+  expect(await (await api.readAsset!(url, new AbortController().signal)).text()).toBe("glb");
+  expect(new Headers(fetcher.mock.calls[0][1]?.headers).get("Authorization")).toBe("Bearer runtime-token");
+  expect(api.canReadAsset?.("https://external.example.test" + url)).toBe(false);
+  expect(api.canReadAsset?.(url + "?token=secret")).toBe(false);
+});
 it("reads only protected application asset/export routes with runtime authorization and exact bytes", async () => {
   const fetcher = vi.fn(
     async (_url: string, _init: RequestInit) =>

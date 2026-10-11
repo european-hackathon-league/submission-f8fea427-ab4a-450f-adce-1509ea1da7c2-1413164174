@@ -15,8 +15,9 @@ from app import wire as w
 from app.auth import Actor, reject
 from app.commands import audit, command, emit, owned_run
 from app.config import Settings
-from app.control import accepted, proposal_row, resource_row
-from app.db import Outbox, Run, Session, StageOutput
+from app.control import accepted, proposal_row, require_pm, resource_row, stale
+from app.db import EvidenceArtifact, Outbox, Run, RunEvidence, Session, StageOutput
+from app.evidence import external_evidence
 
 
 def build_manifest(
@@ -25,6 +26,10 @@ def build_manifest(
     render_id: str,
     config: dict[str, Any],
 ) -> w.RenderManifest:
+    if body.proposal_set_version != proposals.proposal_set_version:
+        reject(
+            "stale_version", "Render must use the selected saved proposal version", 409
+        )
     variants = {variant.variant_id: variant for variant in proposals.variants}
     if len(set(body.variant_ids)) != len(body.variant_ids) or any(
         value not in variants for value in body.variant_ids
@@ -45,6 +50,16 @@ def build_manifest(
         for variant_id in body.variant_ids
         for value in variants[variant_id].change_ids
     }
+    changes = [
+        change
+        for change in proposals.changes
+        if change.change_id in selected
+        and change.decision_state not in {"rejected", "deferred"}
+    ]
+    if not changes:
+        reject(
+            "no_selected_changes", "Select at least one saved, eligible suggestion", 422
+        )
     return w.RenderManifest(
         **body.model_dump(),
         render_request_id=render_id,
@@ -56,15 +71,26 @@ def build_manifest(
                 part_ids=change.part_ids,
                 proposed_outcome=change.outcome,
                 visual_instruction=change.after,
-                preserve_constraints=change.conditions,
+                preserve_constraints=change.preservation_constraints,
                 evidence_ids=list(
                     dict.fromkeys(
                         change.supporting_evidence_ids + change.opposing_evidence_ids
                     )
                 ),
+                proposal_change_version=change.version,
+                assumptions=list(
+                    dict.fromkeys(
+                        change.uncertainty
+                        + change.conditions
+                        + [
+                            assumption
+                            for variant_id in body.variant_ids
+                            for assumption in variants[variant_id].assumptions
+                        ]
+                    )
+                ),
             )
-            for change in proposals.changes
-            if change.change_id in selected
+            for change in changes
         ],
     )
 
@@ -86,11 +112,76 @@ def create_render(
     actor: Actor, run_id: str, body: w.RenderCommand, key: str
 ) -> w.Accepted:
     def effect(session: DBSession, command_id: str) -> dict[str, Any]:
+        require_pm(actor)
         run = owned_run(session, actor, run_id, lock=True)
+        if run.current_proposal_set_version != body.proposal_set_version:
+            stale(run)
         proposals = w.Proposals.model_validate(
             proposal_row(session, run, body.proposal_set_version).payload
         )
+        decisions = session.scalars(
+            select(StageOutput).where(
+                StageOutput.run_id == run.id, StageOutput.stage_key.like("decision:%")
+            )
+        ).all()
+        for row in sorted(
+            decisions, key=lambda value: str(value.payload["occurred_at"])
+        ):
+            decision = row.payload
+            if decision["proposal_set_version"] == body.proposal_set_version:
+                for change in proposals.changes:
+                    if change.change_id in decision["change_ids"]:
+                        change.decision_state = decision["state"]
         manifest = build_manifest(proposals, body, command_id, run.config)
+        evidence_ids = {
+            value for change in manifest.changes for value in change.evidence_ids
+        }
+        excerpts = {
+            artifact.id: artifact.excerpt
+            for artifact in session.scalars(
+                select(EvidenceArtifact).where(
+                    EvidenceArtifact.id.in_(evidence_ids),
+                    EvidenceArtifact.id.in_(
+                        select(RunEvidence.evidence_id).where(
+                            RunEvidence.run_id == run.id
+                        )
+                    ),
+                )
+            )
+        }
+        excerpts.update(
+            {
+                key: value.excerpt
+                for key, value in external_evidence(session, run.id).items()
+                if key in evidence_ids
+            }
+        )
+        for requested_change in manifest.changes:
+            # Bound prompt excerpts; complete evidence remains available through its authorized links.
+            requested_change.requested_wording = (
+                "\n".join(
+                    f"{evidence_id}: {excerpts[evidence_id][:2000]}"
+                    for evidence_id in requested_change.evidence_ids[:6]
+                    if evidence_id in excerpts
+                )
+                or None
+            )
+        # The workspace/run locks also prevent duplicate jobs from different tabs.
+        existing = session.scalars(
+            select(StageOutput).where(
+                StageOutput.run_id == run.id, StageOutput.stage_key.like("render:%")
+            )
+        ).all()
+        requested = manifest.model_dump(exclude={"render_request_id"}, mode="json")
+        for row in existing:
+            previous = w.RenderManifest.model_validate(row.payload["manifest"])
+            if (
+                previous.model_dump(exclude={"render_request_id"}, mode="json")
+                == requested
+            ):
+                return accepted(
+                    command_id, run_id, "renders", previous.render_request_id
+                )
         session.add(
             StageOutput(
                 run_id=run.id,
@@ -127,10 +218,17 @@ def get_render(actor: Actor, run_id: str, render_id: str) -> w.RenderResult:
         result.stale = result.proposal_set_version != run.current_proposal_set_version
         for asset in result.assets:
             asset.url = f"/api/v1/runs/{run_id}/renders/{render_id}/assets/{quote(asset.asset_id, safe='')}"
+        if result.scene_catalog is not None:
+            original = next(
+                (asset for asset in result.assets if asset.asset_id == "original"), None
+            )
+            result.scene_catalog.baseline_url = original.url if original else None
         return result
 
 
 def retry_render(actor: Actor, run_id: str, render_id: str, key: str) -> w.Accepted:
+    require_pm(actor)
+
     def effect(session: DBSession, command_id: str) -> dict[str, Any]:
         run = owned_run(session, actor, run_id, lock=True)
         previous = resource_row(session, run_id, f"render:{render_id}")
@@ -145,6 +243,8 @@ def retry_render(actor: Actor, run_id: str, render_id: str, key: str) -> w.Accep
         payload = deepcopy(previous.payload)
         payload.setdefault("history", []).append(payload["result"])
         payload["result"] = queued_result(manifest).model_dump(mode="json")
+        payload["result"]["job_id"] = result.job_id
+        payload["retry_requested"] = command_id
         payload["attempts"].append(
             {
                 "operation": "retry",
@@ -172,6 +272,13 @@ def retry_render(actor: Actor, run_id: str, render_id: str, key: str) -> w.Accep
 def validate_result(
     manifest: w.RenderManifest, result: w.RenderResult
 ) -> w.RenderResult:
+    if result.scene_catalog is not None and (
+        result.scene_catalog.baseline_asset_id != manifest.baseline_asset_id
+        or result.scene_catalog.part_catalog_version != manifest.part_catalog_version
+        or result.scene_catalog.asset_id
+        not in {asset.asset_id for asset in result.assets}
+    ):
+        raise ValueError("Renderer geometry catalog identity mismatch")
     for name in (
         "render_request_id",
         "proposal_set_version",
@@ -201,9 +308,14 @@ def validate_result(
         successful = sum(
             outcome.outcome in {"rendered", "annotated"} for outcome in result.outcomes
         )
+        needs_review = any(
+            outcome.geometry_produced
+            and (outcome.visual_review != "passed" or outcome.warnings)
+            for outcome in result.outcomes
+        )
         result.status = (
             "succeeded"
-            if successful == len(expected) and expected
+            if successful == len(expected) and expected and not needs_review
             else "partial"
             if successful
             else "failed"
@@ -247,7 +359,7 @@ def _perform(args: list[str], poll: bool) -> str:
         result = w.RenderResult.model_validate(payload["result"])
         if result.status in {"succeeded", "partial", "failed"}:
             return result.status
-        if not poll and result.job_id:
+        if not poll and result.job_id and not payload.get("retry_requested"):
             return "rendering"
         payload["attempts"].append(
             {
@@ -266,9 +378,19 @@ def _perform(args: list[str], poll: bool) -> str:
                 "GET", f"/renderer/v1/jobs/{quote(result.job_id, safe='')}", render_id
             )
         else:
-            raw = renderer_call(
-                "POST", "/renderer/v1/jobs", render_id, manifest.model_dump(mode="json")
-            )
+            if result.job_id and payload.get("retry_requested"):
+                raw = renderer_call(
+                    "POST",
+                    f"/renderer/v1/jobs/{quote(result.job_id, safe='')}/retry",
+                    payload["retry_requested"],
+                )
+            else:
+                raw = renderer_call(
+                    "POST",
+                    "/renderer/v1/jobs",
+                    render_id,
+                    manifest.model_dump(mode="json"),
+                )
         if not poll and set(raw).issubset({"job_id", "status"}) and raw.get("job_id"):
             updated = queued_result(manifest)
             updated.job_id = str(raw["job_id"])
@@ -277,6 +399,7 @@ def _perform(args: list[str], poll: bool) -> str:
             updated = validate_result(manifest, w.RenderResult.model_validate(raw))
     except httpx.HTTPError, ValueError, ValidationError:
         updated = queued_result(manifest)
+        updated.job_id = result.job_id
         updated.status = "failed"
         updated.failure_reason = "Renderer unavailable or returned an invalid version-bound result; proposals are preserved"
         updated.outcomes = [
@@ -301,6 +424,8 @@ def _perform(args: list[str], poll: bool) -> str:
         )
         value = deepcopy(row.payload)
         value["result"] = updated.model_dump(mode="json")
+        if not poll and updated.job_id and updated.status != "failed":
+            value.pop("retry_requested", None)
         if raw is not None and updated.status == "failed":
             value["quarantined"] = raw
         row.payload = value
@@ -385,10 +510,23 @@ def asset_bytes(
         }:
             reject("invalid_asset", "Unsupported renderer media type", 502)
         audit(session, actor, "render.asset.read", asset_id, run_id)
+    return renderer_asset_bytes(asset.url, asset.media_type)
+
+
+def renderer_asset_bytes(url: str, media_type: str) -> tuple[bytes, str]:
+    settings = Settings()
+    configured, target = urlsplit(settings.renderer_url), urlsplit(url)
+    if not settings.renderer_url or (
+        (configured.scheme, configured.netloc) != (target.scheme, target.netloc)
+        or target.username
+        or target.password
+        or target.fragment
+    ):
+        reject("invalid_asset", "Renderer asset origin is not configured", 502)
     with httpx.Client(timeout=30, follow_redirects=False, trust_env=False) as client:
         with client.stream(
             "GET",
-            asset.url,
+            url,
             headers={
                 "Authorization": f"Bearer {settings.renderer_token.get_secret_value()}"
             },
@@ -401,4 +539,40 @@ def asset_bytes(
                     reject(
                         "asset_size_limit", "Renderer asset exceeds bounded size", 502
                     )
-    return bytes(data), asset.media_type
+    return bytes(data), media_type
+
+
+def baseline_catalog(actor: Actor, run_id: str) -> w.GeometrySceneCatalog:
+    with Session() as session:
+        config = owned_run(session, actor, run_id).config
+    try:
+        catalog = w.GeometrySceneCatalog.model_validate(
+            renderer_call("GET", "/renderer/v1/baseline/catalog", run_id)
+        )
+    except httpx.HTTPError, ValueError:
+        reject(
+            "geometry_unavailable",
+            "Verified editable vehicle geometry is unavailable",
+            503,
+        )
+    if (
+        catalog.baseline_asset_id != config["baseline_asset_id"]
+        or catalog.asset_id != config["baseline_asset_id"]
+        or catalog.part_catalog_version != config["part_catalog_version"]
+    ):
+        reject(
+            "invalid_catalog", "Geometry catalog does not match the saved vehicle", 502
+        )
+    catalog.baseline_url = f"/api/v1/runs/{run_id}/geometry/asset"
+    return catalog
+
+
+def baseline_bytes(actor: Actor, run_id: str) -> tuple[bytes, str]:
+    baseline_catalog(actor, run_id)
+    with Session.begin() as session:
+        owned_run(session, actor, run_id)
+        audit(session, actor, "geometry.asset.read", run_id, run_id)
+    return renderer_asset_bytes(
+        Settings().renderer_url.rstrip("/") + "/renderer/v1/baseline/asset",
+        "model/gltf-binary",
+    )

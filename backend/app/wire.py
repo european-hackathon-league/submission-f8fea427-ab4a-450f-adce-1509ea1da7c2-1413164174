@@ -295,6 +295,7 @@ class Change(Wire):
     target_basis: str | None
     conditions: list[str]
     validation_method: str
+    preservation_constraints: list[str] = Field(default_factory=list)
     target_maturity: Literal["proposed", "needs_validation", "validated", "pm_accepted"]
     factors: Factors
     score: float | None
@@ -365,6 +366,38 @@ class RenderCommand(Wire):
     baseline_asset_id: str
 
 
+class GeometryOperation(Wire):
+    operation: Literal["resize_local"]
+    part_id: str
+    dimensions_m: tuple[
+        Annotated[float, Field(gt=0, le=10, allow_inf_nan=False)],
+        Annotated[float, Field(gt=0, le=10, allow_inf_nan=False)],
+        Annotated[float, Field(gt=0, le=10, allow_inf_nan=False)],
+    ]
+
+
+class GeometryPart(Wire):
+    part_id: str
+    mesh_refs: list[str] = Field(min_length=1)
+    anchor_mesh_ref: str
+    anchor_local: tuple[float, float, float]
+    baseline_anchor_local: tuple[float, float, float] | None = None
+    dimensions_m: tuple[float, float, float]
+    edit_origin_local: tuple[float, float, float] | None = None
+    axis_labels: tuple[str, str, str] | None = None
+    operations: list[Literal["resize_local"]] = Field(default_factory=list)
+
+
+class GeometrySceneCatalog(Wire):
+    contract_version: Literal["1"] = "1"
+    baseline_asset_id: str
+    asset_id: str
+    part_catalog_version: str
+    units: Literal["m"] = "m"
+    parts: list[GeometryPart]
+    baseline_url: str | None = None
+
+
 class ManifestChange(Wire):
     change_id: str
     part_ids: list[str]
@@ -372,6 +405,12 @@ class ManifestChange(Wire):
     visual_instruction: str
     preserve_constraints: list[str]
     evidence_ids: list[str]
+    geometry: GeometryOperation | None = None
+    assumptions: list[str] = Field(default_factory=list)
+    dependencies: list[str] = Field(default_factory=list)
+    conflicts: list[str] = Field(default_factory=list)
+    proposal_change_version: int = Field(default=1, ge=1)
+    requested_wording: str | None = None
 
 
 class RenderManifest(RenderCommand):
@@ -393,6 +432,18 @@ class RenderOutcome(Wire):
     outcome: Literal["rendered", "annotated", "unsupported", "failed"]
     reason: str | None = None
     asset_ids: list[str]
+    number: int | None = Field(default=None, ge=1)
+    geometry_produced: bool = False
+    visual_review: Literal["not_run", "passed", "needs_review", "failed"] = "not_run"
+    engineering_validity: Literal["not_assessed"] = "not_assessed"
+    measurements: dict[str, list[float]] | None = None
+    assumptions: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)
+
+
+RenderStage = Literal[
+    "queued", "inspecting", "planning", "editing", "validating", "reviewing", "complete"
+]
 
 
 class RenderResult(Wire):
@@ -402,11 +453,13 @@ class RenderResult(Wire):
     baseline_asset_id: str
     part_catalog_version: str
     status: Literal["queued", "rendering", "succeeded", "partial", "failed"]
+    stage: RenderStage | None = None
     job_id: str | None = None
     assets: list[Asset]
     outcomes: list[RenderOutcome]
     stale: bool = False
     failure_reason: str | None = None
+    scene_catalog: GeometrySceneCatalog | None = None
 
 
 class ExportCommand(Wire):

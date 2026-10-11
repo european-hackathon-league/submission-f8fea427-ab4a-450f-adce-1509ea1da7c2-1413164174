@@ -511,6 +511,17 @@ def decisions(
     return control.decide(identity, run_id, body, idempotency_key)
 
 
+@router.get("/runs/{run_id}/geometry", response_model=w.GeometrySceneCatalog)
+def geometry_catalog(run_id: str, identity: Auth) -> w.GeometrySceneCatalog:
+    return rendering.baseline_catalog(identity, run_id)
+
+
+@router.get("/runs/{run_id}/geometry/asset", response_model=None)
+def geometry_asset(run_id: str, identity: Auth) -> Response:
+    data, media_type = rendering.baseline_bytes(identity, run_id)
+    return Response(data, media_type=media_type, headers={"Cache-Control": "no-store"})
+
+
 @router.post("/runs/{run_id}/renders", response_model=w.Accepted, status_code=202)
 def create_render(
     run_id: str, body: w.RenderCommand, idempotency_key: Key, identity: Auth

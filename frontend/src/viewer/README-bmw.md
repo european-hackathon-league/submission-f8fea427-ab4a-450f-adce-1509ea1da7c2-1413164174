@@ -1,5 +1,11 @@
 # BMW asset viewer provenance
 
+## Verified editable GLB
+
+When a run exposes an authorized geometry catalog, `WorkspaceGeometry` loads the prepared GLB through the application API instead of the hosted reference viewer. The source was downloaded through Sketchfab's legitimate downloadable-model flow; preparation and provenance are documented in `doc/reimagine-assets.md` and `docs/geometry-worker.md`. The actual front-seat connected components are identified by exact GLB node references and independently measured local anchors. Only catalogued parts receive geometry-attached feedback tags. Findings without verified mappings remain available through evidence controls.
+
+`Inspect mapped parts` hides other geometry for visual inspection without changing the asset. Original/reimagined switching preserves the camera; resulting markers describe per-change execution and visual review separately from engineering validity. The Nazh Design / CC BY 4.0 attribution remains visible for prepared baseline and generated variants. The legacy hosted viewer and cabin photograph below remain fallback/reference experiences when editable geometry is unavailable.
+
 ## Exterior model
 
 The interactive exterior loads the creator-uploaded Sketchfab model [2023 BMW i5 M60](https://sketchfab.com/3d-models/2023-bmw-i5-m60-207fd872d28b4cafa7fefe061ae98e26) by Nazh Design. It is published under [Creative Commons Attribution 4.0](https://creativecommons.org/licenses/by/4.0/). Attribution is kept visible beside the viewer. This is a community-created model, not an official BMW asset or endorsement.

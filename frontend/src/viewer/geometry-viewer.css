@@ -1,0 +1,12 @@
+.geometry-viewer { width: 100%; }
+.vehicle-column > .section-title { flex-wrap: wrap; }
+.analysis-column[data-current-view="Renders"]:has(.geometry-viewer) { grid-column: 1 / -1; }
+.workspace-shell .work-area:has(> .analysis-column[data-current-view="Renders"] .geometry-viewer) > .vehicle-column { position: static; grid-column: 1 / -1; }
+.geometry-stage { position: relative; height: clamp(280px, 48vw, 520px); background: #edf0f2; border-radius: 12px; overflow: hidden; }
+.geometry-canvas { width: 100%; height: 100%; }
+.geometry-canvas canvas { display: block; touch-action: none; }
+.geometry-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.geometry-lines line { stroke: #812431; stroke-width: 1.5; }
+.geometry-tag { position: absolute; width: 44px; height: 36px; padding: 0; color: #fff; background: #812431; border: 0; }
+.geometry-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
+.geometry-viewer button:focus-visible { outline: 3px solid #812431; outline-offset: 3px; }

@@ -29,6 +29,7 @@ import ConflictPanel from "./components/ConflictPanel";
 import ProposalWorkspace from "./components/ProposalWorkspace";
 import HistoryPanel from "./components/HistoryPanel";
 import RenderPanel from "./components/RenderPanel";
+import WorkspaceGeometry from "./viewer/WorkspaceGeometry";
 import ChangeExplanation from "./components/ChangeExplanation";
 import SceneCapabilities from "./components/SceneCapabilities";
 import AcceptanceEnvironment from "./components/AcceptanceEnvironment";
@@ -235,6 +236,7 @@ function WorkspaceApp({
   const [connection, setConnection] = useState("");
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const [findingFocusRequest, setFindingFocusRequest] = useState(0);
+  const [reimagineRequest, setReimagineRequest] = useState(0);
   const [source, setSource] = useState<Evidence | null>(null);
   const lock = useRef(false);
   const proposalDrafts = useRef(
@@ -984,6 +986,7 @@ function WorkspaceApp({
           >
             <div className="section-title">
               <h2>{vehicle?.title ?? "Vehicle reference"}</h2>
+              {workspace && <button className="primary" disabled={busy || hasUnsavedWork || !workspace.snapshot.available_actions.includes("reimagine")} onClick={() => { setTab("Renders"); setReimagineRequest(value => value + 1); }}>Reimagine saved suggestions</button>}
               <label className="check-field">
                 <input
                   type="checkbox"
@@ -994,7 +997,8 @@ function WorkspaceApp({
               </label>
             </div>
             <div id="vehicle-content" className="vehicle-content">
-              {baselineAvailable ? (
+              {hasUnsavedWork && <p className="notice">Save or discard unsaved edits before Reimagine.</p>}
+              {baselineAvailable || workspace?.snapshot.resource_links?.geometry ? (
                 <Suspense
                   fallback={
                     <div className="empty-state">
@@ -1002,7 +1006,8 @@ function WorkspaceApp({
                     </div>
                   }
                 >
-                  <VehicleViewer
+                  <WorkspaceGeometry key={JSON.stringify([api.sessionNamespace ?? api.mode, workspace?.snapshot.run_id])} api={api} workspace={workspace} tags={heatmap} onSelect={selectPart} onFinding={id => { const finding = workspace?.findings.find(item => item.finding_id === id); if (finding) { setReviewChange(null); selectFinding(finding); setTab("Evidence"); } }}>
+                  {baselineAvailable ? <VehicleViewer
                     className="bmw-asset-viewer--compact"
                     selectedComponent={selectedComponent}
                     onSelectComponent={selectPart}
@@ -1014,7 +1019,8 @@ function WorkspaceApp({
                       counts: a.counts,
                       cohort_ids: a.wire?.cohort_ids ?? [],
                     }))}
-                  />
+                  /> : <p>Loading verified editable baseline…</p>}
+                  </WorkspaceGeometry>
                 </Suspense>
               ) : (
                 <div className="empty-state">
@@ -1030,8 +1036,8 @@ function WorkspaceApp({
             <details className="vehicle-reference-details">
               <summary>Vehicle details</summary>
               <p>
-                Seat and dashboard tags mark approximate cabin regions in this
-                exterior model.
+                Reference-view tags mark approximate cabin regions. Editable-model
+                tags use verified geometry mappings.
               </p>
               <SceneCapabilities
                 vehicle={vehicle}
@@ -1050,7 +1056,7 @@ function WorkspaceApp({
               ))}
             </details>
           </section>
-          <section className="analysis-column" aria-label="Analysis panels">
+          <section className="analysis-column" data-current-view={tab} aria-label="Analysis panels">
             <div
               className="panel-tabs"
               role="tablist"
@@ -1213,6 +1219,8 @@ function WorkspaceApp({
                       workspace={workspace}
                       variantId={activeVariantId}
                       busy={busy}
+                      hasUnsavedWork={hasUnsavedWork}
+                      requestReimagine={reimagineRequest}
                       onRefresh={() => refresh(runId!)}
                       onOpen={setSource}
                     />

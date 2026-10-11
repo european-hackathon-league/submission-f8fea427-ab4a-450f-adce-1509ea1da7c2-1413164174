@@ -1,4 +1,4 @@
-import { defineConfig } from "vitest/config";
+import { configDefaults, defineConfig } from "vitest/config";
 import { loadEnv, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 function contractHarness(failAssetOnce: boolean): Plugin {
@@ -35,7 +35,7 @@ export default defineConfig(({ mode, command }) => {
   return {
     server: {
       proxy: env.FRONTEND_CONTRACT_HARNESS === "1" ? undefined : {
-        "/api": { target: "http://127.0.0.1:8000", changeOrigin: true },
+        "/api": { target: env.VITE_API_PROXY_TARGET || "http://127.0.0.1:8000", changeOrigin: true },
       },
     },
     plugins: [
@@ -44,7 +44,7 @@ export default defineConfig(({ mode, command }) => {
         ? [contractHarness(env.FRONTEND_HARNESS_FAIL_ASSET_ONCE === "1")]
         : []),
     ],
-    test: { environment: "jsdom", setupFiles: ["./src/test-setup.ts"] },
+    test: { environment: "jsdom", setupFiles: ["./src/test-setup.ts"], exclude: [...configDefaults.exclude, "testing/browser/**"] },
     build: { chunkSizeWarningLimit: 1100 },
   };
 });

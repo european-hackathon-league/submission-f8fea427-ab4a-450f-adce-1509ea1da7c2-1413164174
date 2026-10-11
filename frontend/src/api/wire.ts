@@ -43,6 +43,7 @@ export type Change = {
   origin: "ai" | "pm";
   outcome: string;
   part_ids: string[];
+  preservation_constraints?: string[];
   requirement_id: string;
   scope: Scope;
   score: number | null;
@@ -247,11 +248,39 @@ export type RenderCommand = {
 };
 export type RenderOutcome = {
   asset_ids: string[];
+  assumptions?: string[];
   change_id: string;
+  engineering_validity?: "not_assessed";
+  geometry_produced?: boolean;
+  measurements?: Record<string, number[]> | null;
+  number?: number | null;
   outcome: "rendered" | "annotated" | "unsupported" | "failed";
   reason?: string | null;
+  visual_review?: "not_run" | "passed" | "needs_review" | "failed";
+  warnings?: string[];
+};
+export type GeometryPart = {
+  baseline_anchor_local?: [number, number, number] | null;
+  axis_labels?: [string, string, string] | null;
+  anchor_local: [number, number, number];
+  anchor_mesh_ref: string;
+  dimensions_m: [number, number, number];
+  edit_origin_local?: [number, number, number] | null;
+  mesh_refs: string[];
+  operations?: "resize_local"[];
+  part_id: string;
+};
+export type GeometrySceneCatalog = {
+  asset_id: string;
+  baseline_asset_id: string;
+  baseline_url?: string | null;
+  contract_version?: "1";
+  part_catalog_version: string;
+  parts: GeometryPart[];
+  units?: "m";
 };
 export type RenderResult = {
+  stage?: "queued" | "inspecting" | "planning" | "editing" | "validating" | "reviewing" | "complete" | null;
   assets: Asset[];
   baseline_asset_id: string;
   failure_reason?: string | null;
@@ -260,6 +289,7 @@ export type RenderResult = {
   part_catalog_version: string;
   proposal_set_version: number;
   render_request_id: string;
+  scene_catalog?: GeometrySceneCatalog | null;
   stale?: boolean;
   status: "queued" | "rendering" | "succeeded" | "partial" | "failed";
   variant_ids: string[];

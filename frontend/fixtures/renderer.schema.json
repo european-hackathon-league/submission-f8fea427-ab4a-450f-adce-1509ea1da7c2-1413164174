@@ -1,12 +1,77 @@
 {
   "request": {
     "$defs": {
+      "GeometryOperation": {
+        "additionalProperties": false,
+        "properties": {
+          "dimensions_m": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 10,
+                "type": "number"
+              },
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 10,
+                "type": "number"
+              },
+              {
+                "exclusiveMinimum": 0,
+                "maximum": 10,
+                "type": "number"
+              }
+            ],
+            "title": "Dimensions M",
+            "type": "array"
+          },
+          "operation": {
+            "const": "resize_local",
+            "title": "Operation",
+            "type": "string"
+          },
+          "part_id": {
+            "title": "Part Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "operation",
+          "part_id",
+          "dimensions_m"
+        ],
+        "title": "GeometryOperation",
+        "type": "object"
+      },
       "ManifestChange": {
         "additionalProperties": false,
         "properties": {
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
           "change_id": {
             "title": "Change Id",
             "type": "string"
+          },
+          "conflicts": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Conflicts",
+            "type": "array"
+          },
+          "dependencies": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Dependencies",
+            "type": "array"
           },
           "evidence_ids": {
             "items": {
@@ -14,6 +79,17 @@
             },
             "title": "Evidence Ids",
             "type": "array"
+          },
+          "geometry": {
+            "anyOf": [
+              {
+                "$ref": "#/$defs/GeometryOperation"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null
           },
           "part_ids": {
             "items": {
@@ -29,9 +105,27 @@
             "title": "Preserve Constraints",
             "type": "array"
           },
+          "proposal_change_version": {
+            "default": 1,
+            "minimum": 1,
+            "title": "Proposal Change Version",
+            "type": "integer"
+          },
           "proposed_outcome": {
             "title": "Proposed Outcome",
             "type": "string"
+          },
+          "requested_wording": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Requested Wording"
           },
           "visual_instruction": {
             "title": "Visual Instruction",
@@ -133,6 +227,209 @@
         "title": "Asset",
         "type": "object"
       },
+      "GeometryPart": {
+        "additionalProperties": false,
+        "properties": {
+          "anchor_local": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Anchor Local",
+            "type": "array"
+          },
+          "anchor_mesh_ref": {
+            "title": "Anchor Mesh Ref",
+            "type": "string"
+          },
+          "axis_labels": {
+            "anyOf": [
+              {
+                "maxItems": 3,
+                "minItems": 3,
+                "prefixItems": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "string"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Axis Labels"
+          },
+          "baseline_anchor_local": {
+            "anyOf": [
+              {
+                "maxItems": 3,
+                "minItems": 3,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Baseline Anchor Local"
+          },
+          "dimensions_m": {
+            "maxItems": 3,
+            "minItems": 3,
+            "prefixItems": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Dimensions M",
+            "type": "array"
+          },
+          "edit_origin_local": {
+            "anyOf": [
+              {
+                "maxItems": 3,
+                "minItems": 3,
+                "prefixItems": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "number"
+                  }
+                ],
+                "type": "array"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Edit Origin Local"
+          },
+          "mesh_refs": {
+            "items": {
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Mesh Refs",
+            "type": "array"
+          },
+          "operations": {
+            "items": {
+              "const": "resize_local",
+              "type": "string"
+            },
+            "title": "Operations",
+            "type": "array"
+          },
+          "part_id": {
+            "title": "Part Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "part_id",
+          "mesh_refs",
+          "anchor_mesh_ref",
+          "anchor_local",
+          "dimensions_m"
+        ],
+        "title": "GeometryPart",
+        "type": "object"
+      },
+      "GeometrySceneCatalog": {
+        "additionalProperties": false,
+        "properties": {
+          "asset_id": {
+            "title": "Asset Id",
+            "type": "string"
+          },
+          "baseline_asset_id": {
+            "title": "Baseline Asset Id",
+            "type": "string"
+          },
+          "baseline_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Baseline Url"
+          },
+          "contract_version": {
+            "const": "1",
+            "default": "1",
+            "title": "Contract Version",
+            "type": "string"
+          },
+          "part_catalog_version": {
+            "title": "Part Catalog Version",
+            "type": "string"
+          },
+          "parts": {
+            "items": {
+              "$ref": "#/$defs/GeometryPart"
+            },
+            "title": "Parts",
+            "type": "array"
+          },
+          "units": {
+            "const": "m",
+            "default": "m",
+            "title": "Units",
+            "type": "string"
+          }
+        },
+        "required": [
+          "baseline_asset_id",
+          "asset_id",
+          "part_catalog_version",
+          "parts"
+        ],
+        "title": "GeometrySceneCatalog",
+        "type": "object"
+      },
       "RenderOutcome": {
         "additionalProperties": false,
         "properties": {
@@ -143,9 +440,58 @@
             "title": "Asset Ids",
             "type": "array"
           },
+          "assumptions": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Assumptions",
+            "type": "array"
+          },
           "change_id": {
             "title": "Change Id",
             "type": "string"
+          },
+          "engineering_validity": {
+            "const": "not_assessed",
+            "default": "not_assessed",
+            "title": "Engineering Validity",
+            "type": "string"
+          },
+          "geometry_produced": {
+            "default": false,
+            "title": "Geometry Produced",
+            "type": "boolean"
+          },
+          "measurements": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "items": {
+                    "type": "number"
+                  },
+                  "type": "array"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Measurements"
+          },
+          "number": {
+            "anyOf": [
+              {
+                "minimum": 1,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "default": null,
+            "title": "Number"
           },
           "outcome": {
             "enum": [
@@ -168,6 +514,24 @@
             ],
             "default": null,
             "title": "Reason"
+          },
+          "visual_review": {
+            "default": "not_run",
+            "enum": [
+              "not_run",
+              "passed",
+              "needs_review",
+              "failed"
+            ],
+            "title": "Visual Review",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
           }
         },
         "required": [
@@ -234,6 +598,38 @@
       "render_request_id": {
         "title": "Render Request Id",
         "type": "string"
+      },
+      "scene_catalog": {
+        "anyOf": [
+          {
+            "$ref": "#/$defs/GeometrySceneCatalog"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null
+      },
+      "stage": {
+        "anyOf": [
+          {
+            "enum": [
+              "queued",
+              "inspecting",
+              "planning",
+              "editing",
+              "validating",
+              "reviewing",
+              "complete"
+            ],
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ],
+        "default": null,
+        "title": "Stage"
       },
       "stale": {
         "default": false,

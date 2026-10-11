@@ -1,6 +1,7 @@
 {
-  "source_ref": "origin/backend",
-  "source_commit": "2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46",
+  "source_ref": "codex/vehicle-reimagine",
+  "source_commit": "b22f7abee6dafcc6c8badf3325e140dcea3c5a0e",
   "files": "contracts/{openapi,schemas,scenarios,renderer.schema}.json",
-  "synthetic": true
+  "synthetic": true,
+  "generated_from": "backend/app/contracts.py in this PR working tree; source_commit records the integration base"
 }

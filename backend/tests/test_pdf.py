@@ -4,6 +4,104 @@ import json
 import pytest
 
 
+def test_equipment_descriptions_follow_source_positions_not_merged_docling_rows():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    cells = document["tables"][0]["data"]["table_cells"]
+    # A merged description starts in the previous option, while a codeless row
+    # continues the current option. Neither boundary is a real equipment row.
+    cells[4]["text"] = "5AX"
+    cells[5]["text"] = "Autobahnassistent truncated"
+    cells[8]["text"] = "5DW"
+    cells[9]["text"] = (
+        "Nur in Verbindung mit Driving Assistant Professional Parking Assistant"
+    )
+    cells[9]["bbox"]["t"] = 32
+    cells[10]["end_col_offset_idx"] = 3
+    continuation = dict(cells[9], start_row_offset_idx=3, end_row_offset_idx=4)
+    continuation["text"] = "Smartphone erforderlich Nur in Verbindung mit Travel Paket"
+    continuation["bbox"] = dict(continuation["bbox"], t=65, b=95)
+    symbol = dict(cells[6], start_row_offset_idx=3, end_row_offset_idx=4)
+    symbol["bbox"] = dict(symbol["bbox"], t=75, b=85)
+    cells.extend([continuation, symbol])
+    fragments = {
+        1: [
+            {"x": 0, "y": 25, "text": "5AX"},
+            {"x": 50, "y": 25, "text": "Autobahnassistent"},
+            {
+                "x": 50,
+                "y": 35,
+                "text": "Nur in Verbindung mit Driving Assistant Professional",
+            },
+            {
+                "x": 50,
+                "y": 37,
+                "text": "Dienste gelten 2 Jahre; Ausnahme bleibt erhalten",
+            },
+            {"x": 0, "y": 45, "text": "5DW"},
+            {"x": 50, "y": 45, "text": "Parking Assistant Professional"},
+            {"x": 50, "y": 60, "text": "Kompatibles Smartphone erforderlich"},
+            {"x": 50, "y": 70, "text": "Nur in Verbindung mit Travel Paket"},
+            {"x": 50, "y": 80, "text": "In Verbindung mit Innovationspaket"},
+        ]
+    }
+    result = normalize_document(document, "equipment", positioned_text=fragments)
+    highway = [p for p in result.passages if p.attributes.get("option_code") == "5AX"]
+    parking = [p for p in result.passages if p.attributes.get("option_code") == "5DW"]
+    assert highway and parking
+    assert all("Driving Assistant Professional" in p.text for p in highway)
+    assert all("Travel Paket" not in p.text for p in highway)
+    assert all(
+        "Ausnahme bleibt erhalten" in p.attributes["conditions"][0] for p in highway
+    )
+    assert all("Driving Assistant Professional" not in p.text for p in parking)
+    assert all(
+        "Smartphone erforderlich" in p.text and "Innovationspaket" in p.text
+        for p in parking
+    )
+    assert all(
+        p.attributes["conditions"]
+        == ["Nur in Verbindung mit Travel Paket", "In Verbindung mit Innovationspaket"]
+        for p in parking
+    )
+    assert any(p.attributes["table_row"] == 3 for p in parking)
+    # Unsupported source geometry inside prose must not produce partial recovery.
+    fragments[1][4]["uncertain"] = True
+    uncertain = normalize_document(document, "equipment", positioned_text=fragments)
+    parking = [
+        p for p in uncertain.passages if p.attributes.get("option_code") == "5DW"
+    ]
+    assert parking and all(
+        p.attributes["condition_association"] == "unknown" for p in parking
+    )
+    assert all(p.attributes["conditions"] == [] for p in parking)
+
+
+@pytest.mark.parametrize("crossing", ["previous", "next"])
+def test_unrecoverable_cross_row_description_does_not_claim_another_options_condition(
+    crossing,
+):
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    cells = document["tables"][0]["data"]["table_cells"]
+    target = cells[9] if crossing == "previous" else cells[5]
+    code = "6XX" if crossing == "previous" else "4ZZ"
+    target["text"] = "Nur in Verbindung mit another option Parking Assistant"
+    if crossing == "previous":
+        target["bbox"]["t"] = 25
+    else:
+        target["bbox"]["b"] = 50
+    result = normalize_document(document, "equipment")
+    options = [p for p in result.passages if p.attributes.get("option_code") == code]
+    assert options and all(p.attributes["conditions"] == [] for p in options)
+    assert all(p.attributes["availability"] == "unknown" for p in options)
+    assert all(p.attributes["condition_association"] == "unknown" for p in options)
+
+
 def test_standard_equipment_without_option_codes_keeps_grounded_availability():
     from app.pdf import normalize_document
     from tests.fixtures.pdf import equipment_document

@@ -405,28 +405,44 @@ def test_baseline_inference_accepts_complete_scoped_context_but_remains_bounded(
 
 
 @pytest.mark.parametrize(
-    "topic, quote",
+    "topic, quote, sentiment",
     [
         (
             "cornering-observation",
             "There is a difference in cornering; comparison unclear.",
+            "neutral",
         ),
         (
             "digital-key-status",
             "The customer confirmed Digital Key was already configured.",
+            "neutral",
+        ),
+        (
+            "wheel-controls",
+            "Thankfully there are still manual push buttons and wheel controls.",
+            "positive",
+        ),
+        (
+            "roof-opening",
+            "I wish the roof would open fully.",
+            "negative",
         ),
     ],
 )
-def test_neutral_topic_index_retains_an_explicitly_unestablished_need(
-    monkeypatch, topic, quote
+def test_topic_index_preserves_unknown_needs_and_source_ambiguity(
+    monkeypatch, topic, quote, sentiment
 ):
     observation = Observation(
         evidence_id="neutral-source",
         quote=quote,
         topic_key=topic,
         title="Neutral product observation",
-        customer_need="No customer need or desired change is established by this source.",
-        sentiment="neutral",
+        customer_need="No customer need or desired change is established by this source."
+        if sentiment == "neutral"
+        else "Praise may suggest preserving wheel controls; their type and location are unknown."
+        if sentiment == "positive"
+        else "The desired outcome is full roof opening; current opening behavior is unknown.",
+        sentiment=sentiment,
         need_kind="capability",
         part_ids=[],
         mapping_kind="unmapped",
@@ -464,6 +480,14 @@ def test_neutral_topic_index_retains_an_explicitly_unestablished_need(
         accepted = (
             "mandatory topic index" in instructions and "must not merge" in instructions
         )
+        if sentiment == "positive":
+            accepted = (
+                accepted
+                and "ambiguous" in instructions
+                and "steering-wheel" in instructions
+            )
+        if topic == "roof-opening":
+            accepted = accepted and "current partial opening" in instructions
         return module.Review(
             accepted=accepted,
             objections=[]

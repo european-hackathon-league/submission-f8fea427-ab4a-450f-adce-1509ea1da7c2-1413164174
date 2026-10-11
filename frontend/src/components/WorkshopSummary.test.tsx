@@ -7,6 +7,7 @@ import {
   FeedbackRing,
   SuggestionReview,
 } from "./WorkshopSummary";
+import WorkshopSummary from "./WorkshopSummary";
 import type { Workspace } from "../api/contracts";
 afterEach(() => {
   cleanup();
@@ -32,6 +33,18 @@ async function sample() {
   );
   return { api, w: await api.workspace(run.run_id) };
 }
+it.each([
+  ["failed", "Analysis failed; no suggestions were created."],
+  ["proposals_ready", "No suggestions are available for this selection."],
+  ["waiting_for_pm", "Analysis is waiting for your input."],
+] as const)("explains an empty %s analysis without implying it is running", async (status, message) => {
+  const { api, w } = await sample();
+  w.snapshot.analysis_status = status;
+  w.proposals.variants = [];
+  render(<WorkshopSummary api={api} workspace={w} variantId="" onReview={vi.fn()} />);
+  expect(screen.getByText(message)).toBeVisible();
+  expect(screen.queryByText("Suggestions will appear when analysis completes.")).not.toBeInTheDocument();
+});
 it("uses backend negative shares and leaves unknown shares unestimated", async () => {
   const { w } = await sample();
   const finding = {

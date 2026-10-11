@@ -300,7 +300,8 @@ export default function HistoryPanel({
   const versions = [
     ...new Set(
       [
-        workspace.snapshot.current_proposal_set_version,
+        // Published revisions are contiguous; decision audits do not cover every edit.
+        ...Array.from({ length: workspace.snapshot.current_proposal_set_version ?? 0 }, (_, index) => index + 1),
         ...workspace.history.map((entry) => entry.proposal_set_version),
         version,
       ].filter(

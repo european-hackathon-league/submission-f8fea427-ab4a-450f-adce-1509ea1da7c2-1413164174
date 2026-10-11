@@ -99,6 +99,35 @@ it("loads exact immutable server versions identified by audit rather than browse
   expect(screen.getByText(/PM selection, no approval/)).toBeInTheDocument();
   expect(screen.queryByLabelText("Proposal text")).not.toBeInTheDocument();
 });
+it("includes published revisions without decision audit entries", async () => {
+  const w = workspace();
+  w.snapshot.current_proposal_set_version = 7;
+  w.proposals = proposal(7);
+  w.history = [
+    {
+      event_id: "decision",
+      actor: "pm",
+      description: "Approved proposal version 4",
+      occurred_at: "2026-10-10T10:00:00Z",
+      proposal_set_version: 4,
+    },
+  ];
+  const request = vi.fn(async (path: string) =>
+    proposal(Number(new URL(path, "http://app").searchParams.get("proposal_set_version"))),
+  );
+  render(<HistoryPanel {...props(request, w)} />);
+  await screen.findByText("Immutable proposal version 7");
+  const selector = screen.getByLabelText("Inspect proposal version") as HTMLSelectElement;
+  expect([...selector.options].map(option => option.value)).toEqual(["7", "6", "5", "4", "3", "2", "1"]);
+  fireEvent.change(selector, { target: { value: "6" } });
+  await screen.findByText("Immutable proposal version 6");
+  expect(request).toHaveBeenCalledWith(
+    "/runs/run_demo/proposals?proposal_set_version=6",
+    undefined,
+    undefined,
+    expect.any(AbortSignal),
+  );
+});
 it("withholds inspection and export when response run or version mismatches selection", async () => {
   const wrong = proposal(9);
   const request = vi.fn(async () => wrong);

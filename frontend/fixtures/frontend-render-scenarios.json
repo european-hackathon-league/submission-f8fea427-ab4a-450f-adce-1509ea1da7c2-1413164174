@@ -1,0 +1,165 @@
+{
+  "synthetic": true,
+  "description": "Frontend-owned contract fixtures for static annotations only. No source analysis, provider calls, generated vehicle images, fabricated geometry or validation. Late fixture completes proposal version 1 after current proposal version 2.",
+  "contract_source_commit": "2d0483fd4d9bb4f95da5b8212db5d78b24a5ac46",
+  "results": {
+    "queued": {
+      "render_request_id": "render-synthetic-fixture-v1",
+      "proposal_set_version": 1,
+      "variant_ids": [
+        "variant-digital",
+        "variant-physical"
+      ],
+      "baseline_asset_id": "i5-m60-exterior-v1",
+      "part_catalog_version": "g60-parts-v1",
+      "status": "queued",
+      "assets": [],
+      "outcomes": [],
+      "stale": false,
+      "failure_reason": null,
+      "job_id": null
+    },
+    "rendering": {
+      "render_request_id": "render-synthetic-fixture-v1",
+      "proposal_set_version": 1,
+      "variant_ids": [
+        "variant-digital",
+        "variant-physical"
+      ],
+      "baseline_asset_id": "i5-m60-exterior-v1",
+      "part_catalog_version": "g60-parts-v1",
+      "status": "rendering",
+      "assets": [],
+      "outcomes": [],
+      "stale": false,
+      "failure_reason": null,
+      "job_id": null
+    },
+    "success": {
+      "render_request_id": "render-synthetic-fixture-v1",
+      "proposal_set_version": 1,
+      "variant_ids": [
+        "variant-digital"
+      ],
+      "baseline_asset_id": "i5-m60-exterior-v1",
+      "part_catalog_version": "g60-parts-v1",
+      "status": "succeeded",
+      "assets": [
+        {
+          "asset_id": "synthetic-static-annotation-v1-variant-digital",
+          "url": "/vehicles/frontend-render-annotation.svg",
+          "media_type": "image/svg+xml"
+        }
+      ],
+      "outcomes": [
+        {
+          "change_id": "change-dashboard",
+          "outcome": "annotated",
+          "asset_ids": [
+            "synthetic-static-annotation-v1-variant-digital"
+          ],
+          "reason": "Annotation only. Static synthetic annotation reference only. Requested edit text, new geometry, exact trim, physical preservation and generated imagery are not visualized or verified."
+        }
+      ],
+      "stale": false,
+      "failure_reason": null,
+      "job_id": null
+    },
+    "partial": {
+      "render_request_id": "render-synthetic-fixture-v1",
+      "proposal_set_version": 1,
+      "variant_ids": [
+        "variant-digital",
+        "variant-physical"
+      ],
+      "baseline_asset_id": "i5-m60-exterior-v1",
+      "part_catalog_version": "g60-parts-v1",
+      "status": "partial",
+      "assets": [
+        {
+          "asset_id": "synthetic-static-annotation-v1-variant-digital",
+          "url": "/vehicles/frontend-render-annotation.svg",
+          "media_type": "image/svg+xml"
+        }
+      ],
+      "outcomes": [
+        {
+          "change_id": "change-dashboard",
+          "outcome": "annotated",
+          "asset_ids": [
+            "synthetic-static-annotation-v1-variant-digital"
+          ],
+          "reason": "Annotation only. Static synthetic annotation reference only. Requested edit text, new geometry, exact trim, physical preservation and generated imagery are not visualized or verified."
+        },
+        {
+          "change_id": "change-physical",
+          "outcome": "unsupported",
+          "asset_ids": [],
+          "reason": "Synthetic fixture cannot visualize new tactile hardware or validate cabin geometry. Proposal and evidence remain inspectable."
+        }
+      ],
+      "stale": false,
+      "failure_reason": null,
+      "job_id": null
+    },
+    "failure": {
+      "render_request_id": "render-synthetic-fixture-v1",
+      "proposal_set_version": 1,
+      "variant_ids": [
+        "variant-digital",
+        "variant-physical"
+      ],
+      "baseline_asset_id": "i5-m60-exterior-v1",
+      "part_catalog_version": "g60-parts-v1",
+      "status": "failed",
+      "assets": [],
+      "outcomes": [
+        {
+          "change_id": "change-dashboard",
+          "outcome": "failed",
+          "asset_ids": [],
+          "reason": "Synthetic render failed; proposal evidence remains usable."
+        },
+        {
+          "change_id": "change-physical",
+          "outcome": "failed",
+          "asset_ids": [],
+          "reason": "Synthetic render failed; proposal evidence remains usable."
+        }
+      ],
+      "stale": false,
+      "failure_reason": "Synthetic renderer failure; no generated image or geometry exists.",
+      "job_id": null
+    },
+    "late": {
+      "render_request_id": "render-synthetic-fixture-v1",
+      "proposal_set_version": 1,
+      "variant_ids": [
+        "variant-digital"
+      ],
+      "baseline_asset_id": "i5-m60-exterior-v1",
+      "part_catalog_version": "g60-parts-v1",
+      "status": "partial",
+      "assets": [
+        {
+          "asset_id": "synthetic-static-annotation-v1-variant-digital",
+          "url": "/vehicles/frontend-render-annotation.svg",
+          "media_type": "image/svg+xml"
+        }
+      ],
+      "outcomes": [
+        {
+          "change_id": "change-dashboard",
+          "outcome": "annotated",
+          "asset_ids": [
+            "synthetic-static-annotation-v1-variant-digital"
+          ],
+          "reason": "Annotation only. Static synthetic annotation reference only. Requested edit text, new geometry, exact trim, physical preservation and generated imagery are not visualized or verified."
+        }
+      ],
+      "stale": true,
+      "failure_reason": null,
+      "job_id": null
+    }
+  }
+}

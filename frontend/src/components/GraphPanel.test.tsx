@@ -1,0 +1,86 @@
+import {cleanup,render,screen,within} from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import {afterEach,expect,it,vi} from "vitest";
+import GraphPanel from "./GraphPanel";
+import {findings,graph,proposals,evidence} from "../api/fixtures";
+import type {Api,Workspace} from "../api/contracts";
+import * as normalize from "../api/normalize";
+afterEach(cleanup);
+const workspace={findings,graph,proposals,research:[],history:[],checkpoint:null} as unknown as Workspace;
+it("progressively exposes large graphs and searches stable identities without arbitrary navigation",async()=>{
+ const user=userEvent.setup();const onSelect=vi.fn();
+ const large={...workspace,graph:normalize.graph({revision:3,nodes:Array.from({length:45},(_,i)=>({id:`unknown-${i}`,entity_type:"unknown",revision:1})),edges:[]})};
+ render(<GraphPanel workspace={large} onSelect={onSelect}/>);
+ expect(screen.getAllByRole("button",{name:/Inspect unknown/})).toHaveLength(20);
+ await user.click(screen.getByRole("button",{name:/Show more nodes/}));
+ expect(screen.getAllByRole("button",{name:/Inspect unknown/})).toHaveLength(40);
+ await user.type(screen.getByLabelText("Search graph"),"unknown-44");
+ await user.click(screen.getByRole("button",{name:/Inspect unknown unknown-44/}));
+ expect(screen.getByText(/No verified finding association/)).toBeInTheDocument();
+ expect(onSelect).not.toHaveBeenCalled();
+});
+it("shows all candidate findings for ambiguous part nodes and keeps node selection through updates",async()=>{
+ const user=userEvent.setup();const onSelect=vi.fn();
+ const second={...findings[0],finding_id:"other-finding",title:"Other concern"};
+ const w={...workspace,findings:[findings[0],second],graph:normalize.graph({revision:2,nodes:[{id:findings[0].part_ids[0],entity_type:"part",revision:1}],edges:[]})};
+ const {rerender}=render(<GraphPanel workspace={w} onSelect={onSelect}/>);
+ await user.click(screen.getByRole("button",{name:/Inspect part/}));
+ expect(screen.getByText(/Multiple findings/)).toBeInTheDocument();
+ expect(onSelect).not.toHaveBeenCalled();
+ await user.click(screen.getByRole("button",{name:`Open finding Other concern`}));expect(onSelect).toHaveBeenCalledWith("other-finding");
+ rerender(<GraphPanel workspace={{...w,graph:{...w.graph,revision:3,nodes:[...w.graph.nodes].reverse()}}} onSelect={onSelect}/>);
+ expect(screen.getByRole("region",{name:"Selected graph entity"})).toHaveTextContent(findings[0].part_ids[0]);
+});
+it("opens exact relationship citations and filters types without losing selected detail",async()=>{
+ const user=userEvent.setup();const open=vi.fn();
+ const w={...workspace,graph:normalize.graph({revision:1,nodes:[{id:findings[0].finding_id,entity_type:"finding",revision:1},{id:evidence[0].evidence_id,entity_type:"evidence",revision:1}],edges:[{edge_id:"support-edge",from_id:evidence[0].evidence_id,to_id:findings[0].finding_id,relationship:"support",evidence_ids:[evidence[0].evidence_id]}]})};
+ const api={request:async()=>evidence[0]} as unknown as Api;
+ render(<GraphPanel workspace={w} onSelect={()=>{}} api={api} runId="r" onOpen={open}/>);
+ await user.click(screen.getByRole("button",{name:/Inspect finding/}));
+ await user.selectOptions(screen.getByLabelText("Node type"),"evidence");
+ expect(screen.getByRole("region",{name:"Selected graph entity"})).toHaveTextContent(findings[0].title);
+ await user.click(screen.getByRole("button",{name:"Inspect relationship support-edge"}));
+ const citations=screen.getByRole("region",{name:"Relationship citations"});
+ await user.click(await within(citations).findByRole("button",{name:`Open source ${evidence[0].evidence_id}`}));expect(open).toHaveBeenCalledWith(evidence[0]);
+});
+it("resolves evidence and requirement nodes from stable IDs instead of node position",async()=>{
+ const user=userEvent.setup();const select=vi.fn();const change=proposals.variants[0].changes[0];
+ const w={...workspace,graph:normalize.graph({revision:1,nodes:[{id:evidence[0].evidence_id,entity_type:"evidence",revision:1},{id:change.wire!.requirement_id,entity_type:"requirement",revision:1}],edges:[]})};
+ render(<GraphPanel workspace={w} onSelect={select}/>);
+ await user.click(screen.getByRole("button",{name:/Inspect evidence/}));
+ await user.click(screen.getByRole("button",{name:`Open finding ${findings[0].title}`}));expect(select).toHaveBeenLastCalledWith(findings[0].finding_id);
+ await user.click(screen.getByRole("button",{name:/Inspect requirement/}));
+ expect(screen.getByRole("region",{name:"Selected graph entity"})).toHaveTextContent(change.after);
+ await user.click(screen.getByRole("button",{name:`Open finding ${findings[0].title}`}));expect(select).toHaveBeenLastCalledWith(findings[0].finding_id);
+});
+it("keeps removed selection explicit rather than showing unrelated entity after refresh",async()=>{
+ const user=userEvent.setup();const w={...workspace,graph:normalize.graph({revision:1,nodes:[{id:findings[0].finding_id,entity_type:"finding",revision:1}],edges:[]})};
+ const {rerender}=render(<GraphPanel workspace={w} onSelect={()=>{}}/>);
+ await user.click(screen.getByRole("button",{name:/Inspect finding/}));
+ rerender(<GraphPanel workspace={{...w,graph:normalize.graph({revision:2,nodes:[],edges:[]})}} onSelect={()=>{}}/>);
+ expect(screen.getByRole("region",{name:"Selected graph entity"})).toHaveTextContent(/no longer present/);
+ expect(screen.queryByRole("button",{name:/Open finding/})).not.toBeInTheDocument();
+});
+it("navigates relationship endpoints with keyboard while preserving graph filters",async()=>{
+ const user=userEvent.setup();
+ const w={...workspace,graph:normalize.graph({revision:1,nodes:[{id:findings[0].finding_id,entity_type:"finding",revision:1},{id:evidence[0].evidence_id,entity_type:"evidence",revision:1}],edges:[{edge_id:"edge-keyboard",from_id:evidence[0].evidence_id,to_id:findings[0].finding_id,relationship:"support",evidence_ids:[evidence[0].evidence_id]}]})};
+ render(<GraphPanel workspace={w} onSelect={()=>{}}/>);
+ await user.click(screen.getByRole("button",{name:/Inspect finding/}));
+ await user.selectOptions(screen.getByLabelText("Node type"),"finding");
+ const endpoint=screen.getByRole("button",{name:`Inspect endpoint ${evidence[0].evidence_id}`});endpoint.focus();await user.keyboard("{Enter}");
+ expect(screen.getByRole("region",{name:"Selected graph entity"})).toHaveTextContent(`evidence / ${evidence[0].evidence_id}`);
+ expect(screen.getByLabelText("Node type")).toHaveValue("finding");
+});
+
+it.each(['endpoint','relationship'])('retains keyboard destination when a focused %s control disappears with its relationship',async(kind)=>{
+ const user=userEvent.setup();const w={...workspace,graph:normalize.graph({revision:1,nodes:[{id:'from',entity_type:'part',revision:1},{id:'to',entity_type:'part',revision:1}],edges:[{edge_id:'edge-opaque',from_id:'from',to_id:'to',relationship:'mention',evidence_ids:[]}]})};
+ const {rerender}=render(<GraphPanel workspace={w} onSelect={()=>{}}/>);
+ const control=screen.getByRole('button',{name:kind==='endpoint'?'Inspect endpoint from':'Inspect relationship edge-opaque'});control.focus();await user.keyboard('{Enter}');expect(control).toHaveFocus();
+ rerender(<GraphPanel workspace={{...w,graph:{...w.graph,revision:2,edges:[]}}} onSelect={()=>{}}/>);
+ expect(document.activeElement?.tagName).toMatch(/^H[23]$/);
+ if(kind==='relationship')expect(screen.getByRole('region',{name:'Relationship citations'})).toHaveTextContent('edge-opaque');
+});
+it('does not steal focus from graph search when a previously selected relationship disappears',async()=>{
+ const user=userEvent.setup();const {rerender}=render(<GraphPanel workspace={workspace} onSelect={()=>{}}/>);
+ await user.click(screen.getByRole('button',{name:`Inspect relationship ${workspace.graph.edges[0].edge_id}`}));const search=screen.getByRole('textbox',{name:'Search graph'});search.focus();rerender(<GraphPanel workspace={{...workspace,graph:{...workspace.graph,edges:[]}}} onSelect={()=>{}}/>);expect(search).toHaveFocus();
+});

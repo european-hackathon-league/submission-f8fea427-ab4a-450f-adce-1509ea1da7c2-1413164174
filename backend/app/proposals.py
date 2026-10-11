@@ -90,6 +90,7 @@ def validated_draft(
         }
         for bundle in bundles
     }
+    baselines = (get_stage(run_id, generation, "baselines") or {}).get("items", {})
     change_ids: dict[str, str] = {}
     requirement_ids: dict[str, str] = {}
     for index, change in enumerate(draft.changes):
@@ -118,11 +119,27 @@ def validated_draft(
                 "positive feedback in supporting_evidence_ids, even when the finding "
                 "lists it as opposing evidence"
             )
+        documents = {
+            identifier
+            for finding in related
+            for identifier in [
+                *(
+                    claim["evidence_id"]
+                    for claim in baselines.get(finding.finding_id, {}).get("claims", [])
+                ),
+                *baselines.get(finding.finding_id, {}).get("context_evidence_ids", []),
+            ]
+            if identifier in evidence_scopes
+        }
         if (
-            not set(change.supporting_evidence_ids) <= support
-            or not set(change.opposing_evidence_ids) <= oppose
+            not set(change.supporting_evidence_ids) <= support | documents
+            or not set(change.opposing_evidence_ids) <= oppose | documents
         ):
             raise ValueError("Draft citations are outside supported finding evidence")
+        if not set(change.supporting_evidence_ids) & support:
+            raise ValueError(
+                "Draft change requires related customer or research supporting evidence"
+            )
         if (
             not set(change.part_ids) <= parts
             or not set(change.scope.cohort_ids) <= cohorts

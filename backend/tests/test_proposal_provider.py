@@ -7,6 +7,85 @@ from app import wire as w
 from app.proposals import Draft, validated_draft
 
 
+@pytest.mark.parametrize("role", ["claim", "context"])
+def test_assessed_documents_supplement_customer_citations_without_expanding_scope(
+    client, role
+):
+    from sqlalchemy import select
+    from test_ingestion_cache import feedback, frozen_run
+
+    from app.artifacts import put_stage
+    from app.db import EvidenceArtifact, RunEvidence, Session
+    from app.ingest_types import ParsedPassage, ParseResult
+    from app.ingestion import publish_batch
+
+    run_id, generation, version, binding = frozen_run(client)
+    publish_batch(run_id, generation, version, feedback(binding), batch="feedback")
+    publish_batch(
+        run_id,
+        generation,
+        version,
+        ParseResult(
+            kind="equipment",
+            parser_revision=binding["parser_revision"],
+            passages=[
+                ParsedPassage(
+                    source_kind="equipment" if role == "claim" else "strategy",
+                    text="Synthetic document context",
+                    locator=w.PDFLocator(page=1),
+                    scope=w.Scope(markets=["CN"]),
+                )
+            ],
+        ),
+        batch="document",
+    )
+    with Session() as session:
+        artifacts = session.scalars(
+            select(EvidenceArtifact)
+            .join(RunEvidence, RunEvidence.evidence_id == EvidenceArtifact.id)
+            .where(RunEvidence.run_id == run_id)
+        ).all()
+        customer = next(item for item in artifacts if item.source_kind == "feedback")
+        document = next(item for item in artifacts if item.source_kind != "feedback")
+        row = observation(customer.id, customer.record_id)
+        row.update(quote=customer.excerpt, scope=customer.scope)
+        document_id = document.id
+    finding = w.Finding.model_validate(aggregate([row], [], run_id)["findings"][0])
+    assessment = {
+        "claims": [{"evidence_id": document_id}] if role == "claim" else [],
+        "context_evidence_ids": [document_id] if role == "context" else [],
+    }
+    put_stage(
+        run_id, generation, "baselines", {"items": {finding.finding_id: assessment}}
+    )
+    change = sample().changes[0].model_dump()
+    change.update(
+        finding_ids=[finding.finding_id],
+        supporting_evidence_ids=[row["evidence_id"], document_id],
+        scope=w.Scope(markets=["DE"]).model_dump(),
+    )
+
+    def validate(**updates):
+        return validated_draft(
+            Draft.model_validate({"changes": [change | updates], "gaps": []}),
+            [finding],
+            [],
+            run_id,
+            generation,
+        )
+
+    assert (
+        validate().changes[0].supporting_evidence_ids
+        == change["supporting_evidence_ids"]
+    )
+    with pytest.raises(ValueError, match="supporting evidence"):
+        validate(supporting_evidence_ids=[document_id])
+    with pytest.raises(ValueError, match="outside supported finding evidence"):
+        validate(supporting_evidence_ids=[row["evidence_id"], "unassessed-document"])
+    with pytest.raises(ValueError, match="scope is not established"):
+        validate(scope=w.Scope(markets=["CN"]).model_dump())
+
+
 def test_proposal_schema_only_contains_closed_objects_with_required_properties():
     def check(value):
         if isinstance(value, dict):

@@ -16,7 +16,7 @@ from app.ingest_types import CoverageIssue, ParsedPassage, ParseResult
 from app.parser_models import ModelArtifactsUnavailable, verify_artifacts
 from app.wire import PDFLocator, Scope
 
-PARSER_REVISION = "docling-pdf-v4"
+PARSER_REVISION = "docling-pdf-v5"
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 PDFKind = Literal["equipment", "strategy"]
 
@@ -465,7 +465,17 @@ def normalize_document(
                         locator=table_locator,
                     )
                 )
-            condition_ids = re.findall(r"\b(\d+)\)|(?<!\d)([¹²³⁴⁵⁶⁷⁸⁹])", description)
+            # Scan a copy: model labels and explicit page citations are prose,
+            # even when their final digits resemble flattened note markers.
+            reference_text = re.sub(
+                r"\bi[1-9]\b|\b(?:Seiten?|pages?)\s+\d+(?:\s*[-–]\s*\d+)?\)?",
+                "",
+                description,
+                flags=re.IGNORECASE,
+            )
+            condition_ids = re.findall(
+                r"\b(\d+)\)|(?<!\d)([¹²³⁴⁵⁶⁷⁸⁹])", reference_text
+            )
             superscripts = str.maketrans("¹²³⁴⁵⁶⁷⁸⁹", "123456789")
             condition_ids = [
                 number or superscript.translate(superscripts)
@@ -476,7 +486,7 @@ def normalize_document(
                 word_final or isolated
                 for word_final, isolated in re.findall(
                     r"(?<=[^\W\d])([1-9])(?=\s|$)|(?<=\s)([1-9])(?=\s*(?:\n|$))",
-                    description,
+                    reference_text,
                 )
             )
             condition_ids = list(dict.fromkeys(condition_ids))

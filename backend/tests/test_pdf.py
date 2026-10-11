@@ -4,6 +4,39 @@ import json
 import pytest
 
 
+@pytest.mark.parametrize(
+    ("description", "references"),
+    [
+        ("Für BMW i5 eDrive40, i5 xDrive40, i5 M60 xDrive", []),
+        ("Professional, weitere Informationen siehe Seite 17)", []),
+        ("Komfortsitze (siehe Seite 17)", []),
+        ("Sitzkomfort1 für BMW i5 M60 xDrive", ["1"]),
+        ("Sitzkomfort¹ für BMW i5 M60 xDrive", ["1"]),
+        ("Sitzkomfort 1) (siehe Seite 17)", ["1"]),
+        ("Sitzkomfort für BMW i5\n1", ["1"]),
+    ],
+)
+def test_model_names_and_page_references_are_not_equipment_footnotes(
+    description, references
+):
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    document["tables"][0]["data"]["table_cells"][5]["text"] = description
+    result = normalize_document(document, "equipment")
+    option = next(
+        p
+        for p in result.passages
+        if p.attributes.get("option_code") == "4ZZ"
+        and p.attributes.get("model_column") == "520i"
+    )
+    assert description in option.text
+    assert option.attributes["footnote_references"] == references
+    assert option.attributes["availability"] == "standard"
+    assert len(option.attributes["conditions"]) == len(references)
+
+
 def test_equipment_descriptions_follow_source_positions_not_merged_docling_rows():
     from app.pdf import normalize_document
     from tests.fixtures.pdf import equipment_document

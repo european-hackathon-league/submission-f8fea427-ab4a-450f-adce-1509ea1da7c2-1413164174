@@ -1,7 +1,16 @@
-import { fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { expect, it, vi } from "vitest";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { afterEach, expect, it, vi } from "vitest";
 import WorkspaceGeometry from "./WorkspaceGeometry";
+afterEach(cleanup);
 vi.mock("./GeometryViewer", () => ({ default: ({ attribution }: { attribution: React.ReactNode }) => <div>Verified model{attribution}</div> }));
+it("loads the selected vehicle's verified model before a run is created", async () => {
+  const request = vi.fn().mockResolvedValue({ contract_version: "1", units: "m", asset_id: "i5-m60-exterior-v1", baseline_asset_id: "i5-m60-exterior-v1", part_catalog_version: "v2", baseline_url: "/api/v1/vehicles/g60-i5-m60/geometry/asset", parts: [] });
+  const vehicle = { vehicle_id: "g60-i5-m60", baseline_asset_id: "i5-m60-exterior-v1", part_catalog_version: "v2" };
+  render(<WorkspaceGeometry api={{ request } as never} vehicle={vehicle as never} workspace={null} tags onSelect={() => {}}>Hosted reference</WorkspaceGeometry>);
+  await waitFor(() => expect(screen.getByText(/Verified model/)).toBeVisible());
+  expect(request).toHaveBeenCalledWith("/vehicles/g60-i5-m60/geometry", undefined, undefined, expect.any(AbortSignal));
+  expect(screen.queryByText("Hosted reference")).not.toBeInTheDocument();
+});
 it("keeps the reference visible when no editable geometry is configured", async () => {
   const request = vi.fn().mockRejectedValue(new Error("Not configured"));
   render(<WorkspaceGeometry api={{ request } as never} workspace={{ snapshot: { run_id: "run", config: { baseline_asset_id: "baseline", part_catalog_version: "v2" }, resource_links: { geometry: "/runs/run/geometry" } }, findings: [] } as never} tags onSelect={() => {}}>Vehicle reference</WorkspaceGeometry>);

@@ -1043,7 +1043,7 @@ function WorkspaceApp({
                     </div>
                   }
                 >
-                  <WorkspaceGeometry key={JSON.stringify([api.sessionNamespace ?? api.mode, workspace?.snapshot.run_id])} api={api} workspace={workspace} tags={heatmap} onSelect={selectPart} onFinding={id => { const finding = workspace?.findings.find(item => item.finding_id === id); if (finding) { setReviewChange(null); selectFinding(finding); setTab("Evidence"); } }}>
+                  <WorkspaceGeometry key={JSON.stringify([api.sessionNamespace ?? api.mode, workspace?.snapshot.run_id])} api={api} vehicle={vehicle} workspace={workspace} tags={heatmap} onSelect={selectPart} onFinding={id => { const finding = workspace?.findings.find(item => item.finding_id === id); if (finding) { setReviewChange(null); selectFinding(finding); setTab("Evidence"); } }}>
                   {baselineAvailable ? <VehicleViewer
                     className="bmw-asset-viewer--compact"
                     selectedComponent={selectedComponent}

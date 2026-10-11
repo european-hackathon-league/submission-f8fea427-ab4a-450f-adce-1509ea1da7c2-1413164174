@@ -473,7 +473,7 @@ export function createRealApi(
   const assetAddress = (value: string): URL | null => {
     try {
       const address = new URL(value, apiUrl.origin);
-      const prefix = `${apiUrl.pathname.replace(/\/$/, "")}/runs/`;
+      const prefix = `${apiUrl.pathname.replace(/\/$/, "")}/`;
       if (
         address.origin !== apiUrl.origin ||
         address.username ||
@@ -484,7 +484,7 @@ export function createRealApi(
       )
         return null;
       const suffix = address.pathname.slice(prefix.length);
-      return /^[^/]+\/(?:renders\/[^/]+\/assets\/[^/]+|exports\/[^/]+\/download|geometry\/asset)$/.test(
+      return /^(?:runs\/[^/]+\/(?:renders\/[^/]+\/assets\/[^/]+|exports\/[^/]+\/download|geometry\/asset)|vehicles\/[^/]+\/geometry\/asset)$/.test(
         suffix,
       )
         ? address

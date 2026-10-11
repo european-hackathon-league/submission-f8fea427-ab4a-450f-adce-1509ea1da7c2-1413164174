@@ -18,7 +18,7 @@ from app.config import Settings
 from app.db import EvidenceArtifact, Run, RunEvidence, Session
 from app.ingestion import stable_id
 
-PROMPT_REVISION = "findings-v5"
+PROMPT_REVISION = "findings-v6"
 SCALE_ID = "negative-share-v1"
 MAX_BATCH_CHARACTERS = 40000
 MAX_TOPICS = 200
@@ -89,9 +89,19 @@ class NeedAssessment(w.Wire):
     need_kind: Literal[
         "capability", "usability", "offering", "service", "possible_defect"
     ]
-    baseline_claims: list[BaselineClaim] = Field(max_length=20)
-    preserve_strengths: list[str] = Field(max_length=20)
-    inference: str = Field(min_length=1, max_length=1500)
+    baseline_claims: list[BaselineClaim] = Field(
+        max_length=20,
+        description="Only supplied equipment evidence IDs with exact original quotes and parsed availability. Feedback and studies establish experience/context, not equipment claims; use an empty list when no relevant equipment evidence exists.",
+    )
+    preserve_strengths: list[str] = Field(
+        max_length=20,
+        description="Source-supported strengths relevant to this finding only; exclude unrelated praise from the same feedback record.",
+    )
+    inference: str = Field(
+        min_length=1,
+        max_length=1500,
+        description="Distinguish reported facts from interpretation. Qualify every inferred need, preservation priority or classification in this text itself (e.g. may suggest), not only in uncertainty. Praise is not an explicit request; ambiguous feedback can establish no specific need.",
+    )
     basis_evidence_ids: list[str] = Field(min_length=1, max_length=100)
     uncertainty: list[str] = Field(min_length=1, max_length=20)
     future_assumptions: list[str] = Field(max_length=20)
@@ -864,17 +874,24 @@ def establish_baselines(args: list[str]) -> str:
             "attempts": [],
         }
         if settings.openai_api_key.get_secret_value():
+            previous_assessment = None
             for attempt in range(2):
                 try:
                     assessed, outcome = _call(
                         NeedAssessment,
-                        "Establish the customer's underlying need and relevant current baseline using only supplied evidence. Preserve positive strengths. Separate capability, usability, offering and service issues from isolated possible defects; a single complaint is not a population-wide need. Equipment establishes availability, feedback reports experience, studies provide scoped aggregate context, and sales/strategy provide broader context; never combine incompatible metrics into corroboration or respondents. Select only relevant equipment claims with exact quotes; availability cannot be stronger than parsed source availability. Missing information is unknown, never absent. Do not launch competitor research. Name the basis and uncertainty of every inference. Future assumptions must be explicit assumptions for the configured planning horizon. Do not claim US availability from a German source. Repair previously recorded validation objections.",
+                        "Establish the customer's underlying need and relevant current baseline using only supplied evidence. Preserve positive strengths relevant to this finding; exclude unrelated strengths from the same record. Mark inferred needs, preservation priorities and classifications explicitly tentative in the inference itself, not only the uncertainty list: praise may suggest preservation but is not an explicit request. Ambiguous feedback can establish no specific need. Separate capability, usability, offering and service issues from isolated possible defects; a single complaint is not a population-wide need. Equipment establishes availability, feedback reports experience, studies provide scoped aggregate context, and sales/strategy provide broader context; never combine incompatible metrics into corroboration or respondents. If using study ratings, account for all supplied relevant rating categories, including positive and negative counterevidence, retaining scope and unknown sample-size/denominator caveats without transferring unrelated metrics. Select only relevant equipment claims from claim_evidence_ids with exact original quotes; availability cannot be stronger than parsed source availability. Missing information is unknown, never absent. Do not launch competitor research. Name the basis and uncertainty of every inference. Future assumptions must be explicit assumptions for the configured planning horizon. Do not claim US availability from a German source. The finding is immutable: positive feedback opposes a negative-state improvement in its evidence-link contract, yet can support preserving a strength; never reinterpret its link label as negative sentiment or request changing its links. Repair all previously recorded validation objections in the previous assessment while retaining its supported content.",
                         {
                             "finding": finding,
                             "evidence": supplied,
                             "target_scope": config,
                             "reference_year": policy["reference_year"],
                             "planning_horizon": policy["planning_horizon"],
+                            "claim_evidence_ids": [
+                                item["evidence_id"]
+                                for item in supplied
+                                if item["source_kind"] == "equipment"
+                            ],
+                            "previous_assessment": previous_assessment,
                             "previous_objections": [
                                 objection
                                 for recorded in saved["attempts"]
@@ -883,13 +900,16 @@ def establish_baselines(args: list[str]) -> str:
                         },
                         policy,
                     )
+                    previous_assessment = assessed.model_dump(mode="json")
                     saved["attempts"].append({"attempt": attempt + 1, **outcome})
                     supplied_ids = {item["evidence_id"] for item in supplied}
                     if (
                         assessed.finding_id != identifier
                         or not set(assessed.basis_evidence_ids) <= supplied_ids
                     ):
-                        raise ValueError("invalid_baseline_basis")
+                        raise ValueError(
+                            f"invalid_baseline_basis:{identifier}:returned_finding={assessed.finding_id}:unsupported_evidence={sorted(set(assessed.basis_evidence_ids) - supplied_ids)}; use the supplied finding ID and evidence IDs only"
+                        )
                     claims = []
                     for claim in assessed.baseline_claims:
                         source_item = by_id.get(claim.evidence_id)
@@ -900,7 +920,9 @@ def establish_baselines(args: list[str]) -> str:
                             or not claim.quote.strip()
                             or claim.quote not in source_item["excerpt"]
                         ):
-                            raise ValueError("unsupported_baseline_claim")
+                            raise ValueError(
+                                f"unsupported_baseline_claim:{identifier}:{claim.evidence_id}; use only supplied claim_evidence_ids of source_kind equipment and an exact quote from that source excerpt; feedback/study context belongs in inference and basis_evidence_ids, not baseline_claims; omit unsupported claims"
+                            )
                         parsed_availability = source_item["details"].get(
                             "availability", "unknown"
                         )
@@ -908,7 +930,9 @@ def establish_baselines(args: list[str]) -> str:
                             claim.availability != "unknown"
                             and claim.availability != parsed_availability
                         ):
-                            raise ValueError("unsupported_availability")
+                            raise ValueError(
+                                f"unsupported_availability:{identifier}:{claim.evidence_id}:claimed={claim.availability}:parsed={parsed_availability}; use parsed availability or unknown; applicability and scope limitations remain separate"
+                            )
                         applicable, limitations = applicability(
                             w.Scope.model_validate(source_item["scope"]),
                             config,
@@ -951,7 +975,7 @@ def establish_baselines(args: list[str]) -> str:
                         )
                     semantic, review_outcome = _call(
                         Review,
-                        "Validate relevance of all baseline claims and customer-need classification against the source. Reject inferred absence, incorrect population generalization, fabricated capabilities or strengths, missing counterevidence, unsupported translations, and inferences whose basis does not support them. Every inference must remain explicitly uncertain. Future statements must be assumptions for the configured horizon, not present facts.",
+                        "Validate only the candidate assessment against supplied sources; the finding and its evidence links are immutable input. In that contract positive feedback opposes a negative-state improvement and can still support preservation; do not require moving its IDs between supporting/opposing lists or treat link labels as sentiment. Reject inferred absence, incorrect population generalization, fabricated capabilities or strengths, missing relevant counterevidence, unsupported translations, and inferences whose basis does not support them. Every inferred need, preservation priority and classification must be explicitly tentative in the inference itself, not just an uncertainty list. No specific need can be established from ambiguous feedback; positive praise can tentatively motivate preservation without proving an explicit request. Strengths must be relevant to this finding, not unrelated praise in the same source. When study context is used, account for supplied relevant positive and negative rating categories and their scope/sample-size caveats; do not require unrelated measures or unsupplied evidence. Future statements must be assumptions for the configured horizon, not present facts. Give specific, jointly actionable objections to the assessment's editable fields, preserving source-supported content.",
                         {
                             "finding": finding,
                             "evidence": supplied,
@@ -1016,18 +1040,23 @@ def establish_baselines(args: list[str]) -> str:
                         )
                     break
                 except (OpenAIError, ValidationError, ValueError) as error:
+                    code = (
+                        str(error)
+                        if type(error) is ValueError
+                        else type(error).__name__
+                    )
                     saved["attempts"].append(
                         {
                             "attempt": attempt + 1,
-                            "code": str(error)
-                            if type(error) is ValueError
-                            else type(error).__name__,
+                            "code": code,
+                            "objections": [code],
                         }
                     )
             else:
                 saved["uncertainty"].append("baseline_provider_validation_failed")
         else:
             saved["uncertainty"].append("ai_credentials_unavailable")
+        saved["uncertainty"] = list(dict.fromkeys(saved["uncertainty"]))
         put_stage(run_id, generation, checkpoint, saved)
         published = get_stage(run_id, generation, checkpoint)
         if published is None:

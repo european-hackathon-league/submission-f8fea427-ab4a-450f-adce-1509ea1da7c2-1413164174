@@ -404,8 +404,15 @@ def test_existing_stage_returns_persisted_status_and_stale_generation_stops(
     assert stage(["synthetic-run", "synthetic-generation"]) == "superseded"
 
 
-def test_baseline_review_sees_operator_target_separately_from_source_scope(monkeypatch):
+@pytest.mark.parametrize(
+    "failure", [None, "source_kind", "quote", "availability", "basis", "provider"]
+)
+@pytest.mark.parametrize("sentiment", ["negative", "positive"])
+def test_baseline_review_sees_operator_target_and_repairs_invalid_claims(
+    monkeypatch, failure, sentiment
+):
     row = observation("one", "respondent", cohorts=["GB"])
+    row["sentiment"] = sentiment
     row["scope"] = w.Scope(markets=["GB"], cohort_ids=["GB"]).model_dump()
     findings = aggregate([row], [], "synthetic-run")
     config = {"vehicle_id": "vehicle_demo", "market_context": ["DE"]}
@@ -415,8 +422,23 @@ def test_baseline_review_sees_operator_target_separately_from_source_scope(monke
             "source_kind": "feedback",
             "excerpt": row["quote"],
             "scope": row["scope"],
-        }
+        },
+        {
+            "evidence_id": "equipment",
+            "source_kind": "equipment",
+            "excerpt": "Seat comfort package",
+            "scope": w.Scope(
+                vehicle_ids=["vehicle_demo"], markets=["GB"], year=2026
+            ).model_dump(),
+            "details": {"availability": "optional"},
+            "limitations": [],
+        },
     ]
+    if failure == "provider":
+        evidence.extend(
+            {"evidence_id": str(index), "source_kind": "study", "excerpt": "x" * 40001}
+            for index in range(2)
+        )
     stages = {"findings": findings}
     calls = []
     monkeypatch.setenv("OPENAI_API_KEY", "synthetic-controlled-test")
@@ -444,16 +466,56 @@ def test_baseline_review_sees_operator_target_separately_from_source_scope(monke
         assert data["target_scope"] == config
         assert data["finding"]["cohort_ids"] == ["GB"]
         if schema is module.NeedAssessment:
+            if sentiment == "positive":
+                assert "inference itself" in instructions
+                assert "all supplied relevant rating categories" in instructions
+                assert "unrelated strengths" in instructions
+            if failure == "provider":
+                raise ValueError("Provider validation could not be repaired")
+            invalid = failure and calls.count(schema) == 1
+            if failure and not invalid:
+                assert data["previous_objections"]
+                objection = " ".join(data["previous_objections"])
+                assert findings["findings"][0]["finding_id"] in objection
+                assert (
+                    "one" in objection
+                    if failure == "source_kind"
+                    else "equipment" in objection
+                )
+                assert data["claim_evidence_ids"] == ["equipment"]
+                assert data["previous_assessment"]
             return module.NeedAssessment(
                 finding_id=findings["findings"][0]["finding_id"],
                 need_kind="usability",
-                baseline_claims=[],
+                baseline_claims=[
+                    module.BaselineClaim(
+                        evidence_id="one"
+                        if invalid and failure == "source_kind"
+                        else "equipment",
+                        quote="Fabricated"
+                        if invalid and failure == "quote"
+                        else "Seat comfort",
+                        availability="standard"
+                        if invalid and failure == "availability"
+                        else "optional",
+                        behavior="Seat comfort package availability",
+                    )
+                ]
+                if failure
+                else [],
                 preserve_strengths=[],
                 inference="Feedback may suggest a need for seat comfort.",
-                basis_evidence_ids=["one"],
+                basis_evidence_ids=["equipment-outside-input"]
+                if invalid and failure == "basis"
+                else ["one"],
                 uncertainty=["GB feedback does not establish DE applicability"],
                 future_assumptions=[],
             ), {}
+        if sentiment == "positive":
+            assert data["finding"]["supporting_evidence_ids"] == []
+            assert data["finding"]["opposing_evidence_ids"] == ["one"]
+            assert "immutable" in instructions
+            assert "positive feedback opposes" in instructions
         return module.Review(accepted=True, objections=[]), {}
 
     monkeypatch.setattr(module, "_call", call)
@@ -461,10 +523,27 @@ def test_baseline_review_sees_operator_target_separately_from_source_scope(monke
         module.establish_baselines(["synthetic-run", "synthetic-generation"])
         == "partial"
     )
-    assert calls == [module.NeedAssessment, module.Review]
+    assert calls == (
+        [module.NeedAssessment, module.NeedAssessment]
+        if failure == "provider"
+        else [module.NeedAssessment, module.NeedAssessment, module.Review]
+        if failure
+        else [module.NeedAssessment, module.Review]
+    )
     baseline = next(iter(stages["baselines"]["items"].values()))
     assert baseline["state"] == "unknown"
-    assert "GB feedback does not establish DE applicability" in baseline["uncertainty"]
+    assert len(baseline["uncertainty"]) == len(set(baseline["uncertainty"]))
+    if failure == "provider":
+        assert "baseline_provider_validation_failed" in baseline["uncertainty"]
+        assert baseline["uncertainty"].count("baseline_evidence_budget_limited") == 1
+    else:
+        assert (
+            "GB feedback does not establish DE applicability" in baseline["uncertainty"]
+        )
+    if failure and failure != "provider":
+        assert "baseline_provider_validation_failed" not in baseline["uncertainty"]
+        assert baseline["claims"][0]["applicability"] == "mismatch"
+        assert "market_mismatch" in baseline["claims"][0]["limitations"]
 
 
 @pytest.mark.parametrize("interrupted", [False, True])

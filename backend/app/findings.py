@@ -18,7 +18,7 @@ from app.config import Settings
 from app.db import EvidenceArtifact, Run, RunEvidence, Session
 from app.ingestion import stable_id
 
-PROMPT_REVISION = "findings-v7"
+PROMPT_REVISION = "findings-v8"
 SCALE_ID = "negative-share-v1"
 MAX_BATCH_CHARACTERS = 40000
 MAX_TOPICS = 200
@@ -452,7 +452,7 @@ def reconcile_topics(
         try:
             reconciled, outcome = _call(
                 Reconciliation,
-                "Reconcile new topics with the existing need registry. Merge only equivalent underlying customer tasks; sharing a part or broad subject is insufficient. Opposing experiences of the same task belong to one need. Emit exactly one link for each new key. Existing registry descriptions are immutable. A new topic whose key collides with a different existing need must receive a distinct new canonical key. Canonical keys may be existing keys or new stable short English keys. Include a semantic basis for each link and repair previous objections.",
+                "Reconcile new topics with the existing need registry. Merge only equivalent underlying customer tasks; sharing a part or broad subject is insufficient. Opposing experiences of the same task belong to one need. Emit exactly one link for each new key. Topic keys also index neutral product observations with explicitly unestablished needs; their canonical key is an observation label, not a customer request. Keep such observations distinct from established needs and preserve their uncertainty. The required need_kind routes the observation subject provisionally; it does not establish a customer need. Existing registry descriptions are immutable. A new topic whose key collides with a different existing need must receive a distinct new canonical key. Canonical keys may be existing keys or new stable short English keys. Include a semantic basis for each link and repair previous objections.",
                 {
                     "existing": registry,
                     "new": new_topics,
@@ -482,7 +482,7 @@ def reconcile_topics(
                     raise ValueError("cyclic_topic_reconciliation")
             reviewed, outcome = _call(
                 Review,
-                "Check every proposed topic link against both need descriptions and original source evidence. The canonical need must be supported by every source linked to it: do not narrow general praise to a specific preference or invent a need from a neutral observation. Equivalence must work both ways. Reject merging different customer tasks or splitting equivalent needs. Existing registry descriptions stay immutable; a colliding new topic may use a fresh canonical key to preserve its distinct need. Positive and negative experiences of the same task must retain the same need. Each stated basis must match the supplied descriptions.",
+                "Check every proposed topic link against both need descriptions and original source evidence. Respect the mandatory topic index and required need_kind routing fields: neutral product observations may retain a distinct canonical label while explicitly stating that no customer need is established. That label and provisional routing classification do not assert a need; do not demand removing mandatory links or categories. Neutral observations with unestablished needs must not merge into established customer needs. The canonical description must be supported by every source linked to it: do not narrow general praise to a specific preference or invent a need from a neutral observation. Equivalence must work both ways. Reject merging different customer tasks or splitting equivalent needs. Existing registry descriptions stay immutable; a colliding new topic may use a fresh canonical key to preserve its distinct need. Positive and negative experiences of the same task must retain the same need. Each stated basis must match the supplied descriptions.",
                 {
                     "existing": registry,
                     "new": new_topics,
@@ -591,7 +591,7 @@ def extract_findings(args: list[str]) -> str:
                     try:
                         extracted, outcome = _call(
                             Extraction,
-                            "Extract every distinct product observation, including positive strengths and contradictions, from each feedback annotation. Split multiple customer tasks into separate observations. Translate the need/title to English but quote exact original text, including German. Use catalog IDs only; VFC classification is a hint, never proof of a physical part. Keep unmapped/vehicle-wide topics without inventing a part. Distinguish isolated possible defects, service/offering, capabilities and usability. Every evidence ID must have observations or an explicit disposition. Use stable short English topic keys for the underlying need, not its sentiment. Repair any previous validation objections.",
+                            "Extract every distinct product observation, including positive strengths and contradictions, from each feedback annotation. Split multiple customer tasks into separate observations. Translate the need/title to English but quote exact original text, including German. Use catalog IDs only; VFC classification is a hint, never proof of a physical part. Keep unmapped/vehicle-wide topics without inventing a part. Distinguish isolated possible defects, service/offering, capabilities and usability. Every evidence ID must have observations or an explicit disposition. Use stable short English topic keys for the underlying need or neutral observation subject, not its sentiment. Topic keys are mandatory indexes, not proof that a customer need exists. Keep neutral product observations with explicit no-established-need uncertainty; the mandatory need_kind routes their subject provisionally, not as a confirmed customer requirement. Never invent a desire from an unclear comparison or configuration acknowledgement. Repair any previous validation objections.",
                             {
                                 "evidence": batch,
                                 "catalog": policy["catalog"],
@@ -618,7 +618,7 @@ def extract_findings(args: list[str]) -> str:
                         )
                         reviewed, review_outcome = _call(
                             Review,
-                            "Independently check these observations against the original source evidence and catalog. Reject unsupported needs, sentiment errors, omitted product topics/positive feedback/disagreement, incorrect multilingual interpretation, and unsupported part mappings. No observation may claim scope not in its source. Do not count hypothetical absence of a praised existing feature as an actual negative experience. Acknowledging support instructions does not establish successful feature operation or defect resolution. Dispositions must be justified. Accept only if the complete batch is faithfully represented.",
+                            "Independently check these observations against the original source evidence and catalog. Reject unsupported needs, sentiment errors, omitted product topics/positive feedback/disagreement, incorrect multilingual interpretation, and unsupported part mappings. No observation may claim scope not in its source. Neutral product observations with explicit no-established-need uncertainty are valid. Their mandatory topic_key and need_kind are observation indexing and provisional routing, not assertions of a customer request; do not demand removing these required fields or inventing a need to populate them. Reject any actual unsupported desire or confirmed requirement, and keep ambiguous observations separate from established customer needs. Do not count hypothetical absence of a praised existing feature as an actual negative experience. Acknowledging support instructions does not establish successful feature operation or defect resolution. Dispositions must be justified. Accept only if the complete batch is faithfully represented.",
                             {
                                 "evidence": batch,
                                 "catalog": policy["catalog"],

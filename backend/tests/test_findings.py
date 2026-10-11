@@ -404,6 +404,93 @@ def test_baseline_inference_accepts_complete_scoped_context_but_remains_bounded(
         module.NeedAssessment.model_validate({**payload, "inference": "x" * 3001})
 
 
+@pytest.mark.parametrize(
+    "topic, quote",
+    [
+        (
+            "cornering-observation",
+            "There is a difference in cornering; comparison unclear.",
+        ),
+        (
+            "digital-key-status",
+            "The customer confirmed Digital Key was already configured.",
+        ),
+    ],
+)
+def test_neutral_topic_index_retains_an_explicitly_unestablished_need(
+    monkeypatch, topic, quote
+):
+    observation = Observation(
+        evidence_id="neutral-source",
+        quote=quote,
+        topic_key=topic,
+        title="Neutral product observation",
+        customer_need="No customer need or desired change is established by this source.",
+        sentiment="neutral",
+        need_kind="capability",
+        part_ids=[],
+        mapping_kind="unmapped",
+        mapping_rationale="The subject is retained as context without an established need or catalog part.",
+    )
+    descriptor = {
+        "title": observation.title,
+        "customer_need": observation.customer_need,
+        "need_kind": observation.need_kind,
+    }
+    registry = {
+        "established-capability": {
+            "title": "Specific requested capability",
+            "customer_need": "An explicitly requested improvement",
+            "need_kind": "capability",
+        }
+    }
+    attempts = []
+
+    def call(schema, instructions, data, policy):
+        if schema is module.Reconciliation:
+            assert data["new"][topic] == descriptor
+            return module.Reconciliation(
+                links=[
+                    module.TopicLink(
+                        topic_key=topic,
+                        canonical_key=topic,
+                        basis="Retain a distinct neutral observation index; no need is established.",
+                    )
+                ]
+            ), {}
+        assert data["candidate"][0]["customer_need"] == observation.customer_need
+        assert data["candidate"][0]["canonical_need"] == descriptor
+        assert data["candidate"][0]["topic_key"] == topic
+        accepted = (
+            "mandatory topic index" in instructions and "must not merge" in instructions
+        )
+        return module.Review(
+            accepted=accepted,
+            objections=[]
+            if accepted
+            else [
+                "Remove the neutral canonical link and mandatory need_kind classification."
+            ],
+        ), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    assert module.reconcile_topics(
+        {topic: descriptor},
+        registry,
+        [observation],
+        [{"evidence_id": "neutral-source", "excerpt": quote}],
+        {},
+        attempts,
+        1,
+    ) == {topic: topic}
+    assert observation.customer_need == descriptor["customer_need"]
+    assert (
+        registry["established-capability"]["customer_need"]
+        == "An explicitly requested improvement"
+    )
+    assert [a["phase"] for a in attempts] == ["reconciliation", "reconciliation_review"]
+
+
 def test_missing_provider_credentials_publish_explicit_failure_without_fake_findings(
     monkeypatch,
 ):

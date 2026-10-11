@@ -108,15 +108,29 @@ def retrieve(url: str, *, max_bytes: int, timeout: float) -> tuple[str, str]:
         connection = http.client.HTTPConnection(
             parsed.hostname, port, timeout=remaining
         )
-        connected = socket.create_connection(
-            (addresses[0][4][0], port), timeout=remaining
-        )
-        if parsed.scheme == "https":
-            connected = ssl.create_default_context().wrap_socket(
-                connected, server_hostname=parsed.hostname
-            )
+        connected = None
+        for index, address in enumerate(addresses):
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError("Public source connection deadline exhausted")
+            try:
+                connected = socket.create_connection(
+                    (address[4][0], port),
+                    timeout=min(5, remaining / (len(addresses) - index)),
+                )
+                break
+            except OSError:
+                continue
+        if connected is None:
+            raise OSError("Public source connection failed")
         connection.sock = connected
         try:
+            connected.settimeout(max(0.1, deadline - time.monotonic()))
+            if parsed.scheme == "https":
+                connected = ssl.create_default_context().wrap_socket(
+                    connected, server_hostname=parsed.hostname
+                )
+                connection.sock = connected
             connection.request(
                 "GET",
                 (parsed.path or "/") + ("?" + parsed.query if parsed.query else ""),
@@ -133,10 +147,9 @@ def retrieve(url: str, *, max_bytes: int, timeout: float) -> tuple[str, str]:
                     raise ValueError("Redirect has no destination")
                 url = urljoin(url, location)
                 continue
-            if (
-                response.status != 200
-                or response.getheader("Content-Encoding", "identity") != "identity"
-            ):
+            if response.status != 200:
+                raise ValueError(f"Public source HTTP status {response.status}")
+            if response.getheader("Content-Encoding", "identity") != "identity":
                 raise ValueError("Source cannot be read safely")
             media_type = (
                 response.getheader("Content-Type", "").split(";", 1)[0].strip().lower()
@@ -164,6 +177,20 @@ def retrieve(url: str, *, max_bytes: int, timeout: float) -> tuple[str, str]:
         finally:
             connection.close()
     raise ValueError("Public source redirect budget exceeded")
+
+
+def retrieval_reason(error: Exception) -> str:
+    if isinstance(error, TimeoutError):
+        return "timeout"
+    if isinstance(error, ssl.SSLError):
+        return "tls_failure"
+    if str(error) == "Public source DNS lookup failed":
+        return "dns_failure"
+    if match := re.fullmatch(r"Public source HTTP status (\d{3})", str(error)):
+        return "http_" + match[1]
+    if isinstance(error, OSError):
+        return "connection_failure"
+    return "unsafe_or_unsupported_source"
 
 
 class Candidate(w.Wire):
@@ -339,6 +366,10 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
         bundle.status = "unavailable"
         evidence: dict[str, w.Evidence] = {}
         metadata: list[dict[str, Any]] = []
+        diagnostics: list[dict[str, Any]] = []
+        phase = "search"
+        phase_started = time.monotonic()
+        assessment_reserve = min(60, deadline_seconds / 3)
         if client is None:
             bundle.gaps.append("Research provider is not configured")
         elif (
@@ -371,15 +402,27 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                     search=True,
                 ):
                     raise ValueError("Shared research budget exhausted")
-                response = client.with_options(
-                    timeout=max(0.1, deadline_seconds - (time.monotonic() - start))
-                ).responses.create(
+                search_seconds = min(
+                    60,
+                    (deadline_seconds - (time.monotonic() - start) - assessment_reserve)
+                    * 0.6,
+                )
+                if search_seconds <= 0:
+                    raise TimeoutError("Research search budget exhausted")
+                phase_started = time.monotonic()
+                response = client.with_options(timeout=search_seconds).responses.create(
                     model=policy.get("model", settings.app_model),
                     input=question,
                     tools=[{"type": "web_search", "search_context_size": "low"}],
                     max_tool_calls=1,
                     max_output_tokens=output_allowance,
                     store=False,
+                )
+                diagnostics.append(
+                    {
+                        "phase": "search",
+                        "seconds": round(time.monotonic() - phase_started, 3),
+                    }
                 )
                 urls = list(
                     dict.fromkeys(
@@ -393,12 +436,17 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                     )
                 )
                 for url in urls:
-                    if (
-                        len(seen) >= max_sources
-                        or time.monotonic() - start >= deadline_seconds
-                    ):
+                    fetch_seconds = min(
+                        15,
+                        deadline_seconds
+                        - (time.monotonic() - start)
+                        - assessment_reserve,
+                    )
+                    if len(seen) >= max_sources or fetch_seconds <= 0:
                         bundle.gaps.append("Shared source/time budget exhausted")
                         break
+                    fetch_started = time.monotonic()
+                    fetch_reason = "retrieved"
                     try:
                         if not reserve_call(
                             run_id,
@@ -413,9 +461,7 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                         resolved, passage = retrieve(
                             url,
                             max_bytes=policy.get("research_max_bytes", 1048576),
-                            timeout=max(
-                                0.1, deadline_seconds - (time.monotonic() - start)
-                            ),
+                            timeout=fetch_seconds,
                         )
                         fingerprint = hashlib.sha256(passage.encode()).hexdigest()
                         if fingerprint in seen:
@@ -448,14 +494,31 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                                 "fingerprint": fingerprint,
                             }
                         )
-                    except ValueError, OSError, TimeoutError, http.client.HTTPException:
-                        bundle.gaps.append("A public source failed safe retrieval")
+                    except (
+                        ValueError,
+                        OSError,
+                        TimeoutError,
+                        http.client.HTTPException,
+                    ) as error:
+                        fetch_reason = retrieval_reason(error)
+                        bundle.gaps.append(
+                            "A public source failed safe retrieval: " + fetch_reason
+                        )
+                    finally:
+                        diagnostics.append(
+                            {
+                                "phase": "fetch",
+                                "seconds": round(time.monotonic() - fetch_started, 3),
+                                "reason": fetch_reason,
+                            }
+                        )
                 if (
                     evidence
                     and used_tokens < max_tokens
                     and time.monotonic() - start < deadline_seconds
                 ):
                     bundle.status = "checking"
+                    phase = "assess"
                     progress(run_id, generation, bundle)
                     source_input = [
                         {
@@ -501,6 +564,7 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                         input_allowance + output_allowance,
                     ):
                         raise ValueError("Shared research token budget exhausted")
+                    phase_started = time.monotonic()
                     checked = client.with_options(
                         timeout=max(0.1, deadline_seconds - (time.monotonic() - start))
                     ).responses.parse(
@@ -509,6 +573,12 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                         text_format=Assessment,
                         max_output_tokens=output_allowance,
                         store=False,
+                    )
+                    diagnostics.append(
+                        {
+                            "phase": "assess",
+                            "seconds": round(time.monotonic() - phase_started, 3),
+                        }
                     )
                     assessment = checked.output_parsed
                     if assessment is None:
@@ -556,10 +626,18 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                 bundle.status = "partial" if bundle.claims else "unavailable"
                 if bundle.claims and not bundle.gaps:
                     bundle.status = "ready"
-            except Exception:
+            except Exception as error:
+                diagnostics.append(
+                    {
+                        "phase": phase,
+                        "seconds": round(time.monotonic() - phase_started, 3),
+                        "reason": type(error).__name__,
+                    }
+                )
                 bundle.status = "partial" if bundle.claims else "unavailable"
                 bundle.gaps.append(
-                    "Research tool/provider unavailable or output invalid; completed evidence retained"
+                    "Research tool/provider unavailable or output invalid; completed evidence retained: "
+                    + type(error).__name__
                 )
         put_stage(
             run_id,
@@ -572,6 +650,7 @@ def investigate(run_id: str, generation: str, findings: list[w.Finding]) -> None
                 "model": policy.get("model", settings.app_model),
                 "prompt_revision": "research-v1",
                 "schema_revision": "research-v1",
+                "diagnostics": diagnostics,
             },
             event_type="research.updated",
         )

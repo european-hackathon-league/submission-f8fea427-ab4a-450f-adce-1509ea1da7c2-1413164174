@@ -35,7 +35,7 @@ class Settings(BaseSettings):
     planning_horizon: int = Field(default=2030, ge=1900, le=2200)
     research_max_searches: int = Field(default=3, ge=1, le=20)
     research_max_sources: int = Field(default=6, ge=1, le=50)
-    research_timeout_seconds: int = Field(default=60, ge=1, le=300)
+    research_timeout_seconds: int = Field(default=180, ge=1, le=300)
     research_max_bytes: int = Field(default=1048576, ge=1024, le=8388608)
     research_max_tokens: int = Field(default=6000, ge=100, le=50000)
     ai_batch_size: int = Field(default=5, ge=1, le=100)

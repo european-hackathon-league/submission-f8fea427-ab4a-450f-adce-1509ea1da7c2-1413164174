@@ -38,18 +38,36 @@ it('zooms without fetching frames again and resets zoom when changing models', a
  const {container}=render(<VehicleViewer initial="F70-116" onClose={()=>{}}/>);
  await act(async()=>{}); await act(async()=>frame());
  const width=draw.mock.lastCall[3], canvas=container.querySelector('canvas');
- await user.click(screen.getByRole('button',{name:'Zoom in'})); await act(async()=>frame());
+ expect(screen.queryByRole('button',{name:'Previous angle'})).not.toBeInTheDocument();
+ expect(screen.queryByRole('button',{name:'Next angle'})).not.toBeInTheDocument();
+ fireEvent.change(screen.getByRole('slider',{name:'Exterior angle'}),{target:{value:'90'}});
+ await act(async()=>frame());
+ expect(canvas).toHaveAttribute('data-angle','90');
+ fireEvent.change(screen.getByRole('slider',{name:'Exterior zoom'}),{target:{value:'125'}}); await act(async()=>frame());
  expect(draw.mock.lastCall[3]).toBeGreaterThan(width);
- expect(screen.getByRole('button',{name:'Zoom out'})).toBeEnabled();
+ expect(screen.getByRole('slider',{name:'Exterior zoom'})).toHaveValue('125');
  const zoomed=draw.mock.lastCall[3];
  fireEvent.wheel(canvas,{deltaY:-100}); await act(async()=>frame());
  expect(draw.mock.lastCall[3]).toBeGreaterThan(zoomed);
  await user.click(screen.getByRole('button',{name:'Reset view'})); await act(async()=>frame());
  expect(draw.mock.lastCall[3]).toBe(width);
- expect(screen.getByRole('button',{name:'Zoom out'})).toBeDisabled();
- await user.click(screen.getByRole('button',{name:'Zoom in'}));
+ expect(screen.getByRole('slider',{name:'Exterior zoom'})).toHaveValue('100');
+ fireEvent.change(screen.getByRole('slider',{name:'Exterior zoom'}),{target:{value:'125'}});
  await user.selectOptions(screen.getByRole('combobox',{name:'Model'}),'F70-120');
  await act(async()=>{}); await act(async()=>frame());
  expect(draw.mock.lastCall[3]).toBe(width);
  expect(loadFrames).toHaveBeenCalledTimes(2);
+});
+
+it('fills the viewer with the car instead of fitting the padded source image', async () => {
+ const draw=vi.fn(); HTMLCanvasElement.prototype.getContext.mockReturnValue({clearRect(){},drawImage:draw});
+ const {container}=render(<VehicleViewer initial="F70-116" onClose={()=>{}}/>);
+ await act(async()=>{}); await act(async()=>frame());
+ const [,x,y,width,height]=draw.mock.lastCall, canvas=container.querySelector('canvas');
+ // Studio cars occupy up to 80% of the source width; keep them large without distortion.
+ expect(width*.8).toBeGreaterThanOrEqual(canvas.width*.9);
+ expect(width/height).toBeCloseTo(2560/1440);
+ expect(x).toBeLessThan(0);
+ expect(y).toBeLessThan(0);
+ expect(screen.getByLabelText('Zoom level')).toHaveTextContent('100%');
 });

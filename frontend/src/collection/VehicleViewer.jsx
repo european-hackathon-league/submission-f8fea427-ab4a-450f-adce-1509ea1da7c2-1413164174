@@ -37,9 +37,11 @@ export default function VehicleViewer({initial,onClose}){
    busy=true;const sequence=frames.current;
    try{const image=await sequence.get(frameIndex(value,exterior));if(disposed||sequence!==frames.current)return;
     ctx.clearRect(0,0,el.width,el.height);ctx.imageSmoothingQuality='high';
-    const scale=Math.min(el.width/image.width,el.height/image.height),width=image.width*scale,height=image.height*scale;
-    const dw=width*magnification,dh=height*magnification,anchor=exterior==='g68'?.5:.65;
-    ctx.drawImage(image,(el.width-dw)/2,(el.height-height)/2+height*anchor-dh*anchor,dw,dh);el.dataset.zoom=String(magnification);el.dataset.angle=String(value);el.dataset.model=selected;el.dataset.sourceWidth=String(image.width);previous=`${value}:${magnification}`;
+    // Frame the vehicle, cropping studio padding while leaving room for the widest side angle.
+    const transparent=exterior==='g68',frameWidth=transparent?1.04:.82,frameHeight=transparent?.9:.56;
+    const scale=Math.min(el.width/(image.width*frameWidth),el.height/(image.height*frameHeight));
+    const dw=image.width*scale*magnification,dh=image.height*scale*magnification,anchor=transparent?.5:.59;
+    ctx.drawImage(image,(el.width-dw)/2,el.height/2-dh*anchor,dw,dh);el.dataset.zoom=String(magnification);el.dataset.angle=String(value);el.dataset.model=selected;el.dataset.sourceWidth=String(image.width);previous=`${value}:${magnification}`;
    }catch(e){if(e.name!=='AbortError'&&!disposed)setStatus('Unable to load this view. Please retry.');}finally{busy=false;}
   }
   function tick(){if(!busy&&(dirty||previous!==`${angleRef.current}:${zoomRef.current}`)){dirty=false;void paint(angleRef.current,zoomRef.current);}raf=requestAnimationFrame(tick);}
@@ -49,12 +51,16 @@ export default function VehicleViewer({initial,onClose}){
  const step=(value)=>setAngle(a=>(a+value+360)%360);
  return <dialog ref={dialog} className="v-dialog" onCancel={e=>{e.preventDefault();onClose();}} onClick={e=>{if(e.target===dialog.current)onClose();}} aria-labelledby="v-title">
   <div className="v-shell"><header className="v-header"><div><span className="v-kicker">A closer perspective / {asset.toUpperCase()}</span><h2 id="v-title">{name}</h2></div><button className="v-close" onClick={onClose} aria-label="Close 360 viewer">×</button></header>
-  <div className="v-toolbar"><label>Model<select value={selected} onChange={e=>{setSelected(e.target.value);reset();}}>{families.map(f=><optgroup key={f.id} label={f.name}>{models.filter(m=>m.family===f.id).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>)}<optgroup label="Additional perspective"><option value="I20">BMW iX xDrive45</option></optgroup></select></label><div className="v-modes" role="group" aria-label="View mode"><button aria-pressed={mode==='exterior'} onClick={()=>setMode('exterior')}>Exterior 360°</button><button aria-pressed={mode==='interior'} onClick={()=>setMode('interior')}>Interior</button></div></div>
+  <div className="v-toolbar"><label>Model<select value={selected} onChange={e=>{setSelected(e.target.value);reset();}}>{families.map(f=><optgroup key={f.id} label={f.name}>{models.filter(m=>m.family===f.id).map(m=><option key={m.id} value={m.id}>{m.name}</option>)}</optgroup>)}<optgroup label="Additional perspective"><option value="I20">BMW iX xDrive45</option></optgroup></select></label><div className="v-view-tools">
+  {mode==='exterior'&&<div className="v-zoom"><label><span>Zoom</span><input aria-label="Exterior zoom" type="range" min="100" max="300" step="1" value={Math.round(zoom*100)} disabled={!!status} onChange={e=>setZoom(Number(e.target.value)/100)}/><output aria-label="Zoom level">{Math.round(zoom*100)}%</output></label></div>}
+  {mode==='exterior'&&<div className="v-controls"><label><output>{angle}°</output><input aria-label="Exterior angle" type="range" min="0" max="350" step="10" value={angle} disabled={!!status} onChange={e=>setAngle(Number(e.target.value))}/></label><button disabled={!!status} onClick={reset}>Reset view</button></div>}
+  </div></div>
+  <div className="v-view-area">
+  <div className="v-modes" role="group" aria-label="View mode"><button aria-pressed={mode==='exterior'} onClick={()=>setMode('exterior')}>Exterior 360°</button><button aria-pressed={mode==='interior'} onClick={()=>setMode('interior')}>Interior</button></div>
   <div className={`v-stage ${mode==='interior'?'v-cabin':''}`}>
    {mode==='exterior'?<><canvas ref={canvas} width="960" height="540" tabIndex={0} role="img" aria-label={`${name} exterior. Drag or use left and right arrows to rotate. Scroll or use plus and minus to zoom.`} onKeyDown={e=>{if(['ArrowLeft','ArrowRight','Home','+','=','-'].includes(e.key)){e.preventDefault();if(e.key==='Home')reset();else if(['+','=','-'].includes(e.key))changeZoom(e.key==='-'?-.25:.25);else step(e.key==='ArrowLeft'?-10:10);}}} onPointerDown={e=>{if(status)return;drag.current={x:e.clientX,angle};e.currentTarget.setPointerCapture(e.pointerId);}} onPointerMove={e=>{if(drag.current)setAngle((drag.current.angle+Math.round((e.clientX-drag.current.x)/8)*10+3600)%360);}} onPointerUp={()=>drag.current=null} onPointerCancel={()=>drag.current=null}/>{status&&<div className="v-loading" role="status">{status}{status.includes('retry')&&<button onClick={()=>setRetry(n=>n+1)}>Retry loading</button>}</div>}</>:<Suspense fallback={<p className="v-loading">Preparing cabin…</p>}><Cabin key={asset} asset={asset}/></Suspense>}
   </div>
-  {mode==='exterior'&&<div className="v-controls"><button disabled={!!status} aria-label="Previous angle" onClick={()=>step(-10)}>←</button><label><span>Drag to explore <output>{angle}°</output></span><input aria-label="Exterior angle" type="range" min="0" max="350" step="10" value={angle} disabled={!!status} onChange={e=>setAngle(Number(e.target.value))}/></label><button disabled={!!status} aria-label="Next angle" onClick={()=>step(10)}>→</button><button disabled={!!status} onClick={reset}>Reset view</button></div>}
-  {mode==='exterior'&&<div className="v-zoom" role="group" aria-label="Exterior zoom"><button aria-label="Zoom out" disabled={!!status||zoom<=1} onClick={()=>changeZoom(-.25)}>−</button><output aria-label="Zoom level">{Math.round(zoom*100)}%</output><button aria-label="Zoom in" disabled={!!status||zoom>=3} onClick={()=>changeZoom(.25)}>+</button></div>}
+  </div>
   <footer className="v-footer">{asset==='i20'?'BMW iX xDrive45 · Arctic Race Blue':mode==='interior'?'Representative family cabin':'BMW configurator exterior'}<span>{mode==='exterior'?'36 original camera angles':'Drag to look around · arrow keys to turn'}</span></footer></div>
  </dialog>;
 }

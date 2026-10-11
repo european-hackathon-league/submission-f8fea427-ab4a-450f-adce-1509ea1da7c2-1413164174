@@ -1,3 +1,5 @@
+from threading import Barrier, Event, Lock
+
 import httpx
 import pytest
 from openai import APITimeoutError
@@ -463,3 +465,113 @@ def test_baseline_review_sees_operator_target_separately_from_source_scope(monke
     baseline = next(iter(stages["baselines"]["items"].values()))
     assert baseline["state"] == "unknown"
     assert "GB feedback does not establish DE applicability" in baseline["uncertainty"]
+
+
+@pytest.mark.parametrize("interrupted", [False, True])
+def test_baselines_run_four_at_a_time_preserving_order_and_completed_checkpoints(
+    monkeypatch,
+    interrupted,
+):
+    findings = [
+        {
+            "finding_id": str(index),
+            "title": "Seat comfort",
+            "customer_need": "Comfortable seats",
+            "supporting_evidence_ids": ["feedback"],
+            "opposing_evidence_ids": [],
+            "cohort_ids": ["GB"],
+            "counts": {"total_records": 1},
+        }
+        for index in range(6)
+    ]
+    stages = {
+        "findings": {"findings": findings},
+        "baselines:0": {"finding_id": "0", "state": "unknown"},
+    }
+    barrier = Barrier(4, timeout=2)
+    lock = Lock()
+    later_checkpoint = Event()
+    active = 0
+    peak = 0
+    called = []
+    completed = []
+    resuming = False
+    monkeypatch.setattr(
+        module, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(
+        module,
+        "_inputs",
+        lambda *args: (
+            {"reference_year": 2026, "planning_horizon": 2030},
+            [{"evidence_id": "feedback", "source_kind": "feedback", "excerpt": "Seat"}],
+            {},
+        ),
+    )
+    monkeypatch.setattr(
+        module, "get_stage", lambda run, generation, key: stages.get(key)
+    )
+
+    def put_stage(run, generation, key, payload, **kwargs):
+        with lock:
+            stages[key] = payload
+            if key.startswith("baselines:"):
+                completed.append(payload["finding_id"])
+                if payload["finding_id"] != "1":
+                    later_checkpoint.set()
+
+    monkeypatch.setattr(module, "put_stage", put_stage)
+
+    def call(schema, instructions, data, policy):
+        nonlocal active, peak
+        identifier = data["finding"]["finding_id"]
+        if schema is module.NeedAssessment:
+            with lock:
+                active += 1
+                peak = max(peak, active)
+                called.append(identifier)
+            if identifier != "5" and not resuming:
+                barrier.wait()
+            return module.NeedAssessment(
+                finding_id=identifier,
+                need_kind="usability",
+                baseline_claims=[],
+                preserve_strengths=[],
+                inference="Seat comfort may need validation.",
+                basis_evidence_ids=["feedback"],
+                uncertainty=["One respondent does not establish population need"],
+                future_assumptions=[],
+            ), {}
+        if identifier == "1":
+            assert later_checkpoint.wait(2)
+        with lock:
+            active -= 1
+        if identifier == "1" and interrupted and not resuming:
+            raise RuntimeError("Interrupted assessment activity")
+        return module.Review(accepted=True, objections=[]), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    if interrupted:
+        with pytest.raises(RuntimeError, match="Interrupted assessment activity"):
+            module.establish_baselines(["run", "generation"])
+        assert "baselines" not in stages
+        assert "baselines:1" not in stages
+        assert all("baselines:" + str(index) in stages for index in [0, 2, 3, 4])
+        remaining = {
+            str(index) for index in range(6) if "baselines:" + str(index) not in stages
+        }
+        resuming = True
+        before_resume = list(called)
+        assert module.establish_baselines(["run", "generation"]) == "partial"
+        assert set(called[len(before_resume) :]) == remaining
+    else:
+        assert module.establish_baselines(["run", "generation"]) == "partial"
+    assert peak == 4
+    assert sorted(set(called)) == ["1", "2", "3", "4", "5"]
+    assert completed[0] != "1"
+    assert list(stages["baselines"]["items"]) == [str(index) for index in range(6)]
+    stages.pop("baselines")
+    called.clear()
+    assert module.establish_baselines(["run", "generation"]) == "partial"
+    assert called == []

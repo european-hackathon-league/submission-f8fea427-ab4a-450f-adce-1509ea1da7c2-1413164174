@@ -2,6 +2,7 @@
 
 import json
 from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
 from openai import APITimeoutError, OpenAI, OpenAIError
@@ -787,17 +788,15 @@ def establish_baselines(args: list[str]) -> str:
         for item in evidence
         if item["source_kind"] in {"study", "sales", "strategy"}
     ]
-    for index, finding in enumerate(findings["findings"]):
+
+    def assess(finding: dict[str, Any]) -> dict[str, Any] | None:
         if not _current_generation(run_id, generation):
-            return "superseded"
-        if activity.in_activity():
-            activity.heartbeat("baselines", index)
+            return None
         identifier = finding["finding_id"]
         checkpoint = "baselines:" + identifier
         saved = get_stage(run_id, generation, checkpoint)
         if saved is not None:
-            baselines[identifier] = saved
-            continue
+            return saved
         source_ids = (
             finding["supporting_evidence_ids"] + finding["opposing_evidence_ids"]
         )
@@ -1033,7 +1032,17 @@ def establish_baselines(args: list[str]) -> str:
         published = get_stage(run_id, generation, checkpoint)
         if published is None:
             raise ValueError("Baseline checkpoint publication missing")
-        baselines[identifier] = published
+        return published
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        for index, (finding, baseline) in enumerate(
+            zip(findings["findings"], executor.map(assess, findings["findings"]))
+        ):
+            if baseline is None:
+                return "superseded"
+            if activity.in_activity():
+                activity.heartbeat("baselines", index)
+            baselines[finding["finding_id"]] = baseline
     status = (
         "failed"
         if findings.get("status") == "failed"

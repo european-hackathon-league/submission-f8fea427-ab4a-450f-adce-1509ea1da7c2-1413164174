@@ -40,7 +40,7 @@ export default function FrontendApp({ api }: { api?: Api }) {
     window.scrollTo({ top: 0, behavior: 'instant' });
   }
   return <>
-    {!workspace && <Journey onOpen={open} />}
+    {!workspace && <Journey onOpen={open} initialModel={selected} />}
     {opened && <div hidden={!workspace}>
       <App api={api} initialModel={selected} onBack={back} />
     </div>}

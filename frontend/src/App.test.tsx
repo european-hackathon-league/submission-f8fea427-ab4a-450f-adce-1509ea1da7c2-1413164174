@@ -150,7 +150,7 @@ describe("frontend plan workspace", () => {
   it("guides first-run setup and explains readiness as files are added and removed", async () => {
     const user = userEvent.setup();
     render(<App api={createMockApi()} />);
-    expect(screen.getByText("Synthetic workspace")).toBeInTheDocument();
+    expect(screen.queryByText("Synthetic workspace")).not.toBeInTheDocument();
     const start = screen.getByRole("button", { name: "Add files" });
     await waitFor(() => expect(start).toBeEnabled());
     expect(start).toHaveAccessibleDescription(

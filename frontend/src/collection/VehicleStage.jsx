@@ -1,37 +1,131 @@
-import React, {useEffect,useRef,useState} from 'react';
-import {families} from './journeyData.js';
-import {journeySample} from './journeyMotion.js';
-import {loadFrames,frameIndex} from './vehicleFrames.js';
-export default function VehicleStage({progress}) {
- const canvas=useRef(null),[ready,setReady]=useState(false),[status,setStatus]=useState('Preparing the perspectives'),[attempt,setAttempt]=useState(0);
- useEffect(()=>{
-  const el=canvas.current,ctx=el.getContext('2d');if(!ctx)return;
-  const controller=new AbortController(),sequences=new Map();
-  let disposed=false,raf=0,dirty=true,previous='',w=0,h=0,dpr=1;
-  const resize=()=>{const r=el.getBoundingClientRect();w=r.width;h=r.height;dpr=Math.min(devicePixelRatio||1,1.5);el.width=Math.round(w*dpr);el.height=Math.round(h*dpr);dirty=true;};
-  const observer=new ResizeObserver(resize);observer.observe(el);resize();
-  (async()=>{try{for(let i=0;i<families.length;i++){
-   const frames=await loadFrames(families[i].asset,{signal:controller.signal,onProgress:n=>{if(!disposed)setStatus(`Preparing ${families[i].id} · ${n}/36`);}});
-   if(disposed){frames.forEach(f=>f.close());return;}sequences.set(i,frames);if(i===0)setReady(true);dirty=true;
-  }setStatus('');}catch(e){if(e.name!=='AbortError'&&!disposed)setStatus('Some perspectives could not load');}})();
-  function draw(index,angle,opacity){
-   const frames=sequences.get(index);if(!frames||opacity<=0)return;
-   const img=frames[frameIndex(angle,families[index].asset)],mobile=w<760;
-   const iw=w*(index===2?(mobile?1.02:.64):(mobile?1.20:.78)),ih=iw*img.height/img.width;
-   ctx.globalAlpha=opacity;ctx.drawImage(img,w*(mobile?.50:.67)-iw/2,h*(mobile?.86:.74)-ih*(index===2?.85:.80),iw,ih);
-  }
-  function tick(){
-   const s=journeySample(progress.current),key=`${s.from}:${s.to}:${s.mix.toFixed(3)}:${Math.round(s.angle/10)}`;
-   if(!document.hidden&&(dirty||key!==previous)){
-    dirty=false;previous=key;ctx.setTransform(dpr,0,0,dpr,0,0);ctx.clearRect(0,0,w,h);
-    // Hold the loaded model until the entire next sequence is decoded.
-    const from=sequences.has(s.from)?s.from:[...sequences.keys()].at(-1);
-    if(from!==undefined){const ready=sequences.has(s.to);draw(from,s.angle,ready&&s.from!==s.to?1-s.mix:1);if(ready&&s.from!==s.to)draw(s.to,s.angle,s.mix);}
-    ctx.globalAlpha=1;el.dataset.angle=s.angle.toFixed(2);el.dataset.family=families[s.mix>.5?s.to:s.from].id;el.dataset.loaded=String(sequences.size);
-   }raf=requestAnimationFrame(tick);
-  }
-  raf=requestAnimationFrame(tick);
-  return()=>{disposed=true;controller.abort();cancelAnimationFrame(raf);observer.disconnect();sequences.forEach(frames=>frames.forEach(f=>f.close()));};
- },[progress,attempt]);
- return <div className="j-car-scene"><canvas ref={canvas} aria-label="BMW vehicles rotating through front, side and rear views as you scroll" role="img"/>{!ready&&<img className="j-scene-poster" src="/images/bmw/f70.webp" alt="BMW 1 Series"/>}{status&&<div className="j-load-status" role="status">{status}{status.includes('could not')&&<button onClick={()=>{setReady(false);setAttempt(a=>a+1);}}>Retry</button>}</div>}</div>;
+import React, { useEffect, useRef, useState } from 'react';
+import { families, models } from './journeyData.js';
+import { journeySample } from './journeyMotion.js';
+import { loadFrames, frameIndex } from './vehicleFrames.js';
+
+const defaults = Object.fromEntries(families.map(family => [family.id, models.find(model => model.family === family.id).id]));
+
+export default function VehicleStage({ progress, active = 0, selections = defaults }) {
+  const canvas = useRef(null), sequences = useRef(new Map()), dirty = useRef(true), selection = useRef(selections);
+  selection.current = selections;
+  const [ready, setReady] = useState(false), [errors, setErrors] = useState({}), [attempt, setAttempt] = useState(0);
+  const status = errors[active] || '';
+  const selected = models.find(model => model.id === selections[families[active].id]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    let disposed = false;
+    (async () => {
+      for (let index = 0; index < families.length; index++) {
+        const model = models.find(item => item.id === selections[families[index].id]);
+        if (sequences.current.get(index)?.model.id === model.id) continue;
+        try {
+          const frames = await loadFrames(model.exterior, { signal: controller.signal, feather: true, capacity: 4 });
+          await frames.get(frameIndex(journeySample(progress.current).angle, model.exterior));
+          if (disposed) { frames.close(); return; }
+          frames.detach();
+          sequences.current.get(index)?.frames.close();
+          sequences.current.set(index, { model, frames }); dirty.current = true;
+          setErrors(previous => { const next = { ...previous }; delete next[index]; return next; });
+        } catch (error) {
+          if (error.name === 'AbortError' || disposed) return;
+          setErrors(previous => ({ ...previous, [index]: 'This rotating view could not load.' }));
+        }
+      }
+    })();
+    // Published sequences belong to the stage, not to this loading attempt.
+    // Abort unfinished requests without closing sequences still on screen.
+    return () => { disposed = true; controller.abort(); };
+  }, [selections, progress, attempt]);
+
+  useEffect(() => {
+    const el = canvas.current, ctx = el.getContext('2d');
+    if (!ctx) return () => {
+      sequences.current.forEach(({ frames }) => frames.close()); sequences.current.clear();
+    };
+    let disposed = false, raf, busy = false, previous = '', w = 0, h = 0, dpr = 1;
+    const resize = () => {
+      const rect = el.getBoundingClientRect();
+      w = rect.width; h = rect.height; dpr = Math.min(devicePixelRatio || 1, 2);
+      el.width = Math.round(w * dpr); el.height = Math.round(h * dpr); dirty.current = true;
+    };
+    const observer = new ResizeObserver(resize); observer.observe(el); resize();
+    function draw(index, image, opacity) {
+      const { x, y, width, height } = scenePlacement(index, w, h, image.height / image.width);
+      ctx.globalAlpha = opacity; ctx.drawImage(image, x, y, width, height);
+    }
+    async function paint(sample, key) {
+      busy = true;
+      const desiredIndex = sample.mix > .5 ? sample.to : sample.from;
+      try {
+        const from = sequences.current.get(sample.from), to = sequences.current.get(sample.to);
+        const desired = sequences.current.get(desiredIndex);
+        if (!desired) return;
+        const entries = sample.from !== sample.to && from && to
+          ? [[sample.from, from, 1 - sample.mix], [sample.to, to, sample.mix]]
+          : [[desiredIndex, desired, 1]];
+        const images = await Promise.all(entries.map(([familyIndex, entry]) => {
+          const index = frameIndex(sample.angle, entry.model.exterior);
+          // Keep opacity and layout responsive while a native frame decodes.
+          // Only one background decode per model; always catch and scope errors.
+          if (!entry.frames.peek) return entry.frames.get(index);
+          const exact = entry.frames.peek(index);
+          if (!exact && !entry.pending) {
+            entry.pending = entry.frames.get(index).then(() => { dirty.current = true; }).catch(error => {
+              if (error.name !== 'AbortError' && !disposed && sequences.current.get(familyIndex) === entry)
+                setErrors(previous => ({ ...previous, [familyIndex]: 'This rotating view could not load.' }));
+            }).finally(() => { entry.pending = null; });
+          }
+          return exact || entry.frames.peek(index, true);
+        }));
+        if (disposed || entries.some(([index, entry]) => sequences.current.get(index) !== entry)) return;
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0); ctx.clearRect(0, 0, w, h); ctx.imageSmoothingQuality = 'high';
+        entries.forEach(([index, , opacity], i) => draw(index, images[i], opacity)); ctx.globalAlpha = 1;
+        previous = key; setReady(true);
+        el.dataset.angle = sample.angle.toFixed(2); el.dataset.family = families[desiredIndex].id;
+        el.dataset.model = desired.model.id;
+        el.dataset.sourceWidth = String(images[entries.findIndex(([index]) => index === desiredIndex)].width);
+        el.dataset.loaded = String(sequences.current.size);
+      } catch (error) {
+        if (error.name !== 'AbortError' && !disposed) setErrors(previous => ({ ...previous, [desiredIndex]: 'This rotating view could not load.' }));
+      } finally { busy = false; }
+    }
+    function tick() {
+      const sample = journeySample(progress.current);
+      const key = `${sample.from}:${sample.to}:${sample.mix.toFixed(3)}:${Math.round(sample.angle / 10)}:${Object.values(selection.current).join(':')}`;
+      if (!document.hidden && !busy && (dirty.current || key !== previous)) {
+        dirty.current = false; void paint(sample, key);
+      }
+      raf = requestAnimationFrame(tick);
+    }
+    raf = requestAnimationFrame(tick);
+    return () => {
+      disposed = true; cancelAnimationFrame(raf); observer.disconnect();
+      sequences.current.forEach(({ frames }) => frames.close()); sequences.current.clear();
+    };
+  }, [progress]);
+
+  return <div className="j-car-scene">
+    <canvas ref={canvas} style={{ visibility: ready ? 'visible' : 'hidden' }} aria-label={`${selected.name}, rotating exterior view`} role="img" />
+    {!ready && <img className="j-scene-poster" data-family={selected.family} src={selected.image} alt={selected.name} />}
+    {(status || !ready) && <div className={`j-load-status ${status ? '' : 'j-sr-only'}`} role="status">
+      {status || 'Loading rotating view…'}
+      {status && <button onClick={() => {
+        sequences.current.get(active)?.frames.close(); sequences.current.delete(active);
+        dirty.current = true; setErrors({}); setAttempt(value => value + 1);
+      }}>Retry</button>}
+    </div>}
+  </div>;
+}
+
+// COSY studio images place tyres at 80% of image height; China's transparent
+// frames use 85%. Anchor the tyres, not the differently sized image centers.
+export function scenePlacement(index, w, h, aspect) {
+  const mobile = w <= 600;
+  const regularWidth = mobile ? w * 1.40 : Math.min(w * .90, h * 1.6);
+  const width = index === 2 ? (mobile ? w * 1.10 : Math.min(w * .80, h * 1.6)) : regularWidth;
+  const height = width * aspect;
+  const center = mobile ? (h < 600 ? .32 : .43) : (h < 720 ? .43 : .53);
+  const ground = h * center + regularWidth * (1440 / 2560) * .30;
+  return { x: (w - width) / 2, y: ground - height * (index === 2 ? .85 : .80), width, height };
 }

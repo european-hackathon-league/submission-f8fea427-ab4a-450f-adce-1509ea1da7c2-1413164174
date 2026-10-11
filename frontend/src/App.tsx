@@ -656,9 +656,7 @@ function WorkspaceApp({
             Change API access
           </button>
         )}
-        <span className="environment">
-          {api.mode === "mock" ? "Synthetic workspace" : "Connected workspace"}
-        </span>
+        {api.mode !== "mock" && <span className="environment">Connected workspace</span>}
       </header>
       {collectionViewerOpen && previewModel && (
         <Suspense fallback={<p role="status">Preparing model viewer…</p>}>

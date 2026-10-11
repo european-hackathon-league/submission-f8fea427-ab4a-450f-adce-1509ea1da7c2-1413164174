@@ -10,9 +10,16 @@ const variants = {
  G70:['740 xDrive','740d xDrive','750e xDrive','M760e xDrive','i7 50xDrive','i7 60xDrive','i7 M70 xDrive'],
  G68:['5 Series Long Wheelbase'],
 };
-export const models = families.flatMap(f=>variants[f.id].map(trim=>({
+const exteriorCodes = {
+ F70:['31GE','81GE','61GE','21GE','11GF','21GF'],
+ G60:['11FJ','11FL','21FL','31FL','71FJ','81FJ','11FK','61HG','31HG','41HG'],
+ G70:['61HZ','21HZ','71HZ','81HZ','61HY','71HY','81HY'],
+ G68:['g68'],
+};
+export const models = families.flatMap(f=>variants[f.id].map((trim,index)=>({
  id:`${f.id}-${trim.replaceAll(' ','-')}`, name:`BMW ${trim}`, trim, family:f.id,
- image:`/images/bmw/${f.asset}.webp`, theme:f.name,
+ exterior:exteriorCodes[f.id][index],
+ image:`/images/bmw/exterior/${exteriorCodes[f.id][index]}/${f.id==='G68'?'00':'04'}.webp`, theme:f.name,
  powertrain:f.id==='G68'?'China · Standard':trim.startsWith('i')?'Electric':/\d+e/.test(trim)?'Plug-in hybrid':trim.includes('d')?'Diesel':'Petrol',
  description:`${f.name} · ${trim}. ${f.description}`,
 })));

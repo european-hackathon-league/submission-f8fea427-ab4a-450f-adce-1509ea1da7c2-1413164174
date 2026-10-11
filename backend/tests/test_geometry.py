@@ -105,7 +105,7 @@ def test_plan_is_targeted_bounded_and_version_bound():
 
 def test_renderer_auth_idempotency_failure_and_recovery(tmp_path):
     settings = RendererSettings(
-        token="test", jobs_path=tmp_path, public_url="http://renderer"
+        token="test", jobs_path=tmp_path, public_url="http://renderer", _env_file=None
     )
     with TestClient(create_app(settings)) as client:
         assert (
@@ -144,7 +144,7 @@ def test_renderer_auth_idempotency_failure_and_recovery(tmp_path):
 
 def test_explicit_retry_resets_failed_job_and_deduplicates(tmp_path):
     with TestClient(
-        create_app(RendererSettings(token="test", jobs_path=tmp_path))
+        create_app(RendererSettings(token="test", jobs_path=tmp_path, _env_file=None))
     ) as client:
         headers = {"Authorization": "Bearer test", "Idempotency-Key": "key"}
         job_id = client.post(
@@ -175,7 +175,7 @@ def test_explicit_retry_resets_failed_job_and_deduplicates(tmp_path):
 def test_retry_commit_is_atomic_and_survives_worker_result_updates(
     tmp_path, monkeypatch
 ):
-    settings = RendererSettings(token="test", jobs_path=tmp_path)
+    settings = RendererSettings(token="test", jobs_path=tmp_path, _env_file=None)
     with TestClient(create_app(settings)) as client:
         headers = {"Authorization": "Bearer test", "Idempotency-Key": "key"}
         job_id = client.post(
@@ -331,7 +331,10 @@ def test_worker_timeout_records_failure_and_preserves_baseline(tmp_path, monkeyp
     monkeypatch.setattr(subprocess, "run", timeout)
     execute_job(
         RendererSettings(
-            token="test", baseline_path=baseline, catalog_path=catalog_path
+            token="test",
+            baseline_path=baseline,
+            catalog_path=catalog_path,
+            _env_file=None,
         ),
         job,
     )
@@ -346,7 +349,7 @@ def test_worker_timeout_records_failure_and_preserves_baseline(tmp_path, monkeyp
 
 def test_unconfigured_baseline_routes_report_capability_limit(tmp_path):
     with TestClient(
-        create_app(RendererSettings(token="test", jobs_path=tmp_path))
+        create_app(RendererSettings(token="test", jobs_path=tmp_path, _env_file=None))
     ) as client:
         assert client.get("/renderer/v1/baseline/catalog").status_code == 401
         response = client.get(
@@ -391,7 +394,7 @@ def test_corrections_exhaust_at_two_and_replay_without_paid_calls(
     monkeypatch.setattr("app.geometry_renderer.plan_geometry", plan)
     monkeypatch.setattr("app.geometry_renderer.blender_call", blender)
     result = review_and_correct(
-        RendererSettings(max_correction_rounds=2),
+        RendererSettings(max_correction_rounds=2, _env_file=None),
         tmp_path,
         object(),
         manifest(),
@@ -403,7 +406,7 @@ def test_corrections_exhaust_at_two_and_replay_without_paid_calls(
     assert calls == {"review": 3, "plan": 2, "blender": 2}
     assert result[2]["changes"][0]["passed"] is False
     again = review_and_correct(
-        RendererSettings(max_correction_rounds=2),
+        RendererSettings(max_correction_rounds=2, _env_file=None),
         tmp_path,
         object(),
         manifest(),

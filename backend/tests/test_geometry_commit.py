@@ -90,7 +90,10 @@ def test_worker_retains_unreviewed_geometry_as_partial_and_constraints_unsupport
 
     monkeypatch.setattr("app.geometry_renderer.blender_call", blender)
     execute_job(
-        RendererSettings(baseline_path=baseline, catalog_path=catalog_path), job
+        RendererSettings(
+            baseline_path=baseline, catalog_path=catalog_path, _env_file=None
+        ),
+        job,
     )
     result = json.loads((job / "result.json").read_text())
     if constraints:
@@ -136,7 +139,7 @@ def test_review_failure_after_correction_retains_committed_plan_and_measurement(
     )
     monkeypatch.setattr("app.geometry_renderer.blender_call", blender)
     plan, report, assessment = review_and_correct(
-        RendererSettings(),
+        RendererSettings(_env_file=None),
         tmp_path,
         object(),
         manifest(),

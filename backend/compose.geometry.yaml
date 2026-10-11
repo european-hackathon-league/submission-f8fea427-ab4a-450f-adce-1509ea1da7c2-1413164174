@@ -1,0 +1,23 @@
+# Private HTTP adapter in Docker; the Blender worker runs on the host.
+services:
+  api:
+    environment:
+      RENDERER_URL: http://geometry:8090
+  worker:
+    environment:
+      RENDERER_URL: http://geometry:8090
+  geometry:
+    build:
+      context: .
+      target: runtime
+    command: ["python", "-m", "uvicorn", "app.geometry_renderer:app", "--host", "0.0.0.0", "--port", "8090", "--no-access-log"]
+    restart: unless-stopped
+    env_file: .local/geometry.env
+    environment:
+      GEOMETRY_BASELINE_PATH: /geometry/baseline/baseline.glb
+      GEOMETRY_CATALOG_PATH: /geometry/baseline/catalog.json
+      GEOMETRY_JOBS_PATH: /geometry/jobs
+      GEOMETRY_PUBLIC_URL: http://geometry:8090
+    volumes:
+      - ./.local/bmw-i5-optimized:/geometry/baseline:ro
+      - ./.local/geometry-jobs:/geometry/jobs

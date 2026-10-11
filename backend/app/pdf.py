@@ -16,7 +16,7 @@ from app.ingest_types import CoverageIssue, ParsedPassage, ParseResult
 from app.parser_models import ModelArtifactsUnavailable, verify_artifacts
 from app.wire import PDFLocator, Scope
 
-PARSER_REVISION = "docling-pdf-v2"
+PARSER_REVISION = "docling-pdf-v3"
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 PDFKind = Literal["equipment", "strategy"]
 
@@ -152,6 +152,12 @@ def normalize_document(
         if passage.attributes.get("label") == "footnote"
         or re.match(r"^\d+[). ]", passage.text)
     ]
+    footnotes = [
+        passage.model_copy(update={"text": note.strip()})
+        for passage in footnotes
+        for note in re.split(r"\n(?=\s*\d+[). ]\s*)", passage.text)
+        if note.strip()
+    ]
     context_locators = [
         passage.locator.model_dump(mode="json")
         for passage in source_context
@@ -211,8 +217,12 @@ def normalize_document(
                 continue
             code_cells = [
                 cell
-                for cell in row_cells
-                if re.fullmatch(r"[A-Z0-9]{3}", str(cell["text"]).strip())
+                for cell in cells
+                if not cell.get("column_header")
+                and int(cell["start_row_offset_idx"])
+                <= row
+                < int(cell["end_row_offset_idx"])
+                and re.fullmatch(r"[A-Z0-9]{3}", str(cell["text"]).strip())
             ]
             code = str(code_cells[0]["text"]).strip() if len(code_cells) == 1 else None
             description_cells = [
@@ -227,6 +237,15 @@ def normalize_document(
                 number or superscript.translate(superscripts)
                 for number, superscript in condition_ids
             ]
+            # Docling can flatten a superscript into a word-final or isolated digit.
+            condition_ids.extend(
+                word_final or isolated
+                for word_final, isolated in re.findall(
+                    r"(?<=[^\W\d])([1-9])(?=\s|$)|(?<=\s)([1-9])(?=\s*(?:\n|$))",
+                    description,
+                )
+            )
+            condition_ids = list(dict.fromkeys(condition_ids))
             matching_notes = []
             unresolved = []
             for number in condition_ids:
@@ -270,6 +289,8 @@ def normalize_document(
                     if int(candidate["start_row_offset_idx"])
                     == max(int(item["start_row_offset_idx"]) for item in model_headers)
                 ]
+                if len(leaf_headers) == 1:
+                    header = str(leaf_headers[0]["text"]).strip() or None
                 ambiguous = (
                     int(cell["end_col_offset_idx"]) - col != 1
                     or int(cell["end_row_offset_idx"]) - row != 1
@@ -288,7 +309,7 @@ def normalize_document(
                     or int(leaf_headers[0]["end_col_offset_idx"])
                     - int(leaf_headers[0]["start_col_offset_idx"])
                     != 1
-                    or code is None
+                    or not description
                     or bool(unresolved)
                 )
                 availability = (
@@ -353,7 +374,7 @@ def parse_pdf(
     *,
     artifacts_path: Path | None = None,
     page_range: tuple[int, int] | None = None,
-    timeout_seconds: int = 180,
+    timeout_seconds: int = 600,
     memory_mb: int = 4096,
     context_passages: list[ParsedPassage] | None = None,
 ) -> ParseResult:

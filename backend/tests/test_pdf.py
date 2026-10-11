@@ -4,6 +4,85 @@ import json
 import pytest
 
 
+def test_standard_equipment_without_option_codes_keeps_grounded_availability():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    cells = document["tables"][0]["data"]["table_cells"]
+    cells[:] = [cell for cell in cells if cell["text"] not in {"Code", "4ZZ", "6XX"}]
+    result = normalize_document(document, "equipment")
+    claims = [
+        p
+        for p in result.passages
+        if p.attributes.get("model_column") == "520i"
+        and p.attributes.get("table_row") == 1
+    ]
+    assert len(claims) == 1
+    assert claims[0].attributes["option_code"] is None
+    assert claims[0].attributes["availability"] == "standard"
+
+
+def test_equipment_uses_leaf_model_headers_and_explicit_spanning_option_codes():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    cells = document["tables"][0]["data"]["table_cells"]
+    for cell in cells:
+        cell["start_row_offset_idx"] += 1
+        cell["end_row_offset_idx"] += 1
+    group = {
+        **cells[2],
+        "text": "5 Series",
+        "start_row_offset_idx": 0,
+        "end_row_offset_idx": 1,
+        "end_col_offset_idx": 4,
+    }
+    cells.append(group)
+    code = next(cell for cell in cells if cell["text"] == "4ZZ")
+    code["end_row_offset_idx"] = 4
+    cells[:] = [cell for cell in cells if cell["text"] != "6XX"]
+    cells[-2] = {**cells[-2], "text": "\u25cb", "end_col_offset_idx": 3}
+    result = normalize_document(document, "equipment")
+    claims = [p for p in result.passages if p.attributes.get("option_code") == "4ZZ"]
+    assert {p.attributes["model_column"] for p in claims} == {"520i", "530e"}
+    assert any(
+        p.attributes["table_row"] == 3 and p.attributes["availability"] == "optional"
+        for p in claims
+    )
+
+
+def test_equipment_splits_numbered_footnotes_without_cross_page_guessing():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    document["texts"][2]["text"] = "1) First condition\n2) Second condition"
+    document["tables"][0]["data"]["table_cells"][5]["text"] = "Sitzkomfort 2)"
+    result = normalize_document(document, "equipment")
+    claims = [p for p in result.passages if p.attributes.get("option_code") == "4ZZ"]
+    assert all(p.attributes["conditions"] == ["2) Second condition"] for p in claims)
+    assert all(p.attributes["availability"] != "unknown" for p in claims)
+
+
+def test_flattened_superscript_footnote_still_limits_the_equipment_claim():
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    document["texts"][2]["text"] = "1 First condition"
+    document["tables"][0]["data"]["table_cells"][5]["text"] = "Sitzkomfort1"
+    claims = [
+        p
+        for p in normalize_document(document, "equipment").passages
+        if p.attributes.get("option_code") == "4ZZ"
+    ]
+    assert claims and all(
+        p.attributes["conditions"] == ["1 First condition"] for p in claims
+    )
+
+
 def test_missing_and_changed_model_artifacts_fail_closed_without_network(tmp_path):
     from app.parser_models import ModelArtifactsUnavailable, verify_artifacts
 

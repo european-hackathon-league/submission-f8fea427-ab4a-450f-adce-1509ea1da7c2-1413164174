@@ -10,7 +10,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import App from "./App";
 import { ApiError, createMockApi } from "./api/client";
-import type { Api } from "./api/contracts";
+import type { Api, Workspace } from "./api/contracts";
 
 afterEach(() => {
   cleanup();
@@ -47,6 +47,44 @@ async function createRun(
 }
 
 describe("frontend plan workspace", () => {
+  it("shows failed analysis warnings and manually restarts with the existing uploads", async () => {
+    const api = createMockApi();
+    const originalRequest = api.request, originalWorkspace = api.workspace;
+    const submitted: unknown[] = [];
+    let failedRun = "";
+    let completed: Workspace;
+    api.request = async <T,>(path: string, body?: unknown, key?: string) => {
+      if (path === "/runs") {
+        submitted.push(body);
+        if (submitted.length > 1) return { run_id: "run-retry" } as T;
+      }
+      const response = await originalRequest<T>(path, body, key);
+      if (path === "/runs") failedRun = (response as { run_id: string }).run_id;
+      return response;
+    };
+    api.workspace = async id => {
+      if (id === "run-retry") return { ...completed, snapshot: { ...completed.snapshot, run_id: id, analysis_status: "proposals_ready" } };
+      const w = await originalWorkspace(id);
+      completed = structuredClone(w);
+      if (id === failedRun && submitted.length === 1) {
+        w.snapshot = { ...w.snapshot, analysis_status: "failed", current_proposal_set_version: null, warnings: ["ai_extraction_batch_failed:0"] };
+        w.proposals = { ...w.proposals, variants: [] };
+      }
+      return w;
+    };
+    const user = userEvent.setup();
+    render(<App api={api} />);
+    await user.upload(screen.getByLabelText("Upload files"), new File(["feedback"], "retain.xlsx"));
+    await screen.findByText("ready");
+    await user.click(screen.getByRole("button", { name: "Start analysis" }));
+    await screen.findByText("Analysis failed; no proposals were created.");
+    expect(screen.getByText("AI could not finish processing a feedback batch.")).toBeVisible();
+    expect(submitted).toHaveLength(1);
+    await user.click(screen.getByRole("button", { name: "Start new analysis with existing files" }));
+    await screen.findByText("proposals ready");
+    expect(submitted).toHaveLength(2);
+    expect(submitted[1]).toEqual(submitted[0]);
+  });
   it("recovers vehicle loading locally without losing uploaded files", async () => {
     const user = userEvent.setup();
     const api = createMockApi();

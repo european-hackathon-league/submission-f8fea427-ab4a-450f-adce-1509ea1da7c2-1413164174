@@ -339,8 +339,8 @@ def create_run(
                 payload={
                     "model": settings.app_model,
                     "base_url": settings.openai_base_url,
-                    "prompt_revision": "findings-v1",
-                    "schema_revision": "findings-v1",
+                    "prompt_revision": finding_queries.PROMPT_REVISION,
+                    "schema_revision": finding_queries.PROMPT_REVISION,
                     "planning_horizon": settings.planning_horizon,
                     "reference_year": settings.reference_year,
                     "catalog": runs.catalog(),

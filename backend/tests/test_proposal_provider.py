@@ -7,6 +7,124 @@ from app import wire as w
 from app.proposals import Draft, validated_draft
 
 
+@pytest.mark.parametrize("role", ["claim", "context"])
+def test_assessed_documents_supplement_customer_citations_without_expanding_scope(
+    client, monkeypatch, role
+):
+    import json
+    from types import SimpleNamespace
+
+    from sqlalchemy import select
+    from test_ingestion_cache import feedback, frozen_run
+
+    from app import proposals
+    from app.artifacts import put_stage
+    from app.config import Settings
+    from app.db import EvidenceArtifact, RunEvidence, Session
+    from app.ingest_types import ParsedPassage, ParseResult
+    from app.ingestion import publish_batch
+
+    run_id, generation, version, binding = frozen_run(client)
+    publish_batch(run_id, generation, version, feedback(binding), batch="feedback")
+    publish_batch(
+        run_id,
+        generation,
+        version,
+        ParseResult(
+            kind="equipment",
+            parser_revision=binding["parser_revision"],
+            passages=[
+                ParsedPassage(
+                    source_kind="equipment" if role == "claim" else "strategy",
+                    text="Synthetic document context",
+                    locator=w.PDFLocator(page=1),
+                    scope=w.Scope(markets=["CN"]),
+                ),
+                ParsedPassage(
+                    source_kind="equipment",
+                    text="Unassessed document passage",
+                    locator=w.PDFLocator(page=2),
+                ),
+            ],
+        ),
+        batch="document",
+    )
+    with Session() as session:
+        artifacts = session.scalars(
+            select(EvidenceArtifact)
+            .join(RunEvidence, RunEvidence.evidence_id == EvidenceArtifact.id)
+            .where(RunEvidence.run_id == run_id)
+        ).all()
+        customer = next(item for item in artifacts if item.source_kind == "feedback")
+        document = next(
+            item for item in artifacts if item.excerpt == "Synthetic document context"
+        )
+        row = observation(customer.id, customer.record_id)
+        row.update(quote=customer.excerpt, scope=customer.scope)
+        document_id = document.id
+    finding = w.Finding.model_validate(aggregate([row], [], run_id)["findings"][0])
+    assessment = {
+        "claims": [{"evidence_id": document_id}] if role == "claim" else [],
+        "context_evidence_ids": [document_id] if role == "context" else [],
+    }
+    put_stage(
+        run_id, generation, "baselines", {"items": {finding.finding_id: assessment}}
+    )
+    change = sample().changes[0].model_dump()
+    change.update(
+        finding_ids=[finding.finding_id],
+        supporting_evidence_ids=[row["evidence_id"], document_id],
+        scope=w.Scope(markets=["DE"]).model_dump(),
+    )
+
+    def validate(**updates):
+        return validated_draft(
+            Draft.model_validate({"changes": [change | updates], "gaps": []}),
+            [finding],
+            [],
+            run_id,
+            generation,
+        )
+
+    assert (
+        validate().changes[0].supporting_evidence_ids
+        == change["supporting_evidence_ids"]
+    )
+    with pytest.raises(ValueError, match="supporting evidence"):
+        validate(supporting_evidence_ids=[document_id])
+    with pytest.raises(ValueError, match="outside supported finding evidence"):
+        validate(supporting_evidence_ids=[row["evidence_id"], "unassessed-document"])
+    with pytest.raises(ValueError, match="scope is not established"):
+        validate(scope=w.Scope(markets=["CN"]).model_dump())
+    calls = []
+
+    def parse(**options):
+        calls.append(options)
+        return SimpleNamespace(
+            output_parsed=Draft.model_validate({"changes": [change], "gaps": []}),
+            model="synthetic",
+            usage=None,
+        )
+
+    monkeypatch.setattr(
+        proposals, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(
+        proposals,
+        "OpenAI",
+        lambda **kw: SimpleNamespace(responses=SimpleNamespace(parse=parse)),
+    )
+    assert proposals.draft_changes(run_id, generation, [finding], []).changes
+    payload = json.loads(calls[0]["input"][1]["content"])
+    assert {item["evidence_id"] for item in payload["evidence"]} == set(
+        change["supporting_evidence_ids"]
+    )
+    assert (
+        "Each conflict finding must itself have opposing_evidence_ids"
+        in calls[0]["input"][0]["content"]
+    )
+
+
 def test_proposal_schema_only_contains_closed_objects_with_required_properties():
     def check(value):
         if isinstance(value, dict):
@@ -41,8 +159,12 @@ def test_positive_strength_can_support_a_preservation_requirement(client):
     assert result.changes[0].supporting_evidence_ids == ["positive"]
     assert finding.counts.negative_records == 0
     result.changes[0].supporting_evidence_ids = ["unrelated"]
-    with pytest.raises(ValueError, match="outside supported finding evidence"):
+    with pytest.raises(
+        ValueError, match="outside supported finding evidence"
+    ) as rejected:
         validated_draft(result, [finding], [], run_id, generation)
+    assert "unrelated" in str(rejected.value)
+    assert "positive" in str(rejected.value)
     result.changes[0].supporting_evidence_ids = []
     result.changes[0].opposing_evidence_ids = ["positive"]
     with pytest.raises(ValueError, match="supporting evidence.*preservation"):
@@ -50,8 +172,9 @@ def test_positive_strength_can_support_a_preservation_requirement(client):
 
 
 @pytest.mark.parametrize("repaired", [False, True])
+@pytest.mark.parametrize("malformed", [False, True])
 def test_proposal_validation_repair_is_bounded_and_reuses_returned_drafts(
-    client, monkeypatch, repaired
+    client, monkeypatch, repaired, malformed
 ):
     from types import SimpleNamespace
 
@@ -66,6 +189,8 @@ def test_proposal_validation_repair_is_bounded_and_reuses_returned_drafts(
 
     def parse(**options):
         calls.append(options)
+        if malformed and (not repaired or len(calls) == 1):
+            return Draft.model_validate_json('{"changes": [')
         change = sample().changes[0].model_dump()
         change.update(
             finding_ids=[finding.finding_id],
@@ -92,7 +217,44 @@ def test_proposal_validation_repair_is_bounded_and_reuses_returned_drafts(
         if repaired:
             assert proposals.draft_changes(run_id, generation, [finding], []).changes
         else:
-            with pytest.raises(ValueError, match="scope is not established"):
+            with pytest.raises(
+                ValueError, match="structured draft|scope is not established"
+            ):
                 proposals.draft_changes(run_id, generation, [finding], [])
     assert len(calls) == 2
-    assert "scope is not established" in str(calls[1]["input"])
+    assert ("structured draft" if malformed else "scope is not established") in str(
+        calls[1]["input"]
+    )
+
+
+def test_uncertain_proposal_timeout_is_not_automatically_repeated(client, monkeypatch):
+    from types import SimpleNamespace
+
+    import httpx
+    from openai import APITimeoutError
+
+    from app import proposals
+    from app.config import Settings
+
+    run_id, generation = ready_run(client)
+    calls = []
+
+    def parse(**options):
+        calls.append(options)
+        raise APITimeoutError(
+            request=httpx.Request("POST", "https://synthetic.invalid")
+        )
+
+    monkeypatch.setattr(
+        proposals, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(
+        proposals,
+        "OpenAI",
+        lambda **options: SimpleNamespace(responses=SimpleNamespace(parse=parse)),
+    )
+    with pytest.raises(APITimeoutError):
+        proposals.draft_changes(run_id, generation, [], [])
+    with pytest.raises(ValueError, match="uncertain outcome"):
+        proposals.draft_changes(run_id, generation, [], [])
+    assert len(calls) == 1

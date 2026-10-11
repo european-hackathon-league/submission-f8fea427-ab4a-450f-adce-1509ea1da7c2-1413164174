@@ -4,6 +4,25 @@ This renderer edits a **verified, legally downloaded GLB**, not the Sketchfab if
 
 ## Run locally
 
+For the main Docker application, copy `backend/geometry.env.example` to the ignored
+`backend/.local/geometry.env`. Place the verified `baseline.glb` and matching
+`catalog.json` in `backend/.local/bmw-i5-optimized`. Set `GEOMETRY_TOKEN` to the
+same private value as `RENDERER_TOKEN` in the application's ignored root `.env`,
+and set `GEOMETRY_BLENDER` to the installed executable. Keep AI disabled unless
+explicitly enabling bounded planning/review with its separate credential.
+
+From the repository root run:
+
+```text
+docker compose -p vehicle-app -f backend/compose.yaml -f backend/compose.live.yaml -f backend/compose.geometry.yaml up -d --build api worker geometry
+```
+
+From `backend`, run `uv run python -m app.geometry_renderer` for the Blender
+worker. Both processes load `.local/geometry.env`; Docker overrides only its
+asset/job paths. The adapter has no published host port. The application uses
+`http://geometry:8090` on its private Compose network and proxies authorized
+assets to the browser. Keep this Compose override on subsequent app restarts.
+
 Install Blender separately. In `backend`, run `uv sync --frozen`. Configure the same renderer token in the application and private renderer:
 
 ```text

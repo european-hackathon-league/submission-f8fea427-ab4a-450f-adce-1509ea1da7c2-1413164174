@@ -1,6 +1,6 @@
 """Authorized, audited evidence and run history queries."""
 
-from sqlalchemy import select
+from sqlalchemy import select, tuple_
 from sqlalchemy.orm import Session as DBSession
 
 from app import wire as w
@@ -127,10 +127,16 @@ def history(
             Audit.run_id == run_id, Audit.workspace_id == identity.workspace_id
         )
         if cursor is not None:
-            if session.scalar(query.where(Audit.id == cursor)) is None:
+            previous = session.scalar(query.where(Audit.id == cursor))
+            if previous is None:
                 reject("invalid_cursor", "Cursor does not belong to this run", 422)
-            query = query.where(Audit.id > cursor)
-        rows = session.scalars(query.order_by(Audit.id).limit(limit + 1)).all()
+            query = query.where(
+                tuple_(Audit.occurred_at, Audit.id)
+                > tuple_(previous.occurred_at, previous.id)
+            )
+        rows = session.scalars(
+            query.order_by(Audit.occurred_at, Audit.id).limit(limit + 1)
+        ).all()
         return w.Page[w.Audit](
             items=[
                 w.Audit.model_validate(

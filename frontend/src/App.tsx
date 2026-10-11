@@ -90,6 +90,14 @@ function requestError(error: unknown): string {
     .filter(Boolean)
     .join(" — ");
 }
+function analysisWarning(warning: string): string {
+  if (warning.includes("ai_extraction_batch_failed")) return "AI could not finish processing a feedback batch.";
+  if (warning.includes("ai_credentials_unavailable")) return "AI analysis is unavailable because its provider is not configured.";
+  if (warning.includes("pdf_parser_limit")) return "Some document pages exceeded the parsing limit.";
+  if (warning.includes("ambiguous_table_cell")) return "Some document table values remain uncertain.";
+  if (warning.includes("unresolved_footnote")) return "Some equipment conditions could not be linked to their footnotes.";
+  return warning;
+}
 const spatialPartIds = new Set<string>([
   "body",
   "lighting",
@@ -515,6 +523,18 @@ function WorkspaceApp({
           setPendingRun(null);
         throw error;
       }
+      if (activeRunId.current && activeRunId.current !== result.run_id) {
+        runEpoch.current++;
+        setWorkspace(null);
+        setReviewChange(null);
+        setSource(null);
+        setSelectedFindingId("");
+        setSelectedComponent(null);
+        setVariantId("");
+        setProposalSelection(null);
+        setEditing(false);
+        setTab("Proposals");
+      }
       activeRunId.current = result.run_id;
       setRunId(result.run_id);
       setPendingRun(null);
@@ -936,6 +956,23 @@ function WorkspaceApp({
               </button>
             </details>
           )}
+          {run?.analysis_status === "failed" && (
+            <div role="alert" className="notice">
+              <p>{run.current_proposal_set_version === null
+                ? "Analysis failed; no proposals were created."
+                : "Analysis failed. Saved proposals remain available."}</p>
+              <p>Your source files are retained. Starting a new analysis uses the current service settings and may incur provider charges.</p>
+              <button disabled={busy || hasUnsavedWork} onClick={() => void createRun(run.config)}>
+                {pendingRun ? "Retry new analysis" : "Start new analysis with existing files"}
+              </button>
+            </div>
+          )}
+          {!!run?.warnings.length && (
+            <section aria-label="Analysis warnings" className="notice">
+              <h2>Analysis warnings</h2>
+              <ul>{run.warnings.map(warning => <li key={warning}>{analysisWarning(warning)}</li>)}</ul>
+            </section>
+          )}
           {runId && !run && <p role="status">Recovering saved analysis…</p>}
         </section>
         {error && (
@@ -1049,11 +1086,6 @@ function WorkspaceApp({
                   }
                 }
               />
-              {run?.warnings.map((w) => (
-                <p className="coverage-note" key={w}>
-                  {w}
-                </p>
-              ))}
             </details>
           </section>
           <section className="analysis-column" data-current-view={tab} aria-label="Analysis panels">

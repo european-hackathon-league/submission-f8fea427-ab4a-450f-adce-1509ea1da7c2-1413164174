@@ -251,7 +251,13 @@ export default function WorkshopSummary({
     <section aria-label="Suggestions">
       {!variant?.changes.length && (
         <p className="empty-state">
-          Suggestions will appear when analysis completes.
+          {workspace.snapshot.analysis_status === "failed"
+            ? "Analysis failed; no suggestions were created."
+            : workspace.snapshot.analysis_status === "proposals_ready"
+              ? "No suggestions are available for this selection."
+              : workspace.snapshot.analysis_status === "waiting_for_pm"
+                ? "Analysis is waiting for your input."
+                : "Suggestions will appear when analysis completes."}
         </p>
       )}
       {variant?.changes.map((c) => {

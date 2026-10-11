@@ -5,6 +5,54 @@ from app.db import Audit, EvidenceArtifact, RunEvidence, Session
 from app.ingestion import publish_batch
 
 
+def test_history_pages_follow_time_and_id_ties_without_duplicates(client):
+    from datetime import UTC, datetime, timedelta
+    from uuid import uuid4
+
+    run_id, _, _, _ = frozen_run(client)
+    prefix = str(uuid4())
+    ids = [prefix + suffix for suffix in ("z", "a", "b")]
+    first_time = datetime(2026, 1, 1, tzinfo=UTC)
+    with Session.begin() as session:
+        for identifier, offset in zip(ids, (0, 1, 1), strict=True):
+            session.add(
+                Audit(
+                    id=identifier,
+                    workspace_id="workspace_demo",
+                    run_id=run_id,
+                    actor_id="pm_demo",
+                    actor_type="pm",
+                    action="test.history",
+                    resource_id=run_id,
+                    occurred_at=first_time + timedelta(seconds=offset),
+                )
+            )
+    collected = []
+    cursor = None
+    while True:
+        params = {"limit": 1}
+        if cursor:
+            params["cursor"] = cursor
+        response = client.get(f"/api/v1/runs/{run_id}/history", params=params)
+        assert response.status_code == 200
+        page = response.json()
+        collected.extend(
+            item["audit_id"]
+            for item in page["items"]
+            if item["action"] == "test.history"
+        )
+        cursor = page["next_cursor"]
+        if cursor is None:
+            break
+    assert collected == ids
+    assert (
+        client.get(
+            f"/api/v1/runs/{run_id}/history", params={"cursor": str(uuid4())}
+        ).status_code
+        == 422
+    )
+
+
 def evidence_id(run_id):
     with Session() as session:
         return session.scalar(

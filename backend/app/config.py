@@ -35,12 +35,12 @@ class Settings(BaseSettings):
     planning_horizon: int = Field(default=2030, ge=1900, le=2200)
     research_max_searches: int = Field(default=3, ge=1, le=20)
     research_max_sources: int = Field(default=6, ge=1, le=50)
-    research_timeout_seconds: int = Field(default=60, ge=1, le=300)
+    research_timeout_seconds: int = Field(default=180, ge=1, le=300)
     research_max_bytes: int = Field(default=1048576, ge=1024, le=8388608)
     research_max_tokens: int = Field(default=6000, ge=100, le=50000)
-    ai_batch_size: int = Field(default=25, ge=1, le=100)
-    ai_timeout_seconds: int = Field(default=60, ge=1, le=300)
-    ai_max_output_tokens: int = Field(default=6000, ge=100, le=50000)
+    ai_batch_size: int = Field(default=5, ge=1, le=100)
+    ai_timeout_seconds: int = Field(default=300, ge=1, le=300)
+    ai_max_output_tokens: int = Field(default=24000, ge=100, le=50000)
     cors_origins: list[str] = ["http://localhost:3000"]
     max_upload_bytes: int = 32 * 1024 * 1024
     max_archive_bytes: int = 256 * 1024 * 1024
@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     excel_max_columns: int = Field(default=64, ge=1, le=256)
     excel_max_cells: int = Field(default=1000000, ge=1, le=5000000)
     pdf_artifacts_path: Path | None = None
-    pdf_timeout_seconds: int = Field(default=180, ge=1, le=600)
+    pdf_timeout_seconds: int = Field(default=600, ge=1, le=600)
     pdf_memory_mb: int = Field(default=4096, ge=512, le=8192)
     event_retention: int = 10000
     catalog_path: Path = (

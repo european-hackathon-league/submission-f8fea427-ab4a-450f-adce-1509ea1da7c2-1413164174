@@ -1,4 +1,6 @@
+import httpx
 import pytest
+from openai import APITimeoutError
 
 from app import findings as module
 from app import wire as w
@@ -10,6 +12,93 @@ from app.findings import (
     applicability,
     validate_extraction,
 )
+
+
+@pytest.mark.parametrize("failure", ["timeout", "invalid_quote"])
+def test_failed_batches_split_and_resume_without_losing_evidence(monkeypatch, failure):
+    evidence = [
+        {
+            "evidence_id": str(index),
+            "record_id": str(index),
+            "source_kind": "feedback",
+            "excerpt": "Synthetic seat comfort",
+            "scope": w.Scope(markets=["DE"], cohort_ids=["DE"]).model_dump(),
+            "limitations": [],
+        }
+        for index in range(4)
+    ]
+    policy = {
+        "model": "synthetic-model",
+        "prompt_revision": module.PROMPT_REVISION,
+        "schema_revision": module.PROMPT_REVISION,
+        "ai_batch_size": 4,
+        "catalog": {"parts": [{"part_id": "part_seat"}]},
+    }
+    stages = {}
+    extraction_sizes = []
+    monkeypatch.setattr(
+        module, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(module, "_inputs", lambda *args: (policy, evidence, {}))
+    monkeypatch.setattr(
+        module, "get_stage", lambda run, generation, key: stages.get(key)
+    )
+    monkeypatch.setattr(
+        module,
+        "put_stage",
+        lambda run, generation, key, payload, **kw: stages.update({key: payload}),
+    )
+
+    def call(schema, instructions, data, frozen):
+        if schema is module.Extraction:
+            extraction_sizes.append(len(data["evidence"]))
+            if len(data["evidence"]) > 1 and failure == "timeout":
+                raise APITimeoutError(
+                    request=httpx.Request("POST", "https://synthetic.invalid")
+                )
+            extracted = module.Extraction(
+                observations=[
+                    Observation.model_validate(
+                        {
+                            key: value
+                            for key, value in observation(
+                                data["evidence"][0]["evidence_id"], "record"
+                            ).items()
+                            if key not in {"record_id", "scope", "observation_id"}
+                        }
+                    )
+                ],
+                dispositions=[],
+            )
+            if len(data["evidence"]) > 1:
+                extracted.observations[0].quote = "Fabricated quote"
+            return extracted, {}
+        if schema is module.Reconciliation:
+            return module.Reconciliation(
+                links=[
+                    module.TopicLink(
+                        topic_key="seat-comfort",
+                        canonical_key="seat-comfort",
+                        basis="Same task",
+                    )
+                ]
+            ), {}
+        return module.Review(accepted=True, objections=[]), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    assert module.extract_findings(["run", "generation"]) == "ready"
+    assert extraction_sizes == (
+        [4, 2, 1, 1, 2, 1, 1]
+        if failure == "timeout"
+        else [4, 4, 2, 2, 1, 1, 2, 2, 1, 1]
+    )
+    assert stages["findings"]["counts"]["total_records"] == 4
+    del stages["findings"]
+    extraction_sizes.clear()
+    assert module.extract_findings(["run", "generation"]) == "ready"
+    assert extraction_sizes == []
+    assert stages["findings"]["counts"]["total_records"] == 4
 
 
 def observation(evidence, record, sentiment="negative", parts=None, cohorts=None):
@@ -30,6 +119,102 @@ def observation(evidence, record, sentiment="negative", parts=None, cohorts=None
         "record_id": record,
         "scope": w.Scope(cohort_ids=cohorts or ["DE", "EU"]).model_dump(),
     }
+
+
+@pytest.mark.parametrize("collision", [False, True])
+def test_topic_collision_repairs_grouping_without_reextracting_valid_feedback(
+    monkeypatch,
+    collision,
+):
+    evidence = [
+        {
+            "evidence_id": str(i),
+            "record_id": str(i),
+            "source_kind": "feedback",
+            "excerpt": "Synthetic seat comfort",
+            "scope": w.Scope().model_dump(),
+            "limitations": [],
+        }
+        for i in range(2)
+    ]
+    policy = {
+        "model": "synthetic",
+        "prompt_revision": module.PROMPT_REVISION,
+        "schema_revision": module.PROMPT_REVISION,
+        "ai_batch_size": 1,
+        "catalog": {"parts": [{"part_id": "part_seat"}]},
+    }
+    stages, extractions, merges = {}, [], []
+    needs = (
+        ["Smaller sedan driving feel", "Light driving feel"]
+        if collision
+        else ["Comfortable seat for long trips", "Seat comfort on long journeys"]
+    )
+    monkeypatch.setattr(
+        module, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(module, "_inputs", lambda *args: (policy, evidence, {}))
+    monkeypatch.setattr(module, "get_stage", lambda r, g, k: stages.get(k))
+    monkeypatch.setattr(
+        module, "put_stage", lambda r, g, k, p, **kw: stages.update({k: p})
+    )
+
+    def call(schema, instructions, data, frozen):
+        if schema is module.Extraction:
+            eid = data["evidence"][0]["evidence_id"]
+            extractions.append(eid)
+            row = observation(eid, eid)
+            row["customer_need"] = needs[int(eid)]
+            return module.Extraction(
+                observations=[
+                    Observation.model_validate(
+                        {
+                            k: v
+                            for k, v in row.items()
+                            if k not in {"record_id", "scope", "observation_id"}
+                        }
+                    )
+                ],
+                dispositions=[],
+            ), {}
+        if schema is module.Reconciliation:
+            merges.append(data)
+            target = (
+                "light-driving-feel"
+                if data.get("previous_objections")
+                else "seat-comfort"
+            )
+            return module.Reconciliation(
+                links=[
+                    module.TopicLink(
+                        topic_key="seat-comfort",
+                        canonical_key=target,
+                        basis="Preserve distinct needs",
+                    )
+                ]
+            ), {}
+        rejected = (
+            "links" in data
+            and data["existing"]
+            and collision
+            and data["links"]["links"][0]["canonical_key"] == "seat-comfort"
+        )
+        if "links" in data:
+            assert data["candidate"][0]["quote"] in data["evidence"][0]["excerpt"]
+            assert data["candidate"][0]["canonical_need"]["customer_need"]
+        return module.Review(
+            accepted=not rejected,
+            objections=["Keep different needs separate"] if rejected else [],
+        ), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    assert module.extract_findings(["run", "generation"]) == "ready"
+    assert stages["findings"]["counts"]["total_records"] == 2
+    assert extractions == ["0", "1"]
+    assert len(merges) == (3 if collision else 2)
+    assert stages["findings:batch:1"]["observations"][0]["customer_need"] == needs[1]
+    assert len(stages["findings"]["findings"]) == (2 if collision else 1)
 
 
 def test_annotation_overlap_counts_distinct_records_and_preserves_opposition():
@@ -71,7 +256,7 @@ def test_fabricated_quote_or_catalog_part_is_rejected_before_publication():
     )
     evidence = [{"evidence_id": "one", "excerpt": "Synthetic seat comfort"}]
     validate_extraction([row], [], evidence, {"part_seat"})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="one/seat-comfort.*exact substring"):
         validate_extraction(
             [row.model_copy(update={"quote": "fabricated"})],
             [],
@@ -85,6 +270,29 @@ def test_fabricated_quote_or_catalog_part_is_rejected_before_publication():
             evidence,
             {"part_seat"},
         )
+
+
+def test_invalid_empty_mapping_identifies_the_observation_and_safe_repair():
+    row = Observation.model_validate(
+        {
+            key: value
+            for key, value in observation("one", "record").items()
+            if key not in {"record_id", "scope", "observation_id"}
+        }
+    ).model_copy(update={"part_ids": [], "mapping_kind": "digital"})
+    evidence = [{"evidence_id": "one", "excerpt": "Synthetic seat comfort"}]
+    with pytest.raises(ValueError) as caught:
+        validate_extraction([row], [], evidence, {"part_seat"})
+    message = str(caught.value)
+    assert "one/seat-comfort" in message
+    assert "unmapped" in message
+    assert "vehicle_wide" in message
+    validate_extraction(
+        [row.model_copy(update={"mapping_kind": "unmapped"})],
+        [],
+        evidence,
+        {"part_seat"},
+    )
 
 
 def test_german_baseline_cannot_establish_us_availability_or_unknown_scope_absence():
@@ -160,8 +368,8 @@ def test_missing_provider_credentials_publish_explicit_failure_without_fake_find
     captured = {}
     policy = {
         "model": "synthetic-model",
-        "prompt_revision": "findings-v1",
-        "schema_revision": "findings-v1",
+        "prompt_revision": module.PROMPT_REVISION,
+        "schema_revision": module.PROMPT_REVISION,
         "catalog": {"parts": [{"part_id": "part_seat"}]},
     }
     monkeypatch.setattr(module, "Settings", lambda: Settings(openai_api_key=""))

@@ -9,6 +9,7 @@ def test_analysis_defaults_allow_small_batches_to_complete(monkeypatch):
     settings = Settings(_env_file=None)
     assert settings.ai_batch_size == 5
     assert settings.ai_timeout_seconds == 180
+    assert settings.pdf_timeout_seconds == 600
 
 
 def test_production_rejects_development_identity():

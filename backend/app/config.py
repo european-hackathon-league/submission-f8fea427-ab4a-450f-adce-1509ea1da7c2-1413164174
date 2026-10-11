@@ -52,7 +52,7 @@ class Settings(BaseSettings):
     excel_max_columns: int = Field(default=64, ge=1, le=256)
     excel_max_cells: int = Field(default=1000000, ge=1, le=5000000)
     pdf_artifacts_path: Path | None = None
-    pdf_timeout_seconds: int = Field(default=180, ge=1, le=600)
+    pdf_timeout_seconds: int = Field(default=600, ge=1, le=600)
     pdf_memory_mb: int = Field(default=4096, ge=512, le=8192)
     event_retention: int = 10000
     catalog_path: Path = (

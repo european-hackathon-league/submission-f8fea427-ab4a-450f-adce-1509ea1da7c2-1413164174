@@ -1,12 +1,32 @@
 .geometry-viewer { width: 100%; }
-.vehicle-column > .section-title { flex-wrap: wrap; }
-.analysis-column[data-current-view="Renders"]:has(.geometry-viewer) { grid-column: 1 / -1; }
-.workspace-shell .work-area:has(> .analysis-column[data-current-view="Renders"] .geometry-viewer) > .vehicle-column { position: static; grid-column: 1 / -1; }
-.geometry-stage { position: relative; height: clamp(280px, 48vw, 520px); background: #edf0f2; border-radius: 12px; overflow: hidden; }
+.geometry-view-switch, .geometry-parts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.geometry-view-switch button[aria-pressed="true"], .geometry-parts button[aria-pressed="true"] { color: #125bc1; border-color: #125bc1; background: #eef4fd; }
+.geometry-stage { position: relative; height: 350px; background: #edf0f2; border-radius: 4px; overflow: hidden; }
 .geometry-canvas { width: 100%; height: 100%; }
 .geometry-canvas canvas { display: block; touch-action: none; }
 .geometry-lines { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
-.geometry-lines line { stroke: #812431; stroke-width: 1.5; }
-.geometry-tag { position: absolute; width: 44px; height: 36px; padding: 0; color: #fff; background: #812431; border: 0; }
-.geometry-controls { display: flex; flex-wrap: wrap; gap: 8px; margin: 12px 0; }
-.geometry-viewer button:focus-visible { outline: 3px solid #812431; outline-offset: 3px; }
+.geometry-lines line { stroke: #687983; stroke-width: 1; }
+.geometry-tag { position: absolute; display: flex; align-items: center; justify-content: center; gap: 7px; height: 40px; padding: 0 10px; color: #24343e; background: #fff; border: 1px solid #c9d2d8; border-radius: 20px; font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; box-shadow: 0 2px 6px #1a2c3914; }
+.geometry-tag[aria-pressed="true"] { border-color: #125bc1; color: #125bc1; }
+.geometry-tag i { width: 8px; height: 8px; flex: 0 0 8px; border-radius: 50%; }
+.geometry-camera { position: absolute; left: 10px; bottom: 10px; display: flex; flex-direction: column; gap: 5px; }
+.geometry-camera button { width: 34px; height: 34px; display: grid; place-items: center; padding: 0; background: #fff; }
+.geometry-viewer button:focus-visible, .geometry-canvas:focus-visible { outline: 3px solid #125bc1; outline-offset: 2px; }
+.geometry-status, .geometry-attribution { font-size: 12px; color: #646f73; }
+.geometry-status { margin: 6px 0; }
+.geometry-feedback, .geometry-tools, .render-model-preview, .render-validation { margin: 12px 0; }
+.geometry-feedback summary, .geometry-tools summary, .geometry-attribution summary, .render-model-preview > summary, .render-validation > summary, .analysis-warnings > summary { cursor: pointer; font-size: 13px; }
+.geometry-findings { display: grid; gap: 6px; margin-top: 8px; }
+.geometry-findings button { display: flex; flex-direction: column; align-items: flex-start; text-align: left; gap: 4px; }
+.geometry-findings small { color: #646f73; }
+.geometry-attribution p { margin: 8px 0; }
+.geometry-fallback details { margin-top: 8px; }
+.render-validation-status { font-size: 13px; color: #646f73; }
+.render-measurements { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; font-size: 13px; }
+.render-measurements dd { margin: 0; font-variant-numeric: tabular-nums; }
+.preservation-requirements { font-size: 13px; margin: 16px 0; }
+.preservation-requirements h3 { margin-bottom: 8px; }
+@media (max-width: 600px) {
+  .geometry-stage { height: 300px; }
+  .geometry-camera { left: 8px; bottom: 8px; flex-direction: row; }
+}

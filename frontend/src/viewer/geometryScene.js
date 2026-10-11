@@ -30,7 +30,8 @@ export function disposeGeometry(scene) {
     }
   });
 }
-export function mountGeometry(host, model, markers, onPick, onLayout, savedCamera) {
+/** @param {(camera: {position: number[], target: number[]}) => void} onCameraChange */
+export function mountGeometry(host, model, markers, onPick, onLayout, savedCamera, onCameraChange = () => {}) {
   const renderer = new WebGLRenderer({ antialias: true });
   renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   host.appendChild(renderer.domElement);
@@ -58,13 +59,14 @@ export function mountGeometry(host, model, markers, onPick, onLayout, savedCamer
       ray.set(camera.position, world.clone().sub(camera.position).normalize());
       const hit = ray.intersectObject(model.scene, true).find(item => item.object.visible);
       const occluded = hit && hit.distance + size * .002 < camera.position.distanceTo(world) && !part.meshes.includes(hit.object);
-      return occluded ? [] : [{ id: marker.id, x: (screen.x + 1) * rect.width / 2, y: (1 - screen.y) * rect.height / 2, width: 44, height: 36 }];
+      return occluded ? [] : [{ id: marker.id, x: (screen.x + 1) * rect.width / 2, y: (1 - screen.y) * rect.height / 2, width: Math.min(160, Math.max(88, marker.label.length * 7 + 30)), height: 40 }];
     });
     onLayout(projected, rect.width, rect.height);
   }
   function resize() { const rect = host.getBoundingClientRect(); renderer.setSize(Math.max(1, rect.width), Math.max(1, rect.height)); camera.aspect = Math.max(1, rect.width) / Math.max(1, rect.height); camera.updateProjectionMatrix(); paint(); }
   const observer = new ResizeObserver(resize); observer.observe(host);
   controls.addEventListener("change", paint);
+  controls.addEventListener("end", () => onCameraChange({ position: camera.position.toArray(), target: controls.target.toArray() }));
   function pick(event) {
     const rect = host.getBoundingClientRect(); ray.setFromCamera(new Vector2((event.clientX - rect.left) / rect.width * 2 - 1, 1 - (event.clientY - rect.top) / rect.height * 2), camera);
     const hit = ray.intersectObject(model.scene, true).find(item => item.object.visible);
@@ -78,7 +80,7 @@ export function mountGeometry(host, model, markers, onPick, onLayout, savedCamer
     camera: () => ({ position: camera.position.toArray(), target: controls.target.toArray() }),
     inspect() { inspectParts = !inspectParts; const mapped = new Set([...model.mapping.values()].flatMap(part => part.meshes)); model.scene.traverse(node => { if (node.isMesh) node.visible = !inspectParts || mapped.has(node); }); paint(); return inspectParts; },
     action(action) { if (action === "frame") frame(); else if (action === "left" || action === "right") { const offset = camera.position.clone().sub(controls.target).applyAxisAngle(new Vector3(0, 1, 0), action === "left" ? .2 : -.2); camera.position.copy(controls.target).add(offset); } else camera.position.sub(controls.target).multiplyScalar(action === "in" ? .8 : 1.25).add(controls.target); controls.update(); paint(); },
-    focus(id) { const part = model.mapping.get(id); if (!part) return; const offset = camera.position.clone().sub(controls.target); const partSize = new Box3().setFromObject(part.anchor).getSize(new Vector3()).length(); controls.target.copy(part.anchor.localToWorld(new Vector3(...part.local))); camera.position.copy(controls.target).add(offset.normalize().multiplyScalar(Math.max(partSize * 1.5, .2))); if (selected) { scene.remove(selected); selected.dispose(); } selected = new BoxHelper(part.anchor, 0xb62e3c); scene.add(selected); controls.update(); paint(); },
+    focus(id, moveCamera = true) { if (selected) { scene.remove(selected); selected.dispose(); selected = null; } const part = model.mapping.get(id); if (!part) { paint(); return; } if (moveCamera) { const offset = camera.position.clone().sub(controls.target); const partSize = new Box3().setFromObject(part.anchor).getSize(new Vector3()).length(); controls.target.copy(part.anchor.localToWorld(new Vector3(...part.local))); camera.position.copy(controls.target).add(offset.normalize().multiplyScalar(Math.max(partSize * 1.5, .2))); } selected = new BoxHelper(part.anchor, 0xb62e3c); scene.add(selected); controls.update(); paint(); if (moveCamera) onCameraChange({ position: camera.position.toArray(), target: controls.target.toArray() }); },
     dispose() { observer.disconnect(); controls.dispose(); selected?.dispose(); renderer.dispose(); renderer.domElement.remove(); }
   };
 }

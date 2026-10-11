@@ -27,7 +27,6 @@ export interface RenderPanelProps {
   variantId: string;
   busy?: boolean;
   hasUnsavedWork?: boolean;
-  requestReimagine?: number;
   onRefresh: () => Promise<Workspace>;
   onOpen: (e: Evidence) => void;
 }
@@ -59,6 +58,7 @@ function Job({
   const [proposalAttempt, setProposalAttempt] = useState(0);
   const [explained, setExplained] = useState<string | null>(null);
   const [showEarlierAssets, setShowEarlierAssets] = useState(false);
+  const [showModel, setShowModel] = useState(false);
   const explanation = useRef<HTMLDivElement>(null);
   useEffect(() => {
     mounted.current = true;
@@ -271,12 +271,19 @@ function Job({
           {result.wire?.stage && <span className="status">{result.wire.stage}</span>}
           {result.wire?.failure_reason && <p>{result.wire.failure_reason}</p>}
           {outcomes.map(outcome => {
-            const validation = outcome as typeof outcome & { number?: number; geometry_produced?: boolean; visual_review?: string; engineering_validity?: string; assumptions?: string[]; warnings?: string[] };
-            return validation.visual_review && <div key={`validation:${outcome.change_id}`}><p>
-              Change {validation.number ?? outcome.change_id}: geometry {validation.geometry_produced ? "produced" : "not produced"}; visual review {validation.visual_review.replaceAll("_", " ")}; engineering validity {validation.engineering_validity?.replaceAll("_", " ") ?? "not assessed"}.
+            const validation = outcome;
+            return validation.visual_review && <div key={`validation:${outcome.change_id}`}>
+            <p className="render-validation-status">Change {validation.number ?? outcome.change_id} · Visual review: {validation.visual_review.replaceAll("_", " ")} · Engineering validity: {validation.engineering_validity?.replaceAll("_", " ") ?? "not assessed"}.</p>
+            <details className="render-validation"><summary>Change {validation.number ?? outcome.change_id} details</summary><p>
+              Geometry {validation.geometry_produced ? "produced" : "not produced"}.
             </p>
-            {!!validation.warnings?.length && <details><summary>Warnings for change {validation.number ?? outcome.change_id} ({validation.warnings.length})</summary><ul>{validation.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></details>}
-            {!!validation.assumptions?.length && <details><summary>Assumptions for change {validation.number ?? outcome.change_id}</summary><ul>{validation.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul></details>}
+            {validation.measurements && <dl className="render-measurements">
+              {validation.measurements.before_m && <><dt>Baseline dimensions (m)</dt><dd>{validation.measurements.before_m.join(" × ")}</dd></>}
+              {validation.measurements.after_m && <><dt>Result dimensions (m)</dt><dd>{validation.measurements.after_m.join(" × ")}</dd></>}
+            </dl>}
+            {!!validation.warnings?.length && <><h4>Warnings</h4><ul>{validation.warnings.map((warning, index) => <li key={index}>{warning}</li>)}</ul></>}
+            {!!validation.assumptions?.length && <><h4>Assumptions</h4><ul>{validation.assumptions.map((assumption, index) => <li key={index}>{assumption}</li>)}</ul></>}
+            </details>
             </div>;
           })}
           {props.compact ? (
@@ -326,13 +333,13 @@ function Job({
           )}
           {current && !stale ? (
             <section aria-label="Current render assets">
-              {geometryAsset && sceneCatalog && <GeometryViewer api={api} url={geometryAsset.url} catalog={sceneCatalog} originalUrl={sceneCatalog.baseline_url} attribution={<GeometryAttribution baselineId={sceneCatalog.baseline_asset_id} />}
+              {geometryAsset && sceneCatalog && <details className="render-model-preview" onToggle={event => setShowModel(event.currentTarget.open)}><summary>Compare original &amp; reimagined model</summary>{showModel && <GeometryViewer api={api} url={geometryAsset.url} catalog={sceneCatalog} originalUrl={sceneCatalog.baseline_url} attribution={<GeometryAttribution baselineId={sceneCatalog.baseline_asset_id} />}
                 markers={(renderedVariant?.changes ?? []).flatMap((change, index) => {
                   const outcome = outcomes.find(item => item.change_id === change.change_id);
                   const partId = change.part_ids.find(id => Array.isArray(sceneCatalog.parts) && sceneCatalog.parts.some(part => part?.part_id === id));
                   return outcome?.outcome === "rendered" && partId ? [{ id: change.change_id, partId, number: (outcome as typeof outcome & { number?: number }).number ?? index + 1, label: change.after }] : [];
                 })}
-                onMarker={id => setExplained(id)} />}
+                onMarker={id => setExplained(id)} />}</details>}
               {assetList}
             </section>
           ) : (
@@ -530,12 +537,6 @@ function RunRenderPanel(props: RenderPanelProps) {
     saveRenderJobs(storageKey, next, api, runId);
     setJobs(next);
   }
-  const observedRequest = useRef(props.requestReimagine);
-  useEffect(() => {
-    if (observedRequest.current === props.requestReimagine) return;
-    observedRequest.current = props.requestReimagine;
-    create();
-  }, [props.requestReimagine]);
   return (
     <section aria-label="Visualization">
       <div className="section-title">

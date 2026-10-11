@@ -84,6 +84,27 @@ function result(
     stale: false,
   });
 }
+it("keeps measured dimensions and review limitations in expandable render details", async () => {
+  const value = result();
+  Object.assign(value.wire!.outcomes[0], {
+    number: 1, geometry_produced: true, visual_review: "needs_review",
+    engineering_validity: "not_assessed", measurements: { before_m: [0.5, 0.8, 0.6], after_m: [0.55, 0.8, 0.6] },
+    warnings: ["Clearances remain unverified"], assumptions: ["Existing mounts retained"],
+  });
+  const { api } = service(async (path, body) => {
+    if (path.endsWith("/renders") && body) return { resource_id: "job-1" };
+    if (path.includes("/renders/")) return value;
+  });
+  render(<RenderPanel {...props(api)} />);
+  await userEvent.click(screen.getByRole("button", { name: "Reimagine" }));
+  const details = await screen.findByText("Change 1 details");
+  expect(details.closest("details")).not.toHaveAttribute("open");
+  await userEvent.click(details);
+  expect(screen.getByText("Baseline dimensions (m)").nextElementSibling).toHaveTextContent("0.5 × 0.8 × 0.6");
+  expect(screen.getByText("Result dimensions (m)").nextElementSibling).toHaveTextContent("0.55 × 0.8 × 0.6");
+  expect(screen.getByText("Clearances remain unverified")).toBeVisible();
+  expect(screen.getByText(/Visual review: needs review/)).toBeVisible();
+});
 function service(
   handler?: (path: string, body?: unknown, key?: string) => Promise<unknown>,
   mode: Api["mode"] = "mock",

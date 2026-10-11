@@ -441,6 +441,10 @@ export function SuggestionReview({
             <span>Suggested change</span>
             <p>{change.after}</p>
           </div>
+          {!!change.wire?.preservation_constraints?.length && <section className="preservation-requirements">
+            <h3>Must preserve</h3>
+            <ul>{change.wire.preservation_constraints.map(text => <li key={text}>{text}</li>)}</ul>
+          </section>}
           <details>
             <summary>Customer evidence</summary>
             <EvidenceList

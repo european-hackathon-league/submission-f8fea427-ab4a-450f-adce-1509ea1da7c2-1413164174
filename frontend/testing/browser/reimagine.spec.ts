@@ -1,4 +1,4 @@
-import { test, expect, type Page } from "@playwright/test";
+import { test, expect, type Page, type Locator } from "@playwright/test";
 const runId = process.env.LIVE_REIMAGINE_RUN_ID;
 const token = process.env.LIVE_REIMAGINE_TOKEN;
 const workspace = process.env.LIVE_REIMAGINE_WORKSPACE;
@@ -7,6 +7,19 @@ async function connect(page: Page) {
   await page.getByLabel("API access token", { exact: true }).fill(token!);
   await page.getByRole("button", { name: "Connect to API", exact: true }).click();
 }
+async function openComparison(page: Page, timeout = 180_000) {
+  const details = page.locator(".render-model-preview").last();
+  await expect(details).toBeVisible({ timeout });
+  if (await details.getAttribute("open") === null) await details.locator(":scope > summary").click();
+  return page.getByRole("region", { name: "Editable vehicle model" }).last();
+}
+async function inspectFeedback(viewer: Locator) {
+  await viewer.locator(".geometry-tools > summary").click();
+  await viewer.getByRole("button", { name: "Inspect mapped parts", exact: true }).click();
+  const feedback = viewer.locator(".geometry-feedback");
+  if (await feedback.getAttribute("open") === null) await feedback.locator(":scope > summary").click();
+}
+
 test.afterEach(async ({ page }, info) => {
   if (page.isClosed()) return;
   const saved = await page.evaluate(() => Object.fromEntries(Object.keys(sessionStorage).filter(key => key.startsWith("vehicle-workspace:") || key.startsWith("vehicle-renders:")).map(key => [key, JSON.parse(sessionStorage.getItem(key)!)])));
@@ -32,14 +45,17 @@ test("save an explicit design assumption and mark earlier results stale", async 
   } else {
     await expect(page.getByText("Saved proposal version 1", { exact: true })).toBeVisible();
     await page.getByRole("textbox", { name: "Proposal text", exact: true }).fill(interpretation);
-    await expect(page.getByRole("button", { name: "Reimagine saved suggestions", exact: true })).toBeDisabled();
+    await page.getByRole("combobox", { name: "More review views", exact: true }).selectOption("Renders");
+    await expect(page.getByRole("button", { name: "Reimagine", exact: true })).toBeDisabled();
     await expect(page.getByText("Save or discard unsaved edits before Reimagine.", { exact: true })).toBeVisible();
     await page.screenshot({ path: info.outputPath("unsaved-guard.png"), fullPage: true });
+    await page.getByRole("tab", { name: "Suggestions", exact: true }).click();
+    await page.getByText("Edit suggestions & variants", { exact: true }).click();
     await page.getByRole("button", { name: "Save edit", exact: true }).click();
   }
   await expect(page.getByText("Saved proposal version 2", { exact: true })).toBeVisible({ timeout: 30_000 });
-  await expect(page.getByRole("button", { name: "Reimagine saved suggestions", exact: true })).toBeEnabled();
   await page.getByRole("combobox", { name: "More review views", exact: true }).selectOption("Renders");
+  await expect(page.getByRole("button", { name: "Reimagine", exact: true })).toBeEnabled();
   await expect(page.getByText(/Older render or earlier attempt: proposal version/)).toBeVisible();
   await page.screenshot({ path: info.outputPath("stale-version-one.png"), fullPage: true });
 });
@@ -58,9 +74,9 @@ test("retry one existing failed job, compare result, and recover", async ({ page
   }, { namespace, run: runId!, previous: requestId!, result });
   await page.goto("/#workspace"); await connect(page);
   await page.getByRole("button", { name: `Retry render ${requestId}`, exact: true }).click();
-  const viewer = page.getByRole("region", { name: "Editable vehicle model" }).last();
+  const viewer = await openComparison(page);
   await expect(viewer.getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 180_000 });
-  await viewer.getByRole("button", { name: "Inspect mapped parts", exact: true }).click();
+  await inspectFeedback(viewer);
   await viewer.getByRole("group", { name: "Model feedback and change explanations" }).getByRole("button").first().click();
   await expect(viewer.locator(".geometry-tag").first()).toBeVisible();
   await expect(page.getByRole("region", { name: "Supporting proposal evidence", exact: true }).getByRole("button", { name: /^Open source / }).first()).toBeEnabled();
@@ -71,7 +87,7 @@ test("retry one existing failed job, compare result, and recover", async ({ page
   await viewer.getByRole("button", { name: "Reimagined", exact: true }).click();
   await expect(viewer.getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
   await page.reload(); await connect(page);
-  await expect(page.getByRole("region", { name: "Editable vehicle model" }).last().getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect((await openComparison(page)).getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
 });
 test("Reimagine an existing saved design interpretation and recover", async ({ page }, info) => {
   const recoverId = process.env.LIVE_REIMAGINE_RESULT_REQUEST_ID;
@@ -88,12 +104,13 @@ test("Reimagine an existing saved design interpretation and recover", async ({ p
   await page.addInitScript(({ namespace, run }) => sessionStorage.setItem(`vehicle-workspace:${namespace}`, JSON.stringify({ runId: run, tab: "Renders", selectedFindingId: null, selectedComponent: "", view: "exterior", variantId: "", ideaDraft: "", proposalDrafts: [] })), { namespace: `/api/v1|${workspace}`, run: runId! });
   await page.goto("/#workspace"); await connect(page);
   await expect(page.getByText("Saved proposal version 2", { exact: true })).toBeVisible();
-  const action = page.getByRole("button", { name: "Reimagine saved suggestions", exact: true });
+  await page.getByRole("combobox", { name: "More review views", exact: true }).selectOption("Renders");
+  const action = page.getByRole("button", { name: "Reimagine", exact: true });
   if (!recoverId) { await expect(action).toBeEnabled(); await action.click(); }
   await expect(page.getByRole("region", { name: "Visualization" }).getByRole("button", { name: "Reimagine", exact: true })).toBeDisabled();
-  const viewer = page.getByRole("region", { name: "Editable vehicle model" }).last();
+  const viewer = await openComparison(page, 650_000);
   await expect(viewer.getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 650_000 });
-  await viewer.getByRole("button", { name: "Inspect mapped parts", exact: true }).click();
+  await inspectFeedback(viewer);
   await viewer.getByRole("group", { name: "Model feedback and change explanations" }).getByRole("button").first().click();
   await expect(viewer.locator(".geometry-tag").first()).toBeVisible();
   await expect(page.getByRole("region", { name: "Supporting proposal evidence", exact: true }).getByRole("button", { name: /^Open source / }).first()).toBeEnabled();
@@ -105,7 +122,7 @@ test("Reimagine an existing saved design interpretation and recover", async ({ p
   await viewer.getByRole("button", { name: "Reimagined", exact: true }).click();
   await expect(viewer.getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
   await page.reload(); await connect(page);
-  await expect(page.getByRole("region", { name: "Editable vehicle model" }).last().getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect((await openComparison(page)).getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
 });
 test("verified original GLB loads, rotates, and recovers after reconnect", async ({ page }, info) => {
   test.skip(!runId || !token || !workspace, "Opt-in existing run, workspace, and credential required; this test never submits analysis or provider jobs.");
@@ -113,6 +130,7 @@ test("verified original GLB loads, rotates, and recovers after reconnect", async
     if (!sessionStorage.getItem(key)) sessionStorage.setItem(key, JSON.stringify({ runId: id, tab: "Proposals", selectedFindingId: null, selectedComponent: "", view: "exterior", variantId: "", ideaDraft: "", proposalDrafts: [] }));
   }, { key: `vehicle-workspace:/api/v1|${workspace}`, id: runId! });
   await page.goto("/#workspace"); await connect(page);
+  await expect(page.getByText(/Saved proposal version/)).toBeVisible({ timeout: 60_000 });
   const viewer = page.getByRole("region", { name: "Editable vehicle model" }).first();
   await expect(viewer.getByText("Original model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
   await expect(viewer.locator("canvas")).toBeVisible();
@@ -120,7 +138,7 @@ test("verified original GLB loads, rotates, and recovers after reconnect", async
   await viewer.getByRole("button", { name: "Rotate left", exact: true }).click();
   await viewer.getByRole("button", { name: "Zoom in", exact: true }).click();
   await viewer.screenshot({ path: info.outputPath("rotated.png") });
-  await viewer.getByRole("button", { name: "Inspect mapped parts", exact: true }).click();
+  await inspectFeedback(viewer);
   await viewer.getByRole("group", { name: "Model feedback and change explanations" }).getByRole("button").first().click();
   await expect(viewer.locator(".geometry-tag").first()).toBeVisible();
   await viewer.screenshot({ path: info.outputPath("interior-tags.png") });
@@ -157,21 +175,24 @@ test("upload feedback, Reimagine one saved proposal, compare and recover", async
   await page.goto("/#workspace"); await connect(page);
   await page.getByLabel("Upload files", { exact: true }).setInputFiles(process.env.LIVE_REIMAGINE_FEEDBACK!);
   await page.getByRole("button", { name: "Start analysis", exact: true }).click();
-  const reimagine = page.getByRole("button", { name: "Reimagine saved suggestions", exact: true });
+  await expect(page.getByText(/Saved proposal version/)).toBeVisible({ timeout: 120_000 });
+  await page.getByRole("combobox", { name: "More review views", exact: true }).selectOption("Renders");
+  const reimagine = page.getByRole("button", { name: "Reimagine", exact: true });
   await expect(reimagine).toBeEnabled({ timeout: 120_000 });
   const original = page.getByRole("region", { name: "Editable vehicle model" }).first();
   await expect(original.getByText("Original model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
-  await original.getByRole("button", { name: "Inspect mapped parts", exact: true }).click();
+  await inspectFeedback(original);
   await original.getByRole("group", { name: "Model feedback and change explanations" }).getByRole("button").first().click();
   await expect(page.getByRole("tabpanel", { name: "Evidence", exact: true })).toBeVisible();
   await original.screenshot({ path: info.outputPath("tagged-original.png") });
   await original.getByRole("button", { name: "Rotate left", exact: true }).click();
   await original.screenshot({ path: info.outputPath("tagged-rotated.png") });
+  await page.getByRole("combobox", { name: "More review views", exact: true }).selectOption("Renders");
   await reimagine.click();
   await expect(page.getByRole("tabpanel", { name: "Renders", exact: true })).toBeVisible();
-  const resultViewer = page.getByRole("region", { name: "Editable vehicle model" }).last();
+  const resultViewer = await openComparison(page);
   await expect(resultViewer.getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 180_000 });
-  await resultViewer.getByRole("button", { name: "Inspect mapped parts", exact: true }).click();
+  await inspectFeedback(resultViewer);
   await resultViewer.getByRole("group", { name: "Model feedback and change explanations" }).getByRole("button").first().click();
   await resultViewer.screenshot({ path: info.outputPath("reimagined.png") });
   await resultViewer.getByRole("button", { name: "Original", exact: true }).click();
@@ -179,5 +200,5 @@ test("upload feedback, Reimagine one saved proposal, compare and recover", async
   await resultViewer.getByRole("button", { name: "Reimagined", exact: true }).click();
   await expect(resultViewer.getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
   await page.reload(); await connect(page);
-  await expect(page.getByRole("region", { name: "Editable vehicle model" }).last().getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
+  await expect((await openComparison(page)).getByText("Reimagined model loaded.", { exact: true })).toBeVisible({ timeout: 60_000 });
 });

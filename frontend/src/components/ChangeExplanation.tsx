@@ -208,6 +208,10 @@ export default function ChangeExplanation({
         <dt>Evidence strength</dt>
         <dd>{wire?.evidence_strength ?? "Not supplied"}</dd>
       </dl>
+      {!!wire?.preservation_constraints?.length && <>
+        <h4>Must preserve</h4>
+        <ul>{wire.preservation_constraints.map(text => <li key={text}>{text}</li>)}</ul>
+      </>}
       <h4>Conditions and uncertainty</h4>
       <ul>
         {[...new Set([...(wire?.conditions ?? []), ...change.assumptions])].map(

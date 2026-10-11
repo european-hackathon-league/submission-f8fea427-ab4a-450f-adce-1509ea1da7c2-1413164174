@@ -244,7 +244,6 @@ function WorkspaceApp({
   const [connection, setConnection] = useState("");
   const [recoveryAttempt, setRecoveryAttempt] = useState(0);
   const [findingFocusRequest, setFindingFocusRequest] = useState(0);
-  const [reimagineRequest, setReimagineRequest] = useState(0);
   const [source, setSource] = useState<Evidence | null>(null);
   const lock = useRef(false);
   const proposalDrafts = useRef(
@@ -286,6 +285,7 @@ function WorkspaceApp({
       sceneCatalog.part_catalog_version;
   const configurationAvailable =
     !!vehicle?.baseline_asset_id && !!vehicle.part_catalog_version;
+  const spatialSelectionAvailable = baselineAvailable || !!workspace?.snapshot.resource_links?.geometry;
   const setupLocked = !!runId || !!pendingRun;
   useEffect(() => {
     if (initialModel && !setupLocked)
@@ -547,17 +547,17 @@ function WorkspaceApp({
     setFindingFocusRequest((old) => old + 1);
     setSelectedFindingId(next.finding_id);
     const mapped =
-      baselineAvailable &&
+      spatialSelectionAvailable &&
       next.part_ids.find(
         (id) =>
           spatialPartIds.has(id) &&
-          sceneCatalog.parts.some(
+          (!!workspace?.snapshot.resource_links?.geometry || sceneCatalog.parts.some(
             (part) =>
               part.part_id === id &&
               part.capabilities.some(
                 (c) => c === "list_annotation" || c === "photo_annotation",
               ),
-          ),
+          )),
       );
     setSelectedComponent(mapped || null);
   }
@@ -603,7 +603,7 @@ function WorkspaceApp({
     if (!catalogReady || (runId && !workspace)) return;
     if (
       selectedComponent &&
-      (!baselineAvailable ||
+      (!spatialSelectionAvailable ||
         (selectedFindingId && !finding?.part_ids.includes(selectedComponent)))
     )
       setSelectedComponent(null);
@@ -611,7 +611,7 @@ function WorkspaceApp({
     catalogReady,
     runId,
     workspace,
-    baselineAvailable,
+    spatialSelectionAvailable,
     finding,
     selectedFindingId,
     selectedComponent,
@@ -968,10 +968,10 @@ function WorkspaceApp({
             </div>
           )}
           {!!run?.warnings.length && (
-            <section aria-label="Analysis warnings" className="notice">
-              <h2>Analysis warnings</h2>
+            <details open={run.analysis_status === "failed"} aria-label="Analysis warnings" className="notice analysis-warnings">
+              <summary>Analysis warnings ({run.warnings.length})</summary>
               <ul>{run.warnings.map(warning => <li key={warning}>{analysisWarning(warning)}</li>)}</ul>
-            </section>
+            </details>
           )}
           {runId && !run && <p role="status">Recovering saved analysis…</p>}
         </section>
@@ -1023,7 +1023,6 @@ function WorkspaceApp({
           >
             <div className="section-title">
               <h2>{vehicle?.title ?? "Vehicle reference"}</h2>
-              {workspace && <button className="primary" disabled={busy || hasUnsavedWork || !workspace.snapshot.available_actions.includes("reimagine")} onClick={() => { setTab("Renders"); setReimagineRequest(value => value + 1); }}>Reimagine saved suggestions</button>}
               <label className="check-field">
                 <input
                   type="checkbox"
@@ -1034,7 +1033,6 @@ function WorkspaceApp({
               </label>
             </div>
             <div id="vehicle-content" className="vehicle-content">
-              {hasUnsavedWork && <p className="notice">Save or discard unsaved edits before Reimagine.</p>}
               {baselineAvailable || workspace?.snapshot.resource_links?.geometry ? (
                 <Suspense
                   fallback={
@@ -1043,7 +1041,7 @@ function WorkspaceApp({
                     </div>
                   }
                 >
-                  <WorkspaceGeometry key={JSON.stringify([api.sessionNamespace ?? api.mode, workspace?.snapshot.run_id])} api={api} vehicle={vehicle} workspace={workspace} tags={heatmap} onSelect={selectPart} onFinding={id => { const finding = workspace?.findings.find(item => item.finding_id === id); if (finding) { setReviewChange(null); selectFinding(finding); setTab("Evidence"); } }}>
+                  <WorkspaceGeometry key={JSON.stringify([api.sessionNamespace ?? api.mode, workspace?.snapshot.run_id])} api={api} vehicle={vehicle} workspace={workspace} tags={heatmap} selectedPart={selectedComponent} view={view} onViewChange={setView} referenceAvailable={baselineAvailable} onSelect={selectPart} onFinding={id => { const finding = workspace?.findings.find(item => item.finding_id === id); if (finding) { setReviewChange(null); selectFinding(finding); setTab("Evidence"); } }}>
                   {baselineAvailable ? <VehicleViewer
                     className="bmw-asset-viewer--compact"
                     selectedComponent={selectedComponent}
@@ -1056,7 +1054,7 @@ function WorkspaceApp({
                       counts: a.counts,
                       cohort_ids: a.wire?.cohort_ids ?? [],
                     }))}
-                  /> : <p>Loading verified editable baseline…</p>}
+                  /> : <p>No reference viewer is available for this baseline. Evidence and proposals remain accessible.</p>}
                   </WorkspaceGeometry>
                 </Suspense>
               ) : (
@@ -1252,7 +1250,6 @@ function WorkspaceApp({
                       variantId={activeVariantId}
                       busy={busy}
                       hasUnsavedWork={hasUnsavedWork}
-                      requestReimagine={reimagineRequest}
                       onRefresh={() => refresh(runId!)}
                       onOpen={setSource}
                     />

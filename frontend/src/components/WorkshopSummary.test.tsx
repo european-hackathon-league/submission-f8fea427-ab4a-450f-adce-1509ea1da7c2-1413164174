@@ -63,6 +63,14 @@ it("uses backend negative shares and leaves unknown shares unestimated", async (
   expect(screen.queryByText("0%")).toBeInTheDocument(); // Axis only; no invented share.
   expect(screen.getAllByText("—")).toHaveLength(2);
 });
+it("shows preservation requirements when reviewing a suggestion", async () => {
+  const { api, w } = await sample();
+  const variant = w.proposals.variants[0], change = variant.changes[0];
+  change.wire!.preservation_constraints = ["Keep existing physical controls"];
+  render(<SuggestionReview api={api} workspace={w} variantId={variant.variant_id} changeId={change.change_id} onClose={vi.fn()} onRefresh={vi.fn()} onOpen={vi.fn()} onEdit={vi.fn()} />);
+  expect(screen.getByRole("heading", { name: "Must preserve" })).toBeVisible();
+  expect(screen.getByText("Keep existing physical controls")).toBeVisible();
+});
 it("replays an uncertain decision with identical body/key and refreshes real decision state", async () => {
   const { api, w } = await sample(),
     request = api.request,

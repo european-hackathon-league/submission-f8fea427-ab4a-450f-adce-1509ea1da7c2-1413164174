@@ -24,6 +24,14 @@ const props = {
   changeId: "change-dashboard",
   onOpen: vi.fn(),
 };
+it("shows the exact proposal's preservation requirements", async () => {
+  const p = structuredClone(proposals);
+  p.variants[0].changes[0].wire!.preservation_constraints = ["Keep existing physical controls"];
+  render(<ChangeExplanation {...props} api={api()} proposals={p} />);
+  expect(screen.getByRole("heading", { name: "Must preserve" })).toBeVisible();
+  expect(screen.getByText("Keep existing physical controls")).toBeVisible();
+  await screen.findByText(/Current finding finding-dashboard/);
+});
 it("explains exact proposal/variant/change with source-bound evidence and target maturity", async () => {
   const service = api();
   render(<ChangeExplanation {...props} api={service} />);

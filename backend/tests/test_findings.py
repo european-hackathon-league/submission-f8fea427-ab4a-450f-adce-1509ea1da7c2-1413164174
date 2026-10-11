@@ -28,8 +28,8 @@ def test_timed_out_batches_split_and_resume_without_losing_evidence(monkeypatch)
     ]
     policy = {
         "model": "synthetic-model",
-        "prompt_revision": "findings-v1",
-        "schema_revision": "findings-v1",
+        "prompt_revision": module.PROMPT_REVISION,
+        "schema_revision": module.PROMPT_REVISION,
         "ai_batch_size": 4,
         "catalog": {"parts": [{"part_id": "part_seat"}]},
     }
@@ -168,6 +168,29 @@ def test_fabricated_quote_or_catalog_part_is_rejected_before_publication():
         )
 
 
+def test_invalid_empty_mapping_identifies_the_observation_and_safe_repair():
+    row = Observation.model_validate(
+        {
+            key: value
+            for key, value in observation("one", "record").items()
+            if key not in {"record_id", "scope", "observation_id"}
+        }
+    ).model_copy(update={"part_ids": [], "mapping_kind": "digital"})
+    evidence = [{"evidence_id": "one", "excerpt": "Synthetic seat comfort"}]
+    with pytest.raises(ValueError) as caught:
+        validate_extraction([row], [], evidence, {"part_seat"})
+    message = str(caught.value)
+    assert "one/seat-comfort" in message
+    assert "unmapped" in message
+    assert "vehicle_wide" in message
+    validate_extraction(
+        [row.model_copy(update={"mapping_kind": "unmapped"})],
+        [],
+        evidence,
+        {"part_seat"},
+    )
+
+
 def test_german_baseline_cannot_establish_us_availability_or_unknown_scope_absence():
     scope = w.Scope(vehicle_ids=["G60"], markets=["DE"], year=2026)
     assert (
@@ -241,8 +264,8 @@ def test_missing_provider_credentials_publish_explicit_failure_without_fake_find
     captured = {}
     policy = {
         "model": "synthetic-model",
-        "prompt_revision": "findings-v1",
-        "schema_revision": "findings-v1",
+        "prompt_revision": module.PROMPT_REVISION,
+        "schema_revision": module.PROMPT_REVISION,
         "catalog": {"parts": [{"part_id": "part_seat"}]},
     }
     monkeypatch.setattr(module, "Settings", lambda: Settings(openai_api_key=""))

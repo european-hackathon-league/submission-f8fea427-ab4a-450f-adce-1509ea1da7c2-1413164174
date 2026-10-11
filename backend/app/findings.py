@@ -17,7 +17,7 @@ from app.config import Settings
 from app.db import EvidenceArtifact, Run, RunEvidence, Session
 from app.ingestion import stable_id
 
-PROMPT_REVISION = "findings-v1"
+PROMPT_REVISION = "findings-v2"
 SCALE_ID = "negative-share-v1"
 MAX_BATCH_CHARACTERS = 40000
 MAX_TOPICS = 200
@@ -33,8 +33,15 @@ class Observation(w.Wire):
     need_kind: Literal[
         "capability", "usability", "offering", "service", "possible_defect"
     ]
-    part_ids: list[str] = Field(max_length=20)
-    mapping_kind: Literal["physical", "parent", "digital", "vehicle_wide", "unmapped"]
+    part_ids: list[str] = Field(
+        max_length=20,
+        description="Existing catalog IDs only. Empty requires unmapped or vehicle_wide mapping_kind.",
+    )
+    mapping_kind: Literal[
+        "physical", "parent", "digital", "vehicle_wide", "unmapped"
+    ] = Field(
+        description="physical, parent and digital require a supported catalog ID; use unmapped when none exists, including uncataloged software topics.",
+    )
     mapping_rationale: str = Field(min_length=1, max_length=500)
 
 
@@ -137,7 +144,10 @@ def validate_extraction(
         if not set(item.part_ids) <= part_ids:
             raise ValueError("unknown_catalog_part")
         if not item.part_ids and item.mapping_kind not in {"vehicle_wide", "unmapped"}:
-            raise ValueError("missing_part_mapping")
+            raise ValueError(
+                f"missing_part_mapping: {item.evidence_id}/{item.topic_key} has empty part_ids with {item.mapping_kind}; "
+                "use unmapped when no catalog ID is supported, or vehicle_wide for whole-vehicle topics; never invent a part"
+            )
         observed.add(item.evidence_id)
     ignored = {item.evidence_id for item in dispositions}
     if (

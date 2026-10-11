@@ -2,7 +2,7 @@ from threading import Barrier, Event, Lock
 
 import httpx
 import pytest
-from openai import APITimeoutError
+from openai import APIConnectionError, APITimeoutError
 
 from app import findings as module
 from app import wire as w
@@ -101,6 +101,120 @@ def test_failed_batches_split_and_resume_without_losing_evidence(monkeypatch, fa
     assert module.extract_findings(["run", "generation"]) == "ready"
     assert extraction_sizes == []
     assert stages["findings"]["counts"]["total_records"] == 4
+
+
+@pytest.mark.parametrize(
+    "outcome", ["connection", "oversize", "source_warning", "disposition"]
+)
+def test_incomplete_extraction_blocks_downstream_but_retains_completed_work(
+    monkeypatch, outcome
+):
+    evidence = [
+        {
+            "evidence_id": str(index),
+            "record_id": str(index),
+            "source_kind": "feedback",
+            "excerpt": "Synthetic seat comfort",
+            "scope": w.Scope(markets=["DE"], cohort_ids=["DE"]).model_dump(),
+            "limitations": [],
+        }
+        for index in range(2)
+    ]
+    if outcome == "oversize":
+        evidence[1]["excerpt"] = "x" * module.MAX_BATCH_CHARACTERS
+    if outcome == "source_warning":
+        evidence[1]["limitations"] = ["Uncertain source scope"]
+    if outcome == "disposition":
+        evidence[1]["excerpt"] = "Survey submission received."
+    policy = {
+        "model": "synthetic-model",
+        "prompt_revision": module.PROMPT_REVISION,
+        "schema_revision": module.PROMPT_REVISION,
+        "ai_batch_size": 1,
+        "catalog": {"parts": [{"part_id": "part_seat"}]},
+    }
+    stages, calls = {}, []
+    monkeypatch.setattr(
+        module, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(module, "_inputs", lambda *args: (policy, evidence, {}))
+    monkeypatch.setattr(module, "get_stage", lambda run, gen, key: stages.get(key))
+    monkeypatch.setattr(
+        module,
+        "put_stage",
+        lambda run, gen, key, payload, **kw: stages.update({key: payload}),
+    )
+
+    def call(schema, instructions, data, frozen):
+        calls.append(schema)
+        if schema is module.Extraction:
+            eid = data["evidence"][0]["evidence_id"]
+            if eid == "1" and outcome == "connection":
+                raise APIConnectionError(
+                    request=httpx.Request("POST", "https://synthetic.invalid")
+                )
+            if eid == "1" and outcome == "disposition":
+                return module.Extraction(
+                    observations=[],
+                    dispositions=[
+                        Disposition(evidence_id=eid, reason="no_product_observation")
+                    ],
+                ), {}
+            row = observation(eid, eid)
+            return module.Extraction(
+                observations=[
+                    Observation.model_validate(
+                        {
+                            key: value
+                            for key, value in row.items()
+                            if key not in {"record_id", "scope", "observation_id"}
+                        }
+                    )
+                ],
+                dispositions=[],
+            ), {}
+        if schema is module.Reconciliation:
+            return module.Reconciliation(
+                links=[
+                    module.TopicLink(
+                        topic_key="seat-comfort",
+                        canonical_key="seat-comfort",
+                        basis="Same customer task",
+                    )
+                ]
+                if data["new"]
+                else []
+            ), {}
+        return module.Review(accepted=True, objections=[]), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    expected = (
+        "failed"
+        if outcome in {"connection", "oversize"}
+        else "partial"
+        if outcome == "source_warning"
+        else "ready"
+    )
+    assert module.extract_findings(["run", "generation"]) == expected
+    result = stages["findings"]
+    assert result["observations"][0]["evidence_id"] == "0"
+    assert result["input_record_ids"] == ["0", "1"]
+    assert result["counts"]["total_records"] == (
+        2 if outcome == "source_warning" else 1
+    )
+    if outcome in {"connection", "oversize"}:
+        assert any(
+            item.startswith(
+                "ai_extraction_batch_failed:"
+                if outcome == "connection"
+                else "feedback_exceeds_model_batch_limit:"
+            )
+            for item in result["coverage"]
+        )
+    initial_calls = list(calls)
+    assert module.extract_findings(["run", "generation"]) == expected
+    assert calls == initial_calls
 
 
 def observation(evidence, record, sentiment="negative", parts=None, cohorts=None):
@@ -423,6 +537,11 @@ def test_baseline_inference_accepts_complete_scoped_context_but_remains_bounded(
             "positive",
         ),
         (
+            "ambient-lighting-praise",
+            "Customer stated that they really love the ambient lighting in the vehicle.",
+            "positive",
+        ),
+        (
             "roof-opening",
             "I wish the roof would open fully.",
             "negative",
@@ -439,6 +558,8 @@ def test_topic_index_preserves_unknown_needs_and_source_ambiguity(
         title="Neutral product observation",
         customer_need="No customer need or desired change is established by this source."
         if sentiment == "neutral"
+        else "The customer praises ambient lighting; no explicit preservation request is established."
+        if topic == "ambient-lighting-praise"
         else "Praise may suggest preserving wheel controls; their type and location are unknown."
         if sentiment == "positive"
         else "The desired outcome is full roof opening; current opening behavior is unknown.",
@@ -461,8 +582,17 @@ def test_topic_index_preserves_unknown_needs_and_source_ambiguity(
         }
     }
     attempts = []
+    if topic == "ambient-lighting-praise":
+        description = Observation.model_json_schema()["properties"]["customer_need"][
+            "description"
+        ].casefold()
+        assert "positive and neutral" in description
+        assert "explicitly tentative" in description
 
     def call(schema, instructions, data, policy):
+        if topic == "ambient-lighting-praise":
+            assert "positive and neutral" in instructions.casefold()
+            assert "explicitly tentative" in instructions.casefold()
         if schema is module.Reconciliation:
             assert data["new"][topic] == descriptor
             return module.Reconciliation(

@@ -16,7 +16,7 @@ from app.ingest_types import CoverageIssue, ParsedPassage, ParseResult
 from app.parser_models import ModelArtifactsUnavailable, verify_artifacts
 from app.wire import PDFLocator, Scope
 
-PARSER_REVISION = "docling-pdf-v5"
+PARSER_REVISION = "docling-pdf-v6"
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 PDFKind = Literal["equipment", "strategy"]
 
@@ -359,7 +359,9 @@ def normalize_document(
                 int(cell["start_col_offset_idx"]),
             )
             rows[row].append(cell)
-            if cell.get("column_header"):
+            # A body availability mark can be misclassified as a later header.
+            # It cannot replace the genuine model name or establish one itself.
+            if cell.get("column_header") and re.search(r"\w", str(cell["text"])):
                 for column in range(col, int(cell["end_col_offset_idx"])):
                     headers[column].append(str(cell["text"]).strip())
                     header_cells[column].append(cell)

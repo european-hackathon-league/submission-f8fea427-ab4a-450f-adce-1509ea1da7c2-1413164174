@@ -6,6 +6,7 @@
 **/.ruff_cache/
 **/.mypy_cache/
 backend/.local/
+.local/
 backend/private-results/
 doc\googledrive
 # Frontend local artifacts

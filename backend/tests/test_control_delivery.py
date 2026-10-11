@@ -362,6 +362,237 @@ def test_export_freezes_decisions_and_download_is_workspace_authorized(client):
     assert error.value.status_code == 404
 
 
+@pytest.mark.parametrize("format", ["json", "xlsx"])
+def test_export_preserves_external_citations_from_selected_proposal_generation(
+    client, format
+):
+    import json
+
+    from app.auth import Actor
+    from app.db import Run, Session, StageOutput
+    from app.exports import create_export, download_export, export_build
+
+    actor = Actor("pm_demo", "workspace_demo", "pm")
+    run_id, generation = ready_run(client)
+    external = w.Evidence(
+        evidence_id="external_supported",
+        source_version_id="external_version",
+        source_kind="external",
+        locator=w.WebLocator(
+            url="https://example.test/study", passage_start=4, passage_end=23
+        ),
+        scope=w.Scope(markets=["DE"]),
+        excerpt="Original research quote",
+        limitations=["Public sample"],
+        source_url="https://example.test/study",
+    ).model_dump(mode="json")
+    opposing = deepcopy(external)
+    opposing.update(evidence_id="external_opposing", excerpt="Original counterpoint")
+    newer = deepcopy(external)
+    newer["excerpt"] = "Newer generation must not replace frozen source"
+    with Session.begin() as session:
+        row = session.get(StageOutput, (run_id, generation, "proposals:1"))
+        proposals = deepcopy(row.payload)
+        proposals["changes"][0]["supporting_evidence_ids"] = [external["evidence_id"]]
+        proposals["changes"][0]["opposing_evidence_ids"] = [opposing["evidence_id"]]
+        row.payload = proposals
+        for stage, source in [
+            ("research_sources", external),
+            ("research:step:1", opposing),
+        ]:
+            session.add(
+                StageOutput(
+                    run_id=run_id,
+                    generation_id=generation,
+                    stage_key=stage,
+                    payload={"sources": [{"evidence": source}]},
+                )
+            )
+        current_generation = str(uuid4())
+        session.get(Run, run_id).generation_id = current_generation
+        session.add(
+            StageOutput(
+                run_id=run_id,
+                generation_id=current_generation,
+                stage_key="research_sources",
+                payload={"sources": [{"evidence": newer}]},
+            )
+        )
+    job = create_export(
+        actor,
+        run_id,
+        w.ExportCommand(
+            proposal_set_version=1, variant_ids=["variant_a"], format=format
+        ),
+        str(uuid4()),
+    )
+    assert export_build([run_id, current_generation, job.resource_id]) == "ready"
+    binary, _ = download_export(actor, run_id, job.resource_id)
+    with Session() as session:
+        frozen = session.get(
+            StageOutput, (run_id, current_generation, f"export:{job.resource_id}")
+        )
+        assert {e["evidence_id"] for e in frozen.payload["snapshot"]["evidence"]} == {
+            external["evidence_id"],
+            opposing["evidence_id"],
+        }
+    if format == "json":
+        evidence = {e["evidence_id"]: e for e in json.loads(binary)["evidence"]}
+        assert evidence == {
+            external["evidence_id"]: external,
+            opposing["evidence_id"]: opposing,
+        }
+    else:
+        book = load_workbook(BytesIO(binary), read_only=True)
+        headers, *rows = list(book["Evidence"].values)
+        evidence = {
+            row[headers.index("evidence_id")]: dict(zip(headers, row, strict=True))
+            for row in rows
+        }
+        for expected in [external, opposing]:
+            actual = evidence[expected["evidence_id"]]
+            for key, value in expected.items():
+                assert (
+                    json.loads(actual[key])
+                    if isinstance(value, (dict, list))
+                    else actual[key]
+                ) == value
+        book.close()
+
+
+def test_export_rejects_external_citation_missing_from_selected_generation(client):
+    from sqlalchemy import select
+
+    from app.auth import Actor
+    from app.db import Session, StageOutput
+    from app.exports import create_export
+
+    run_id, generation = ready_run(client)
+    with Session.begin() as session:
+        row = session.get(StageOutput, (run_id, generation, "proposals:1"))
+        proposals = deepcopy(row.payload)
+        proposals["changes"][0]["supporting_evidence_ids"] = ["unavailable_external"]
+        row.payload = proposals
+    with pytest.raises(HTTPException) as error:
+        create_export(
+            Actor("pm_demo", "workspace_demo", "pm"),
+            run_id,
+            w.ExportCommand(
+                proposal_set_version=1, variant_ids=["variant_a"], format="json"
+            ),
+            str(uuid4()),
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "evidence_unavailable"
+    with Session() as session:
+        assert (
+            session.scalar(
+                select(StageOutput).where(
+                    StageOutput.run_id == run_id, StageOutput.stage_key.like("export:%")
+                )
+            )
+            is None
+        )
+
+
+@pytest.mark.parametrize("format", ["json", "xlsx"])
+def test_export_includes_baseline_citations_outside_selected_changes(client, format):
+    import json
+
+    from sqlalchemy import select
+    from test_ingestion_cache import feedback
+
+    from app.auth import Actor
+    from app.db import EvidenceArtifact, RunEvidence, RunSource, Session, StageOutput
+    from app.exports import create_export, download_export, export_build
+    from app.ingestion import publish_batch
+
+    run_id, generation = ready_run(client)
+    with Session() as session:
+        source = session.scalar(select(RunSource).where(RunSource.run_id == run_id))
+        version, binding = source.source_version_id, source.binding
+    publish_batch(run_id, generation, version, feedback(binding))
+    with Session.begin() as session:
+        evidence_id = session.scalar(
+            select(RunEvidence.evidence_id).where(RunEvidence.run_id == run_id)
+        )
+        artifact = session.get(EvidenceArtifact, evidence_id)
+        artifact.source_kind = "equipment"
+        artifact.locator = w.PDFLocator(page=18).model_dump(mode="json")
+        artifact.excerpt = "Comfort seats are optional in the documented market."
+        session.add(
+            StageOutput(
+                run_id=run_id,
+                generation_id=generation,
+                stage_key="baselines",
+                payload={
+                    "items": {
+                        "finding_a": {
+                            "basis_evidence_ids": [evidence_id],
+                            "claims": [{"evidence_id": evidence_id}],
+                        }
+                    }
+                },
+            )
+        )
+    actor = Actor("pm_demo", "workspace_demo", "pm")
+    job = create_export(
+        actor,
+        run_id,
+        w.ExportCommand(
+            proposal_set_version=1, variant_ids=["variant_a"], format=format
+        ),
+        str(uuid4()),
+    )
+    assert export_build([run_id, generation, job.resource_id]) == "ready"
+    binary, _ = download_export(actor, run_id, job.resource_id)
+    if format == "json":
+        evidence = json.loads(binary)["evidence"]
+    else:
+        book = load_workbook(BytesIO(binary), read_only=True)
+        exported_rows = list(book["Evidence"].values)
+        assert len(exported_rows) == 2
+        headers, *rows = exported_rows
+        evidence = [dict(zip(headers, row, strict=True)) for row in rows]
+        for item in evidence:
+            item["locator"] = json.loads(item["locator"])
+        book.close()
+    assert len(evidence) == 1
+    assert evidence[0]["evidence_id"] == evidence_id
+    assert evidence[0]["locator"]["page"] == 18
+    assert evidence[0]["excerpt"] == artifact.excerpt
+
+
+def test_export_rejects_missing_analysis_citation(client):
+    from app.auth import Actor
+    from app.db import Session, StageOutput
+    from app.exports import create_export
+
+    run_id, generation = ready_run(client)
+    with Session.begin() as session:
+        session.add(
+            StageOutput(
+                run_id=run_id,
+                generation_id=generation,
+                stage_key="baselines",
+                payload={
+                    "items": {"finding_a": {"claims": [{"evidence_id": "missing"}]}}
+                },
+            )
+        )
+    with pytest.raises(HTTPException) as error:
+        create_export(
+            Actor("pm_demo", "workspace_demo", "pm"),
+            run_id,
+            w.ExportCommand(
+                proposal_set_version=1, variant_ids=["variant_a"], format="json"
+            ),
+            str(uuid4()),
+        )
+    assert error.value.status_code == 409
+    assert error.value.detail["code"] == "evidence_unavailable"
+
+
 def test_unconfigured_renderer_fails_explicitly_retains_proposals_and_retry_identity(
     client, monkeypatch
 ):

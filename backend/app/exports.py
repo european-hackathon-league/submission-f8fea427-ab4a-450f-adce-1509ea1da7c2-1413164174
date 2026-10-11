@@ -24,6 +24,7 @@ from app.db import (
     EvidenceArtifact,
     Outbox,
     Run,
+    RunEvidence,
     Session,
     SourceVersion,
     StageOutput,
@@ -100,12 +101,72 @@ def create_export(
             for change in frozen_proposals.changes
             for value in change.supporting_evidence_ids + change.opposing_evidence_ids
         }
+        analysis = {
+            value.stage_key: deepcopy(value.payload)
+            for value in outputs
+            if value.generation_id == row.generation_id
+            and value.stage_key
+            in {
+                "findings",
+                "baselines",
+                "research",
+                "research_sources",
+                "conflicts",
+                "configuration",
+            }
+        }
+        pending: list[Any] = [analysis]
+        while pending:
+            value = pending.pop()
+            if isinstance(value, dict):
+                for field, item in value.items():
+                    if field == "evidence_id" and isinstance(item, str):
+                        evidence_ids.add(item)
+                    elif field.endswith("evidence_ids") and isinstance(item, list):
+                        evidence_ids.update(item)
+                    else:
+                        pending.append(item)
+            elif isinstance(value, list):
+                pending.extend(value)
         evidence = session.scalars(
-            select(EvidenceArtifact).where(
+            select(EvidenceArtifact)
+            .join(RunEvidence, RunEvidence.evidence_id == EvidenceArtifact.id)
+            .where(
+                RunEvidence.run_id == run_id,
+                RunEvidence.generation_id == row.generation_id,
                 EvidenceArtifact.id.in_(evidence_ids),
                 EvidenceArtifact.source_version_id.in_(proposals.source_version_ids),
             )
         ).all()
+        external: dict[str, w.Evidence] = {}
+        for output in outputs:
+            if output.generation_id != row.generation_id or not (
+                output.stage_key == "research_sources"
+                or output.stage_key.startswith("research:step:")
+            ):
+                continue
+            for source in output.payload.get("sources", []):
+                item = w.Evidence.model_validate(source["evidence"])
+                if item.evidence_id not in evidence_ids:
+                    continue
+                if item.source_kind != "external":
+                    raise ValueError("Research source has an invalid evidence kind")
+                previous = external.get(item.evidence_id)
+                if previous is not None and previous != item:
+                    raise ValueError(
+                        "Research evidence identity changed across snapshots"
+                    )
+                external[item.evidence_id] = item
+        artifact_ids = {item.id for item in evidence}
+        if (
+            artifact_ids & external.keys()
+            or evidence_ids != artifact_ids | external.keys()
+        ):
+            reject(
+                "evidence_unavailable",
+                "Export cited evidence is unavailable in the selected version",
+                409,
+            )
         snapshot: dict[str, Any] = {
             "proposals": frozen_proposals.model_dump(mode="json"),
             "config": deepcopy(run.config),
@@ -130,21 +191,9 @@ def create_export(
                     "limitations": value.limitations,
                 }
                 for value in evidence
-            ],
-            "analysis": {
-                value.stage_key: deepcopy(value.payload)
-                for value in outputs
-                if value.generation_id == row.generation_id
-                and value.stage_key
-                in {
-                    "findings",
-                    "baselines",
-                    "research",
-                    "research_sources",
-                    "conflicts",
-                    "configuration",
-                }
-            },
+            ]
+            + [value.model_dump(mode="json") for value in external.values()],
+            "analysis": analysis,
             "renders": [
                 render_snapshot(value.payload, run_id)
                 for value in outputs

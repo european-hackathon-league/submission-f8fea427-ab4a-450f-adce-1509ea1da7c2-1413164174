@@ -101,6 +101,8 @@ AI extraction uses the configured Responses API model and strict typed outputs;
 missing credentials, refusals, exhausted repairs and unsupported evidence remain
 explicit failed/partial stages. Counts include distinct uploaded logical feedback
 records only. Studies, sales and external research never increase those counts.
+Unrecovered extraction batches and feedback exceeding the model input limit stop
+analysis before baselines or proposals; completed findings remain available.
 The model, catalog, prompt/schema revisions, reference year and planning horizon
 are frozen for each run. Extraction and baseline batches retain provider response
 IDs, token usage and coverage outcomes so worker retries resume committed work.

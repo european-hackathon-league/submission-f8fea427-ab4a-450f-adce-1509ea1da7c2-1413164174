@@ -4,6 +4,32 @@ import json
 import pytest
 
 
+@pytest.mark.parametrize("genuine_header", [True, False])
+def test_availability_symbol_marked_as_header_does_not_replace_model_label(
+    genuine_header,
+):
+    from app.pdf import normalize_document
+    from tests.fixtures.pdf import equipment_document
+
+    document = equipment_document()
+    cells = document["tables"][0]["data"]["table_cells"]
+    cells[6].update(column_header=True, text="■")
+    document["texts"][1]["text"] = "■ Serienausstattung; ○ Sonderausstattung"
+    if not genuine_header:
+        cells.remove(cells[2])
+    result = normalize_document(document, "equipment")
+    option = next(
+        p
+        for p in result.passages
+        if p.attributes.get("option_code") == "4ZZ"
+        and p.attributes.get("table_column") == 2
+    )
+    assert option.attributes["model_column"] == ("520i" if genuine_header else None)
+    assert option.attributes["availability"] == (
+        "standard" if genuine_header else "unknown"
+    )
+
+
 @pytest.mark.parametrize(
     ("description", "references"),
     [

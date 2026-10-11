@@ -33,6 +33,11 @@ function contractHarness(failAssetOnce: boolean): Plugin {
 export default defineConfig(({ mode, command }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
+    server: {
+      proxy: env.FRONTEND_CONTRACT_HARNESS === "1" ? undefined : {
+        "/api": { target: "http://127.0.0.1:8000", changeOrigin: true },
+      },
+    },
     plugins: [
       react(),
       ...(command === "serve" && env.FRONTEND_CONTRACT_HARNESS === "1"

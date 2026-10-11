@@ -2,10 +2,16 @@ services:
   api:
     environment:
       APP_ENV_FILE: /run/secrets/app_env
+      CATALOG_PATH: /srv/scene-catalog-v1.json
+    volumes:
+      - ../frontend/public/vehicles/scene-catalog-v1.json:/srv/scene-catalog-v1.json:ro
     secrets: [app_env]
   worker:
     environment:
       APP_ENV_FILE: /run/secrets/app_env
+      CATALOG_PATH: /srv/scene-catalog-v1.json
+    volumes:
+      - ../frontend/public/vehicles/scene-catalog-v1.json:/srv/scene-catalog-v1.json:ro
     secrets: [app_env]
 secrets:
   app_env:

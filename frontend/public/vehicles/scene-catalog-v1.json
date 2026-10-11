@@ -1,5 +1,6 @@
 {
   "vehicle_id": "g60-i5-m60",
+  "synthetic": false,
   "baseline_asset_id": "i5-m60-exterior-v1",
   "baseline_asset": {
     "type": "sketchfab",

@@ -143,6 +143,25 @@ def test_pm_cannot_inject_approval_or_unsupported_numeric_target():
             )
 
 
+def test_frontend_cohort_regroup_preserves_evidence_and_rejects_invented_scopes():
+    base = sample()
+    instruction = w.Instruction(
+        operation="regroup_variants",
+        base_proposal_set_version=1,
+        target_ids=["variant_a"],
+        changed_fields={"cohort_ids": ["cohort_b"]},
+    )
+    result = apply_instruction(base, instruction, "generation_b")
+    assert result.variants[0].cohort_ids == ["cohort_b"]
+    assert result.variants[0].change_ids == base.variants[0].change_ids
+    assert result.changes == base.changes
+    assert base.variants[0].cohort_ids == ["cohort_a", "cohort_b"]
+    instruction.changed_fields = {"cohort_ids": ["invented"]}
+    with pytest.raises(HTTPException) as error:
+        apply_instruction(base, instruction, "generation_b")
+    assert error.value.status_code == 422
+
+
 def test_more_variants_without_distinct_supported_scope_reports_a_gap():
     base = sample()
     base.variants[0].cohort_ids = ["cohort_a"]

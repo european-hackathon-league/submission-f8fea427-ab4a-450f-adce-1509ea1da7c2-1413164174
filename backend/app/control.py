@@ -228,21 +228,37 @@ def apply_instruction(
         if (
             not targets
             or any(target not in variants for target in targets)
-            or set(fields) != {"change_ids"}
+            or set(fields) not in ({"change_ids"}, {"cohort_ids"})
         ):
             reject(
-                "invalid_instruction", "Regroup requires variants and change_ids", 422
+                "invalid_instruction",
+                "Regroup requires variants and change_ids or cohort_ids",
+                422,
             )
-        requested = fields["change_ids"]
+        field = "cohort_ids" if "cohort_ids" in fields else "change_ids"
+        known = (
+            {cohort for variant in result.variants for cohort in variant.cohort_ids}
+            | {
+                cohort
+                for change in result.changes
+                for cohort in change.scope.cohort_ids
+            }
+            if field == "cohort_ids"
+            else set(changes)
+        )
+        requested = fields[field]
         if not isinstance(requested, list) or any(
-            value not in changes for value in requested
+            value not in known for value in requested
         ):
-            reject("invalid_target", "Regrouped changes must exist", 422)
+            reject("invalid_target", "Regrouped changes or cohorts must exist", 422)
         for target in targets:
-            variants[target].change_ids = list(dict.fromkeys(requested))
-            variants[target].requirement_ids = list(
-                dict.fromkeys(changes[value].requirement_id for value in requested)
-            )
+            if field == "cohort_ids":
+                variants[target].cohort_ids = list(dict.fromkeys(requested))
+            else:
+                variants[target].change_ids = list(dict.fromkeys(requested))
+                variants[target].requirement_ids = list(
+                    dict.fromkeys(changes[value].requirement_id for value in requested)
+                )
     elif operation == "request_more_variants":
         if (
             fields

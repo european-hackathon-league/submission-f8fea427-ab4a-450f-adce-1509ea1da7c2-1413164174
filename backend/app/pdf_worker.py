@@ -2,6 +2,7 @@
 
 import json
 import logging
+import math
 import socket
 import sys
 import time
@@ -27,6 +28,56 @@ def readable_pdf(path: Path) -> tuple[Path, int]:
         writer.write(decrypted)
         path = decrypted
     return path, len(reader.pages)
+
+
+def positioned_pdf_text(
+    path: Path, page_numbers: list[int]
+) -> dict[int, list[dict[str, Any]]]:
+    from pypdf import PdfReader, mult
+
+    reader = PdfReader(path)
+    positioned: dict[int, list[dict[str, Any]]] = {}
+    for number in page_numbers:
+        page = reader.pages[number - 1]
+        fragments: list[dict[str, Any]] = []
+        positioned[number] = fragments
+        if page.rotation % 360 or page.get("/UserUnit", 1) != 1:
+            continue
+        left, top = float(page.mediabox.left), float(page.mediabox.top)
+        width, height = float(page.mediabox.width), float(page.mediabox.height)
+        invalid = False
+
+        def visit(
+            text: str, cm: list[float], tm: list[float], font: Any, size: float
+        ) -> None:
+            nonlocal invalid
+            if not text.strip():
+                return
+            matrix = mult(tm, cm)
+            if not all(math.isfinite(value) for value in matrix):
+                invalid = True
+                return
+            x, y = matrix[4] - left, top - matrix[5]
+            if not (0 <= x <= width and 0 <= y <= height):
+                invalid = True
+                return
+            fragment: dict[str, Any] = {"x": x, "y": y, "text": text.rstrip("\r\n")}
+            if (
+                font is None
+                or "\n" in text.strip()
+                or "\r" in text.strip()
+                or matrix[0] <= 0
+                or matrix[3] <= 0
+                or abs(matrix[1]) > 1e-8
+                or abs(matrix[2]) > 1e-8
+            ):
+                fragment["uncertain"] = True
+            fragments.append(fragment)
+
+        page.extract_text(visitor_text=visit)
+        if invalid:
+            positioned[number] = []
+    return positioned
 
 
 def extract(request: dict[str, Any]) -> dict[str, Any]:
@@ -101,7 +152,10 @@ def extract(request: dict[str, Any]) -> dict[str, Any]:
         ]
         context.extend(result.passages)
         normalized = normalize_document(
-            converted.document.export_to_dict(), kind, context_passages=context
+            converted.document.export_to_dict(),
+            kind,
+            context_passages=context,
+            positioned_text=positioned_pdf_text(path, list(range(first, last + 1))),
         )
         result.passages.extend(normalized.passages)
         result.coverage.extend(normalized.coverage)

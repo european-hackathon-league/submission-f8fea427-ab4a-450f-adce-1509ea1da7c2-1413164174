@@ -1,3 +1,5 @@
+from threading import Barrier, Event, Lock
+
 import httpx
 import pytest
 from openai import APITimeoutError
@@ -362,6 +364,157 @@ def test_baseline_equipment_software_and_date_conditions_remain_visible():
     }
 
 
+def test_baseline_inference_accepts_complete_scoped_context_but_remains_bounded():
+    summary = (
+        "One fictional customer praises existing physical controls while describing complex electronics. "
+        "This may suggest a tentative usability need for understandable access to vehicle functions and "
+        "preservation of appreciated controls. Praise does not establish an explicit retention request, "
+        "and the hypothetical removal of controls is not an actual failure or a measured distraction effect. "
+        "The source provides one experience despite three duplicate annotations; these must not be counted "
+        "as three respondents or interpreted as independent corroboration. The individual electronics "
+        "complaint does not establish a population-wide capability gap, offering issue, service issue, "
+        "or confirmed defect, and it must remain separate from unrelated praise for ride quality and space. "
+        "Scoped fictional vehicle-A study context has seven control-usability categories: I Hate It 4%, "
+        "A Failure 1%, Unsatisfactory 4%, Satisfactory 22%, Excellent 26%, Delightful 23%, and I Love It 20%. "
+        "These mixed ratings describe broad control usability, not manual controls or entertainment alone. "
+        "The favorable and unfavorable categories qualify any generalization while neither confirming "
+        "nor disproving this individual's experience. Their respondent denominator and sample size are "
+        "unknown, so fractions must not become feedback-record counts or a quantified defect rate. "
+        "Study evidence for vehicle B is outside this assessment and is not pooled with vehicle A. "
+        "No relevant supplied equipment claim establishes physical-control availability for the target "
+        "configuration. Foreign-market option listings cannot confirm the customer's equipment, software, "
+        "model year, or local availability. Missing documentation remains unknown rather than absent. "
+        "A future preservation priority would be a planning assumption requiring vehicle-specific usability "
+        "research and engineering validation; this evidence alone establishes no required redesign."
+    )
+    assert 1500 < len(summary) <= 3000
+    payload = {
+        "finding_id": "synthetic-finding",
+        "need_kind": "usability",
+        "baseline_claims": [],
+        "preserve_strengths": ["Appreciated existing physical controls"],
+        "inference": summary,
+        "basis_evidence_ids": ["synthetic-feedback", "synthetic-study"],
+        "uncertainty": ["Sample size and target applicability unknown"],
+        "future_assumptions": [],
+    }
+    assessed = module.NeedAssessment.model_validate(payload)
+    assert assessed.inference == summary
+    with pytest.raises(ValueError):
+        module.NeedAssessment.model_validate({**payload, "inference": "x" * 3001})
+
+
+@pytest.mark.parametrize(
+    "topic, quote, sentiment",
+    [
+        (
+            "cornering-observation",
+            "There is a difference in cornering; comparison unclear.",
+            "neutral",
+        ),
+        (
+            "digital-key-status",
+            "The customer confirmed Digital Key was already configured.",
+            "neutral",
+        ),
+        (
+            "wheel-controls",
+            "Thankfully there are still manual push buttons and wheel controls.",
+            "positive",
+        ),
+        (
+            "roof-opening",
+            "I wish the roof would open fully.",
+            "negative",
+        ),
+    ],
+)
+def test_topic_index_preserves_unknown_needs_and_source_ambiguity(
+    monkeypatch, topic, quote, sentiment
+):
+    observation = Observation(
+        evidence_id="neutral-source",
+        quote=quote,
+        topic_key=topic,
+        title="Neutral product observation",
+        customer_need="No customer need or desired change is established by this source."
+        if sentiment == "neutral"
+        else "Praise may suggest preserving wheel controls; their type and location are unknown."
+        if sentiment == "positive"
+        else "The desired outcome is full roof opening; current opening behavior is unknown.",
+        sentiment=sentiment,
+        need_kind="capability",
+        part_ids=[],
+        mapping_kind="unmapped",
+        mapping_rationale="The subject is retained as context without an established need or catalog part.",
+    )
+    descriptor = {
+        "title": observation.title,
+        "customer_need": observation.customer_need,
+        "need_kind": observation.need_kind,
+    }
+    registry = {
+        "established-capability": {
+            "title": "Specific requested capability",
+            "customer_need": "An explicitly requested improvement",
+            "need_kind": "capability",
+        }
+    }
+    attempts = []
+
+    def call(schema, instructions, data, policy):
+        if schema is module.Reconciliation:
+            assert data["new"][topic] == descriptor
+            return module.Reconciliation(
+                links=[
+                    module.TopicLink(
+                        topic_key=topic,
+                        canonical_key=topic,
+                        basis="Retain a distinct neutral observation index; no need is established.",
+                    )
+                ]
+            ), {}
+        assert data["candidate"][0]["customer_need"] == observation.customer_need
+        assert data["candidate"][0]["canonical_need"] == descriptor
+        assert data["candidate"][0]["topic_key"] == topic
+        accepted = (
+            "mandatory topic index" in instructions and "must not merge" in instructions
+        )
+        if sentiment == "positive":
+            accepted = (
+                accepted
+                and "ambiguous" in instructions
+                and "steering-wheel" in instructions
+            )
+        if topic == "roof-opening":
+            accepted = accepted and "current partial opening" in instructions
+        return module.Review(
+            accepted=accepted,
+            objections=[]
+            if accepted
+            else [
+                "Remove the neutral canonical link and mandatory need_kind classification."
+            ],
+        ), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    assert module.reconcile_topics(
+        {topic: descriptor},
+        registry,
+        [observation],
+        [{"evidence_id": "neutral-source", "excerpt": quote}],
+        {},
+        attempts,
+        1,
+    ) == {topic: topic}
+    assert observation.customer_need == descriptor["customer_need"]
+    assert (
+        registry["established-capability"]["customer_need"]
+        == "An explicitly requested improvement"
+    )
+    assert [a["phase"] for a in attempts] == ["reconciliation", "reconciliation_review"]
+
+
 def test_missing_provider_credentials_publish_explicit_failure_without_fake_findings(
     monkeypatch,
 ):
@@ -402,8 +555,15 @@ def test_existing_stage_returns_persisted_status_and_stale_generation_stops(
     assert stage(["synthetic-run", "synthetic-generation"]) == "superseded"
 
 
-def test_baseline_review_sees_operator_target_separately_from_source_scope(monkeypatch):
+@pytest.mark.parametrize(
+    "failure", [None, "source_kind", "quote", "availability", "basis", "provider"]
+)
+@pytest.mark.parametrize("sentiment", ["negative", "positive"])
+def test_baseline_review_sees_operator_target_and_repairs_invalid_claims(
+    monkeypatch, failure, sentiment
+):
     row = observation("one", "respondent", cohorts=["GB"])
+    row["sentiment"] = sentiment
     row["scope"] = w.Scope(markets=["GB"], cohort_ids=["GB"]).model_dump()
     findings = aggregate([row], [], "synthetic-run")
     config = {"vehicle_id": "vehicle_demo", "market_context": ["DE"]}
@@ -413,8 +573,23 @@ def test_baseline_review_sees_operator_target_separately_from_source_scope(monke
             "source_kind": "feedback",
             "excerpt": row["quote"],
             "scope": row["scope"],
-        }
+        },
+        {
+            "evidence_id": "equipment",
+            "source_kind": "equipment",
+            "excerpt": "Seat comfort package",
+            "scope": w.Scope(
+                vehicle_ids=["vehicle_demo"], markets=["GB"], year=2026
+            ).model_dump(),
+            "details": {"availability": "optional"},
+            "limitations": [],
+        },
     ]
+    if failure == "provider":
+        evidence.extend(
+            {"evidence_id": str(index), "source_kind": "study", "excerpt": "x" * 40001}
+            for index in range(2)
+        )
     stages = {"findings": findings}
     calls = []
     monkeypatch.setenv("OPENAI_API_KEY", "synthetic-controlled-test")
@@ -442,16 +617,56 @@ def test_baseline_review_sees_operator_target_separately_from_source_scope(monke
         assert data["target_scope"] == config
         assert data["finding"]["cohort_ids"] == ["GB"]
         if schema is module.NeedAssessment:
+            if sentiment == "positive":
+                assert "inference itself" in instructions
+                assert "all supplied relevant rating categories" in instructions
+                assert "unrelated strengths" in instructions
+            if failure == "provider":
+                raise ValueError("Provider validation could not be repaired")
+            invalid = failure and calls.count(schema) == 1
+            if failure and not invalid:
+                assert data["previous_objections"]
+                objection = " ".join(data["previous_objections"])
+                assert findings["findings"][0]["finding_id"] in objection
+                assert (
+                    "one" in objection
+                    if failure == "source_kind"
+                    else "equipment" in objection
+                )
+                assert data["claim_evidence_ids"] == ["equipment"]
+                assert data["previous_assessment"]
             return module.NeedAssessment(
                 finding_id=findings["findings"][0]["finding_id"],
                 need_kind="usability",
-                baseline_claims=[],
+                baseline_claims=[
+                    module.BaselineClaim(
+                        evidence_id="one"
+                        if invalid and failure == "source_kind"
+                        else "equipment",
+                        quote="Fabricated"
+                        if invalid and failure == "quote"
+                        else "Seat comfort",
+                        availability="standard"
+                        if invalid and failure == "availability"
+                        else "optional",
+                        behavior="Seat comfort package availability",
+                    )
+                ]
+                if failure
+                else [],
                 preserve_strengths=[],
                 inference="Feedback may suggest a need for seat comfort.",
-                basis_evidence_ids=["one"],
+                basis_evidence_ids=["equipment-outside-input"]
+                if invalid and failure == "basis"
+                else ["one"],
                 uncertainty=["GB feedback does not establish DE applicability"],
                 future_assumptions=[],
             ), {}
+        if sentiment == "positive":
+            assert data["finding"]["supporting_evidence_ids"] == []
+            assert data["finding"]["opposing_evidence_ids"] == ["one"]
+            assert "immutable" in instructions
+            assert "positive feedback opposes" in instructions
         return module.Review(accepted=True, objections=[]), {}
 
     monkeypatch.setattr(module, "_call", call)
@@ -459,7 +674,134 @@ def test_baseline_review_sees_operator_target_separately_from_source_scope(monke
         module.establish_baselines(["synthetic-run", "synthetic-generation"])
         == "partial"
     )
-    assert calls == [module.NeedAssessment, module.Review]
+    assert calls == (
+        [module.NeedAssessment, module.NeedAssessment]
+        if failure == "provider"
+        else [module.NeedAssessment, module.NeedAssessment, module.Review]
+        if failure
+        else [module.NeedAssessment, module.Review]
+    )
     baseline = next(iter(stages["baselines"]["items"].values()))
     assert baseline["state"] == "unknown"
-    assert "GB feedback does not establish DE applicability" in baseline["uncertainty"]
+    assert len(baseline["uncertainty"]) == len(set(baseline["uncertainty"]))
+    if failure == "provider":
+        assert "baseline_provider_validation_failed" in baseline["uncertainty"]
+        assert baseline["uncertainty"].count("baseline_evidence_budget_limited") == 1
+    else:
+        assert (
+            "GB feedback does not establish DE applicability" in baseline["uncertainty"]
+        )
+    if failure and failure != "provider":
+        assert "baseline_provider_validation_failed" not in baseline["uncertainty"]
+        assert baseline["claims"][0]["applicability"] == "mismatch"
+        assert "market_mismatch" in baseline["claims"][0]["limitations"]
+
+
+@pytest.mark.parametrize("interrupted", [False, True])
+def test_baselines_run_four_at_a_time_preserving_order_and_completed_checkpoints(
+    monkeypatch,
+    interrupted,
+):
+    findings = [
+        {
+            "finding_id": str(index),
+            "title": "Seat comfort",
+            "customer_need": "Comfortable seats",
+            "supporting_evidence_ids": ["feedback"],
+            "opposing_evidence_ids": [],
+            "cohort_ids": ["GB"],
+            "counts": {"total_records": 1},
+        }
+        for index in range(6)
+    ]
+    stages = {
+        "findings": {"findings": findings},
+        "baselines:0": {"finding_id": "0", "state": "unknown"},
+    }
+    barrier = Barrier(4, timeout=2)
+    lock = Lock()
+    later_checkpoint = Event()
+    active = 0
+    peak = 0
+    called = []
+    completed = []
+    resuming = False
+    monkeypatch.setattr(
+        module, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(
+        module,
+        "_inputs",
+        lambda *args: (
+            {"reference_year": 2026, "planning_horizon": 2030},
+            [{"evidence_id": "feedback", "source_kind": "feedback", "excerpt": "Seat"}],
+            {},
+        ),
+    )
+    monkeypatch.setattr(
+        module, "get_stage", lambda run, generation, key: stages.get(key)
+    )
+
+    def put_stage(run, generation, key, payload, **kwargs):
+        with lock:
+            stages[key] = payload
+            if key.startswith("baselines:"):
+                completed.append(payload["finding_id"])
+                if payload["finding_id"] != "1":
+                    later_checkpoint.set()
+
+    monkeypatch.setattr(module, "put_stage", put_stage)
+
+    def call(schema, instructions, data, policy):
+        nonlocal active, peak
+        identifier = data["finding"]["finding_id"]
+        if schema is module.NeedAssessment:
+            with lock:
+                active += 1
+                peak = max(peak, active)
+                called.append(identifier)
+            if identifier != "5" and not resuming:
+                barrier.wait()
+            return module.NeedAssessment(
+                finding_id=identifier,
+                need_kind="usability",
+                baseline_claims=[],
+                preserve_strengths=[],
+                inference="Seat comfort may need validation.",
+                basis_evidence_ids=["feedback"],
+                uncertainty=["One respondent does not establish population need"],
+                future_assumptions=[],
+            ), {}
+        if identifier == "1":
+            assert later_checkpoint.wait(2)
+        with lock:
+            active -= 1
+        if identifier == "1" and interrupted and not resuming:
+            raise RuntimeError("Interrupted assessment activity")
+        return module.Review(accepted=True, objections=[]), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    if interrupted:
+        with pytest.raises(RuntimeError, match="Interrupted assessment activity"):
+            module.establish_baselines(["run", "generation"])
+        assert "baselines" not in stages
+        assert "baselines:1" not in stages
+        assert all("baselines:" + str(index) in stages for index in [0, 2, 3, 4])
+        remaining = {
+            str(index) for index in range(6) if "baselines:" + str(index) not in stages
+        }
+        resuming = True
+        before_resume = list(called)
+        assert module.establish_baselines(["run", "generation"]) == "partial"
+        assert set(called[len(before_resume) :]) == remaining
+    else:
+        assert module.establish_baselines(["run", "generation"]) == "partial"
+    assert peak == 4
+    assert sorted(set(called)) == ["1", "2", "3", "4", "5"]
+    assert completed[0] != "1"
+    assert list(stages["baselines"]["items"]) == [str(index) for index in range(6)]
+    stages.pop("baselines")
+    called.clear()
+    assert module.establish_baselines(["run", "generation"]) == "partial"
+    assert called == []

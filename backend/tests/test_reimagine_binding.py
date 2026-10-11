@@ -3,6 +3,7 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from sqlalchemy import select
 from test_control_delivery import ready_run, sample
 
 from app import wire as w
@@ -180,6 +181,58 @@ def test_baseline_catalog_is_authorized_and_bound_to_the_run(client, monkeypatch
     )
     catalog["part_catalog_version"] = "other"
     assert client.get(f"/api/v1/runs/{run_id}/geometry").status_code == 502
+
+
+def test_vehicle_geometry_is_authenticated_and_verified_without_a_run(
+    client, monkeypatch
+):
+    import app.rendering as rendering
+    from app import runs
+    from app.db import Audit, Session
+
+    config = runs.catalog()
+    path = f"/api/v1/vehicles/{config['vehicle_id']}/geometry"
+    catalog = {
+        "contract_version": "1",
+        "baseline_asset_id": config["baseline_asset_id"],
+        "asset_id": config["baseline_asset_id"],
+        "part_catalog_version": config["part_catalog_version"],
+        "units": "m",
+        "parts": [],
+        "baseline_url": "http://private/asset",
+    }
+    calls = []
+    monkeypatch.setattr(
+        rendering, "renderer_call", lambda *args: calls.append(args) or catalog
+    )
+    monkeypatch.setattr(
+        rendering, "renderer_asset_bytes", lambda *args: (b"glTF", "model/gltf-binary")
+    )
+    assert client.get(path, headers={"Authorization": ""}).status_code == 401
+    assert (
+        client.get(path, headers={"X-Workspace-ID": "workspace_other"}).status_code
+        == 403
+    )
+    assert client.get("/api/v1/vehicles/unknown/geometry").status_code == 404
+    assert calls == []
+    response = client.get(path)
+    assert response.status_code == 200
+    assert response.json()["baseline_url"] == path + "/asset"
+    asset = client.get(path + "/asset")
+    assert asset.status_code == 200
+    assert asset.content == b"glTF"
+    assert asset.headers["cache-control"] == "private, no-store"
+    with Session() as session:
+        row = session.scalars(
+            select(Audit).where(
+                Audit.action == "geometry.asset.read",
+                Audit.resource_id == config["vehicle_id"],
+            )
+        ).first()
+        assert row is not None and row.run_id is None
+    catalog["part_catalog_version"] = "other"
+    assert client.get(path).status_code == 502
+    assert client.get(path + "/asset").status_code == 502
 
 
 def test_retry_resumes_existing_renderer_job(client, monkeypatch):

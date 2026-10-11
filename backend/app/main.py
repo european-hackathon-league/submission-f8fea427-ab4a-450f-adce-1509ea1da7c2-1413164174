@@ -516,6 +516,24 @@ def geometry_catalog(run_id: str, identity: Auth) -> w.GeometrySceneCatalog:
     return rendering.baseline_catalog(identity, run_id)
 
 
+@router.get("/vehicles/{vehicle_id}/geometry", response_model=w.GeometrySceneCatalog)
+def vehicle_geometry_catalog(vehicle_id: str, identity: Auth) -> w.GeometrySceneCatalog:
+    return rendering.vehicle_baseline_catalog(vehicle_id)
+
+
+@router.get("/vehicles/{vehicle_id}/geometry/asset", response_model=None)
+def vehicle_geometry_asset(vehicle_id: str, identity: Auth) -> Response:
+    data, media_type = rendering.vehicle_baseline_bytes(identity, vehicle_id)
+    return Response(
+        data,
+        media_type=media_type,
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
+
+
 @router.get("/runs/{run_id}/geometry/asset", response_model=None)
 def geometry_asset(run_id: str, identity: Auth) -> Response:
     data, media_type = rendering.baseline_bytes(identity, run_id)

@@ -18,6 +18,7 @@ from app.config import Settings
 from app.control import accepted, proposal_row, require_pm, resource_row, stale
 from app.db import EvidenceArtifact, Outbox, Run, RunEvidence, Session, StageOutput
 from app.evidence import external_evidence
+from app.runs import catalog as vehicle_catalog
 
 
 def build_manifest(
@@ -545,9 +546,24 @@ def renderer_asset_bytes(url: str, media_type: str) -> tuple[bytes, str]:
 def baseline_catalog(actor: Actor, run_id: str) -> w.GeometrySceneCatalog:
     with Session() as session:
         config = owned_run(session, actor, run_id).config
+    return verified_baseline_catalog(config, f"/api/v1/runs/{run_id}/geometry", run_id)
+
+
+def vehicle_baseline_catalog(vehicle_id: str) -> w.GeometrySceneCatalog:
+    config = vehicle_catalog()
+    if config["vehicle_id"] != vehicle_id:
+        reject("vehicle_not_found", "Vehicle is not in the configured catalog", 404)
+    return verified_baseline_catalog(
+        config, f"/api/v1/vehicles/{quote(vehicle_id, safe='')}/geometry", vehicle_id
+    )
+
+
+def verified_baseline_catalog(
+    config: dict[str, Any], resource_path: str, key: str
+) -> w.GeometrySceneCatalog:
     try:
         catalog = w.GeometrySceneCatalog.model_validate(
-            renderer_call("GET", "/renderer/v1/baseline/catalog", run_id)
+            renderer_call("GET", "/renderer/v1/baseline/catalog", key)
         )
     except httpx.HTTPError, ValueError:
         reject(
@@ -561,9 +577,11 @@ def baseline_catalog(actor: Actor, run_id: str) -> w.GeometrySceneCatalog:
         or catalog.part_catalog_version != config["part_catalog_version"]
     ):
         reject(
-            "invalid_catalog", "Geometry catalog does not match the saved vehicle", 502
+            "invalid_catalog",
+            "Geometry catalog does not match the selected vehicle",
+            502,
         )
-    catalog.baseline_url = f"/api/v1/runs/{run_id}/geometry/asset"
+    catalog.baseline_url = resource_path + "/asset"
     return catalog
 
 
@@ -572,6 +590,16 @@ def baseline_bytes(actor: Actor, run_id: str) -> tuple[bytes, str]:
     with Session.begin() as session:
         owned_run(session, actor, run_id)
         audit(session, actor, "geometry.asset.read", run_id, run_id)
+    return renderer_asset_bytes(
+        Settings().renderer_url.rstrip("/") + "/renderer/v1/baseline/asset",
+        "model/gltf-binary",
+    )
+
+
+def vehicle_baseline_bytes(actor: Actor, vehicle_id: str) -> tuple[bytes, str]:
+    vehicle_baseline_catalog(vehicle_id)
+    with Session.begin() as session:
+        audit(session, actor, "geometry.asset.read", vehicle_id)
     return renderer_asset_bytes(
         Settings().renderer_url.rstrip("/") + "/renderer/v1/baseline/asset",
         "model/gltf-binary",

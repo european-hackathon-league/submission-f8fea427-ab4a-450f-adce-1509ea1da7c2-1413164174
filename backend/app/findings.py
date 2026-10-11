@@ -2,6 +2,7 @@
 
 import json
 from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Literal
 
 from openai import APITimeoutError, OpenAI, OpenAIError
@@ -17,7 +18,7 @@ from app.config import Settings
 from app.db import EvidenceArtifact, Run, RunEvidence, Session
 from app.ingestion import stable_id
 
-PROMPT_REVISION = "findings-v4"
+PROMPT_REVISION = "findings-v9"
 SCALE_ID = "negative-share-v1"
 MAX_BATCH_CHARACTERS = 40000
 MAX_TOPICS = 200
@@ -28,8 +29,14 @@ class Observation(w.Wire):
     quote: str = Field(min_length=1, max_length=4000)
     topic_key: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=80)
     title: str = Field(min_length=1, max_length=200)
-    customer_need: str = Field(min_length=1, max_length=1000)
-    sentiment: Literal["negative", "positive", "neutral"]
+    customer_need: str = Field(
+        min_length=1,
+        max_length=1000,
+        description="A source-supported need or preservation of praised strengths. For neutral observations with no stated need, explicitly retain that uncertainty; never invent a desire.",
+    )
+    sentiment: Literal["negative", "positive", "neutral"] = Field(
+        description="Sentiment of the reported experience. Praise for an existing feature with a hypothetical worse alternative is positive, not an actual negative experience. Acknowledging advice or promising to test is not successful operation.",
+    )
     need_kind: Literal[
         "capability", "usability", "offering", "service", "possible_defect"
     ]
@@ -82,9 +89,19 @@ class NeedAssessment(w.Wire):
     need_kind: Literal[
         "capability", "usability", "offering", "service", "possible_defect"
     ]
-    baseline_claims: list[BaselineClaim] = Field(max_length=20)
-    preserve_strengths: list[str] = Field(max_length=20)
-    inference: str = Field(min_length=1, max_length=1500)
+    baseline_claims: list[BaselineClaim] = Field(
+        max_length=20,
+        description="Only supplied equipment evidence IDs with exact original quotes and parsed availability. Feedback and studies establish experience/context, not equipment claims; use an empty list when no relevant equipment evidence exists.",
+    )
+    preserve_strengths: list[str] = Field(
+        max_length=20,
+        description="Source-supported strengths relevant to this finding only; exclude unrelated praise from the same feedback record.",
+    )
+    inference: str = Field(
+        min_length=1,
+        max_length=3000,
+        description="Complete, concise sentences within 3000 characters. Distinguish reported facts from interpretation. Qualify every inferred need, preservation priority or classification in this text itself (e.g. may suggest), not only in uncertainty. Praise is not an explicit request; ambiguous feedback can establish no specific need. Omit irrelevant other-model study context rather than truncating relevant evidence and caveats.",
+    )
     basis_evidence_ids: list[str] = Field(min_length=1, max_length=100)
     uncertainty: list[str] = Field(min_length=1, max_length=20)
     future_assumptions: list[str] = Field(max_length=20)
@@ -435,7 +452,7 @@ def reconcile_topics(
         try:
             reconciled, outcome = _call(
                 Reconciliation,
-                "Reconcile new topics with the existing need registry. Merge only equivalent underlying customer tasks; sharing a part or broad subject is insufficient. Opposing experiences of the same task belong to one need. Emit exactly one link for each new key. Existing registry descriptions are immutable. A new topic whose key collides with a different existing need must receive a distinct new canonical key. Canonical keys may be existing keys or new stable short English keys. Include a semantic basis for each link and repair previous objections.",
+                "Reconcile new topics with the existing need registry. Merge only equivalent underlying customer tasks; sharing a part or broad subject is insufficient. Opposing experiences of the same task belong to one need. Emit exactly one link for each new key. Topic keys also index neutral product observations with explicitly unestablished needs; their canonical key is an observation label, not a customer request. Keep such observations distinct from established needs and preserve their uncertainty. The required need_kind routes the observation subject provisionally; it does not establish a customer need. Preserve ambiguous control type and location: wheel controls do not establish steering-wheel-mounted controls unless the source explicitly says so. Reject unsupported narrowing, and retain the original ambiguity even when a parent part mapping is valid. A roof wish to open fully establishes a desired outcome, not current partial opening, mechanism details or confirmed missing capability; retain the baseline as unknown unless stated by the source. Existing registry descriptions are immutable. A new topic whose key collides with a different existing need must receive a distinct new canonical key. Canonical keys may be existing keys or new stable short English keys. Include a semantic basis for each link and repair previous objections.",
                 {
                     "existing": registry,
                     "new": new_topics,
@@ -465,7 +482,7 @@ def reconcile_topics(
                     raise ValueError("cyclic_topic_reconciliation")
             reviewed, outcome = _call(
                 Review,
-                "Check every proposed topic link against both need descriptions and original source evidence. The canonical need must be supported by every source linked to it: do not narrow general praise to a specific preference or invent a need from a neutral observation. Equivalence must work both ways. Reject merging different customer tasks or splitting equivalent needs. Existing registry descriptions stay immutable; a colliding new topic may use a fresh canonical key to preserve its distinct need. Positive and negative experiences of the same task must retain the same need. Each stated basis must match the supplied descriptions.",
+                "Check every proposed topic link against both need descriptions and original source evidence. Respect the mandatory topic index and required need_kind routing fields: neutral product observations may retain a distinct canonical label while explicitly stating that no customer need is established. That label and provisional routing classification do not assert a need; do not demand removing mandatory links or categories. Neutral observations with unestablished needs must not merge into established customer needs. Preserve ambiguous control type and location: wheel controls do not establish steering-wheel-mounted controls unless the source explicitly says so. Reject unsupported narrowing, and retain the original ambiguity even when a parent part mapping is valid. A roof wish to open fully establishes a desired outcome, not current partial opening, mechanism details or confirmed missing capability; retain the baseline as unknown unless stated by the source. The canonical description must be supported by every source linked to it: do not narrow general praise to a specific preference or invent a need from a neutral observation. Equivalence must work both ways. Reject merging different customer tasks or splitting equivalent needs. Existing registry descriptions stay immutable; a colliding new topic may use a fresh canonical key to preserve its distinct need. Positive and negative experiences of the same task must retain the same need. Each stated basis must match the supplied descriptions.",
                 {
                     "existing": registry,
                     "new": new_topics,
@@ -574,7 +591,7 @@ def extract_findings(args: list[str]) -> str:
                     try:
                         extracted, outcome = _call(
                             Extraction,
-                            "Extract every distinct product observation, including positive strengths and contradictions, from each feedback annotation. Split multiple customer tasks into separate observations. Translate the need/title to English but quote exact original text, including German. Use catalog IDs only; VFC classification is a hint, never proof of a physical part. Keep unmapped/vehicle-wide topics without inventing a part. Distinguish isolated possible defects, service/offering, capabilities and usability. Every evidence ID must have observations or an explicit disposition. Use stable short English topic keys for the underlying need, not its sentiment. Repair any previous validation objections.",
+                            "Extract every distinct product observation, including positive strengths and contradictions, from each feedback annotation. Split multiple customer tasks into separate observations. Translate the need/title to English but quote exact original text, including German. Use catalog IDs only; VFC classification is a hint, never proof of a physical part. Keep unmapped/vehicle-wide topics without inventing a part. Distinguish isolated possible defects, service/offering, capabilities and usability. Every evidence ID must have observations or an explicit disposition. Use stable short English topic keys for the underlying need or neutral observation subject, not its sentiment. Topic keys are mandatory indexes, not proof that a customer need exists. Keep neutral product observations with explicit no-established-need uncertainty; the mandatory need_kind routes their subject provisionally, not as a confirmed customer requirement. Never invent a desire from an unclear comparison or configuration acknowledgement. Preserve ambiguous control type and location: wheel controls do not establish steering-wheel-mounted controls unless the source explicitly says so. Reject unsupported narrowing, and retain the original ambiguity even when a parent part mapping is valid. A roof wish to open fully establishes a desired outcome, not current partial opening, mechanism details or confirmed missing capability; retain the baseline as unknown unless stated by the source. Repair any previous validation objections.",
                             {
                                 "evidence": batch,
                                 "catalog": policy["catalog"],
@@ -601,7 +618,7 @@ def extract_findings(args: list[str]) -> str:
                         )
                         reviewed, review_outcome = _call(
                             Review,
-                            "Independently check these observations against the original source evidence and catalog. Reject unsupported needs, sentiment errors, omitted product topics/positive feedback/disagreement, incorrect multilingual interpretation, and unsupported part mappings. No observation may claim scope not in its source. Dispositions must be justified. Accept only if the complete batch is faithfully represented.",
+                            "Independently check these observations against the original source evidence and catalog. Reject unsupported needs, sentiment errors, omitted product topics/positive feedback/disagreement, incorrect multilingual interpretation, and unsupported part mappings. No observation may claim scope not in its source. Neutral product observations with explicit no-established-need uncertainty are valid. Their mandatory topic_key and need_kind are observation indexing and provisional routing, not assertions of a customer request; do not demand removing these required fields or inventing a need to populate them. Reject any actual unsupported desire or confirmed requirement, and keep ambiguous observations separate from established customer needs. Preserve ambiguous control type and location: wheel controls do not establish steering-wheel-mounted controls unless the source explicitly says so. Reject unsupported narrowing, and retain the original ambiguity even when a parent part mapping is valid. A roof wish to open fully establishes a desired outcome, not current partial opening, mechanism details or confirmed missing capability; retain the baseline as unknown unless stated by the source. Do not count hypothetical absence of a praised existing feature as an actual negative experience. Acknowledging support instructions does not establish successful feature operation or defect resolution. Dispositions must be justified. Accept only if the complete batch is faithfully represented.",
                             {
                                 "evidence": batch,
                                 "catalog": policy["catalog"],
@@ -781,17 +798,15 @@ def establish_baselines(args: list[str]) -> str:
         for item in evidence
         if item["source_kind"] in {"study", "sales", "strategy"}
     ]
-    for index, finding in enumerate(findings["findings"]):
+
+    def assess(finding: dict[str, Any]) -> dict[str, Any] | None:
         if not _current_generation(run_id, generation):
-            return "superseded"
-        if activity.in_activity():
-            activity.heartbeat("baselines", index)
+            return None
         identifier = finding["finding_id"]
         checkpoint = "baselines:" + identifier
         saved = get_stage(run_id, generation, checkpoint)
         if saved is not None:
-            baselines[identifier] = saved
-            continue
+            return saved
         source_ids = (
             finding["supporting_evidence_ids"] + finding["opposing_evidence_ids"]
         )
@@ -859,17 +874,24 @@ def establish_baselines(args: list[str]) -> str:
             "attempts": [],
         }
         if settings.openai_api_key.get_secret_value():
+            previous_assessment = None
             for attempt in range(2):
                 try:
                     assessed, outcome = _call(
                         NeedAssessment,
-                        "Establish the customer's underlying need and relevant current baseline using only supplied evidence. Preserve positive strengths. Separate capability, usability, offering and service issues from isolated possible defects; a single complaint is not a population-wide need. Equipment establishes availability, feedback reports experience, studies provide scoped aggregate context, and sales/strategy provide broader context; never combine incompatible metrics into corroboration or respondents. Select only relevant equipment claims with exact quotes; availability cannot be stronger than parsed source availability. Missing information is unknown, never absent. Do not launch competitor research. Name the basis and uncertainty of every inference. Future assumptions must be explicit assumptions for the configured planning horizon. Do not claim US availability from a German source. Repair previously recorded validation objections.",
+                        "Establish the customer's underlying need and relevant current baseline using only supplied evidence. Preserve positive strengths relevant to this finding; exclude unrelated strengths from the same record. Mark inferred needs, preservation priorities and classifications explicitly tentative in the inference itself, not only the uncertainty list: praise may suggest preservation but is not an explicit request. Ambiguous feedback can establish no specific need. Separate capability, usability, offering and service issues from isolated possible defects; a single complaint is not a population-wide need. Equipment establishes availability, feedback reports experience, studies provide scoped aggregate context, and sales/strategy provide broader context; never combine incompatible metrics into corroboration or respondents. If using study ratings, account for all supplied relevant rating categories, including positive and negative counterevidence, retaining scope and unknown sample-size/denominator caveats without transferring unrelated metrics. Select only relevant equipment claims from claim_evidence_ids with exact original quotes; availability cannot be stronger than parsed source availability. Missing information is unknown, never absent. Do not launch competitor research. Name the basis and uncertainty of every inference. Future assumptions must be explicit assumptions for the configured planning horizon. Do not claim US availability from a German source. The finding is immutable: positive feedback opposes a negative-state improvement in its evidence-link contract, yet can support preserving a strength; never reinterpret its link label as negative sentiment or request changing its links. Repair all previously recorded validation objections in the previous assessment while retaining its supported content. Keep inference complete and concise within 3000 characters, finishing every sentence and relevant scoped rating distribution. Omit irrelevant other-model study context rather than truncating relevant evidence or caveats.",
                         {
                             "finding": finding,
                             "evidence": supplied,
                             "target_scope": config,
                             "reference_year": policy["reference_year"],
                             "planning_horizon": policy["planning_horizon"],
+                            "claim_evidence_ids": [
+                                item["evidence_id"]
+                                for item in supplied
+                                if item["source_kind"] == "equipment"
+                            ],
+                            "previous_assessment": previous_assessment,
                             "previous_objections": [
                                 objection
                                 for recorded in saved["attempts"]
@@ -878,13 +900,16 @@ def establish_baselines(args: list[str]) -> str:
                         },
                         policy,
                     )
+                    previous_assessment = assessed.model_dump(mode="json")
                     saved["attempts"].append({"attempt": attempt + 1, **outcome})
                     supplied_ids = {item["evidence_id"] for item in supplied}
                     if (
                         assessed.finding_id != identifier
                         or not set(assessed.basis_evidence_ids) <= supplied_ids
                     ):
-                        raise ValueError("invalid_baseline_basis")
+                        raise ValueError(
+                            f"invalid_baseline_basis:{identifier}:returned_finding={assessed.finding_id}:unsupported_evidence={sorted(set(assessed.basis_evidence_ids) - supplied_ids)}; use the supplied finding ID and evidence IDs only"
+                        )
                     claims = []
                     for claim in assessed.baseline_claims:
                         source_item = by_id.get(claim.evidence_id)
@@ -895,7 +920,9 @@ def establish_baselines(args: list[str]) -> str:
                             or not claim.quote.strip()
                             or claim.quote not in source_item["excerpt"]
                         ):
-                            raise ValueError("unsupported_baseline_claim")
+                            raise ValueError(
+                                f"unsupported_baseline_claim:{identifier}:{claim.evidence_id}; use only supplied claim_evidence_ids of source_kind equipment and an exact quote from that source excerpt; feedback/study context belongs in inference and basis_evidence_ids, not baseline_claims; omit unsupported claims"
+                            )
                         parsed_availability = source_item["details"].get(
                             "availability", "unknown"
                         )
@@ -903,7 +930,9 @@ def establish_baselines(args: list[str]) -> str:
                             claim.availability != "unknown"
                             and claim.availability != parsed_availability
                         ):
-                            raise ValueError("unsupported_availability")
+                            raise ValueError(
+                                f"unsupported_availability:{identifier}:{claim.evidence_id}:claimed={claim.availability}:parsed={parsed_availability}; use parsed availability or unknown; applicability and scope limitations remain separate"
+                            )
                         applicable, limitations = applicability(
                             w.Scope.model_validate(source_item["scope"]),
                             config,
@@ -946,7 +975,7 @@ def establish_baselines(args: list[str]) -> str:
                         )
                     semantic, review_outcome = _call(
                         Review,
-                        "Validate relevance of all baseline claims and customer-need classification against the source. Reject inferred absence, incorrect population generalization, fabricated capabilities or strengths, missing counterevidence, unsupported translations, and inferences whose basis does not support them. Every inference must remain explicitly uncertain. Future statements must be assumptions for the configured horizon, not present facts.",
+                        "Validate only the candidate assessment against supplied sources; the finding and its evidence links are immutable input. In that contract positive feedback opposes a negative-state improvement and can still support preservation; do not require moving its IDs between supporting/opposing lists or treat link labels as sentiment. Reject inferred absence, incorrect population generalization, fabricated capabilities or strengths, missing relevant counterevidence, unsupported translations, and inferences whose basis does not support them. Every inferred need, preservation priority and classification must be explicitly tentative in the inference itself, not just an uncertainty list. No specific need can be established from ambiguous feedback; positive praise can tentatively motivate preservation without proving an explicit request. Strengths must be relevant to this finding, not unrelated praise in the same source. When study context is used, account for supplied relevant positive and negative rating categories and their scope/sample-size caveats; do not require unrelated measures or unsupplied evidence. Future statements must be assumptions for the configured horizon, not present facts. Give specific, jointly actionable objections to the assessment's editable fields, preserving source-supported content.",
                         {
                             "finding": finding,
                             "evidence": supplied,
@@ -1011,23 +1040,38 @@ def establish_baselines(args: list[str]) -> str:
                         )
                     break
                 except (OpenAIError, ValidationError, ValueError) as error:
+                    code = (
+                        str(error)
+                        if type(error) is ValueError
+                        else type(error).__name__
+                    )
                     saved["attempts"].append(
                         {
                             "attempt": attempt + 1,
-                            "code": str(error)
-                            if type(error) is ValueError
-                            else type(error).__name__,
+                            "code": code,
+                            "objections": [code],
                         }
                     )
             else:
                 saved["uncertainty"].append("baseline_provider_validation_failed")
         else:
             saved["uncertainty"].append("ai_credentials_unavailable")
+        saved["uncertainty"] = list(dict.fromkeys(saved["uncertainty"]))
         put_stage(run_id, generation, checkpoint, saved)
         published = get_stage(run_id, generation, checkpoint)
         if published is None:
             raise ValueError("Baseline checkpoint publication missing")
-        baselines[identifier] = published
+        return published
+
+    with ThreadPoolExecutor(max_workers=4) as executor:
+        for index, (finding, baseline) in enumerate(
+            zip(findings["findings"], executor.map(assess, findings["findings"]))
+        ):
+            if baseline is None:
+                return "superseded"
+            if activity.in_activity():
+                activity.heartbeat("baselines", index)
+            baselines[finding["finding_id"]] = baseline
     status = (
         "failed"
         if findings.get("status") == "failed"

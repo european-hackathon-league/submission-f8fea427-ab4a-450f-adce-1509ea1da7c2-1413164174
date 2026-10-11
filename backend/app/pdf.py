@@ -16,7 +16,7 @@ from app.ingest_types import CoverageIssue, ParsedPassage, ParseResult
 from app.parser_models import ModelArtifactsUnavailable, verify_artifacts
 from app.wire import PDFLocator, Scope
 
-PARSER_REVISION = "docling-pdf-v3"
+PARSER_REVISION = "docling-pdf-v5"
 MAX_OUTPUT_BYTES = 8 * 1024 * 1024
 PDFKind = Literal["equipment", "strategy"]
 
@@ -49,11 +49,171 @@ def _locator(
     return PDFLocator(page=page, bbox=region, section=section)
 
 
+def _positioned_descriptions(
+    document: dict[str, Any],
+    cells: list[dict[str, Any]],
+    provenance: dict[str, Any],
+    fragments: list[dict[str, Any]],
+) -> dict[int, tuple[str, str]]:
+    """Recover physical equipment rows, keeping Docling's model/symbol grid."""
+    if not fragments:
+        return {}
+    page = int(provenance["page_no"])
+    boxed = [
+        (cell, _locator(document, {"page_no": page, "bbox": cell.get("bbox")}).bbox)
+        for cell in cells
+    ]
+    codes = [
+        (cell, box)
+        for cell, box in boxed
+        if box
+        and not cell.get("column_header")
+        and re.fullmatch(r"[A-Z0-9]{3}", str(cell["text"]).strip())
+    ]
+    if not codes:
+        return {}
+    code_columns = {int(cell["start_col_offset_idx"]) for cell, _ in codes}
+    if len(code_columns) != 1:
+        return {}
+    # A description column contains prose, unlike prices and availability symbols.
+    descriptions = [
+        (cell, box)
+        for cell, box in boxed
+        if box
+        and not cell.get("column_header")
+        and len(str(cell["text"])) > 3
+        and re.search(r"[a-zA-Z]{4}", str(cell["text"]))
+        and int(cell["start_col_offset_idx"]) not in code_columns
+    ]
+    columns: dict[int, int] = defaultdict(int)
+    for cell, _ in descriptions:
+        columns[int(cell["start_col_offset_idx"])] += len(str(cell["text"]))
+    if not columns:
+        return {}
+    description_column = max(columns, key=lambda col: columns[col])
+    description_boxes = [
+        box
+        for cell, box in descriptions
+        if int(cell["start_col_offset_idx"]) == description_column
+    ]
+    left = min(box[0] for box in description_boxes)
+    right = max(box[2] for box in description_boxes)
+    # Section cells may span the whole table. Do not let their width admit
+    # neighboring prices, option codes, or model symbols into the prose.
+    preceding = [
+        box[2]
+        for cell, box in boxed
+        if box and int(cell["end_col_offset_idx"]) <= description_column
+    ]
+    following = [
+        box[0]
+        for cell, box in boxed
+        if box and int(cell["start_col_offset_idx"]) > description_column
+    ]
+    if preceding:
+        left = max(left, max(preceding) + 2)
+    if following:
+        right = min(right, min(following) - 2)
+    if right <= left:
+        return {}
+    anchors = []
+    for cell, box in codes:
+        matches = [
+            fragment
+            for fragment in fragments
+            if not fragment.get("uncertain")
+            and str(fragment["text"]).strip() == str(cell["text"]).strip()
+            and box[0] - 2 <= float(fragment["x"]) <= box[2] + 2
+            and box[1] - 2 <= float(fragment["y"]) <= box[3] + 2
+        ]
+        if len(matches) != 1:
+            return {}  # Never guess a missing or duplicated source code anchor.
+        anchors.append((float(matches[0]["y"]), str(cell["text"]).strip(), cell))
+    anchors.sort(key=lambda anchor: anchor[0])
+    if any(second[0] - first[0] < 2 for first, second in zip(anchors, anchors[1:])):
+        return {}
+    sections = [
+        box[1]
+        for cell, box in descriptions
+        if int(cell["start_col_offset_idx"]) == description_column
+        and str(cell["text"]).strip().isupper()
+    ]
+    table_bottom = max(box[3] for _, box in boxed if box) + 2
+    if any(
+        fragment.get("uncertain")
+        and left - 2 <= float(fragment["x"]) <= right + 2
+        and anchors[0][0] - 0.8 <= float(fragment["y"]) <= table_bottom
+        for fragment in fragments
+    ):
+        return {}
+    recovered = []
+    for index, (start, code, _) in enumerate(anchors):
+        end = anchors[index + 1][0] if index + 1 < len(anchors) else table_bottom
+        end = min([end] + [boundary for boundary in sections if boundary > start + 2])
+        selected = sorted(
+            [
+                fragment
+                for fragment in fragments
+                if left - 2 <= float(fragment["x"]) <= right + 2
+                and start - 0.8 <= float(fragment["y"]) < end - 0.8
+            ],
+            key=lambda fragment: (round(float(fragment["y"])), float(fragment["x"])),
+        )
+        lines: list[tuple[float, list[str]]] = []
+        for fragment in selected:
+            text = str(fragment["text"]).strip()
+            if not text:
+                continue
+            y = float(fragment["y"])
+            if not lines or abs(lines[-1][0] - y) > 0.8:
+                lines.append((y, []))
+            lines[-1][1].append(text)
+        description = "\n".join(" ".join(parts) for _, parts in lines)
+        if not description:
+            return {}
+        recovered.append((start, end, code, description))
+    result = {}
+    for row in {
+        int(cell["start_row_offset_idx"])
+        for cell in cells
+        if not cell.get("column_header")
+    }:
+        own_codes = [
+            anchor
+            for anchor in anchors
+            if int(anchor[2]["start_row_offset_idx"])
+            <= row
+            < int(anchor[2]["end_row_offset_idx"])
+        ]
+        if len(own_codes) == 1:
+            y = own_codes[0][0]
+        else:
+            row_boxes = [
+                box
+                for cell, box in boxed
+                if box
+                and int(cell["start_row_offset_idx"]) == row
+                and int(cell["start_col_offset_idx"]) != description_column
+            ]
+            if not row_boxes:
+                continue
+            y = min(box[1] for box in row_boxes) + 2
+        row_matches = [
+            (code, description)
+            for start, end, code, description in recovered
+            if start - 0.8 <= y < end - 0.8
+        ]
+        if len(row_matches) == 1:
+            result[row] = row_matches[0]
+    return result
+
+
 def normalize_document(
     document: dict[str, Any],
     kind: PDFKind,
     *,
     context_passages: list[ParsedPassage] | None = None,
+    positioned_text: dict[int, list[dict[str, Any]]] | None = None,
 ) -> ParseResult:
     """Normalize an actual Docling export without translating original passages."""
     result = ParseResult(
@@ -180,6 +340,16 @@ def normalize_document(
         table_locator = _locator(document, provenance[0], section)
         data = table.get("data", {})
         cells = data.get("table_cells", [])
+        source_descriptions = (
+            _positioned_descriptions(
+                document,
+                cells,
+                provenance[0],
+                (positioned_text or {}).get(table_locator.page, []),
+            )
+            if kind == "equipment"
+            else {}
+        )
         rows: dict[int, list[dict[str, Any]]] = defaultdict(list)
         headers: dict[int, list[str]] = defaultdict(list)
         header_cells: dict[int, list[dict[str, Any]]] = defaultdict(list)
@@ -231,7 +401,81 @@ def normalize_document(
                 if cell not in code_cells and len(str(cell["text"]).strip()) > 3
             ]
             description = " | ".join(str(cell["text"]) for cell in description_cells)
-            condition_ids = re.findall(r"\b(\d+)\)|(?<!\d)([¹²³⁴⁵⁶⁷⁸⁹])", description)
+            description_association_unknown = False
+            if code_cells:
+                code_box = _locator(
+                    document,
+                    {"page_no": table_locator.page, "bbox": code_cells[0].get("bbox")},
+                ).bbox
+                next_code_tops = [
+                    other_box[1]
+                    for other in cells
+                    if int(other["start_row_offset_idx"]) > row
+                    and not other.get("column_header")
+                    and re.fullmatch(r"[A-Z0-9]{3}", str(other["text"]).strip())
+                    and (
+                        other_box := _locator(
+                            document,
+                            {"page_no": table_locator.page, "bbox": other.get("bbox")},
+                        ).bbox
+                    )
+                ]
+                description_association_unknown = code_box is not None and any(
+                    (
+                        box := _locator(
+                            document,
+                            {
+                                "page_no": table_locator.page,
+                                "bbox": candidate.get("bbox"),
+                            },
+                        ).bbox
+                    )
+                    and (
+                        box[1] < code_box[1] - 3
+                        or bool(next_code_tops)
+                        and box[3] > min(next_code_tops) + 3
+                    )
+                    for candidate in description_cells
+                )
+            source_row = source_descriptions.get(row)
+            if source_row:
+                code, description = source_row
+                description_association_unknown = False
+            elif description_association_unknown:
+                result.passages.append(
+                    ParsedPassage(
+                        source_kind=kind,
+                        text=description,
+                        locator=table_locator,
+                        scope=scope,
+                        attributes={
+                            "claim_role": "context",
+                            "condition_association": "unknown",
+                        },
+                        limitations=[
+                            "Equipment description crosses a row boundary; condition association is unknown"
+                        ],
+                    )
+                )
+                description = ""
+                result.coverage.append(
+                    CoverageIssue(
+                        code="unknown_condition_association",
+                        message="Merged description cannot be associated with one equipment option",
+                        locator=table_locator,
+                    )
+                )
+            # Scan a copy: model labels and explicit page citations are prose,
+            # even when their final digits resemble flattened note markers.
+            reference_text = re.sub(
+                r"\bi[1-9]\b|\b(?:Seiten?|pages?)\s+\d+(?:\s*[-–]\s*\d+)?\)?",
+                "",
+                description,
+                flags=re.IGNORECASE,
+            )
+            condition_ids = re.findall(
+                r"\b(\d+)\)|(?<!\d)([¹²³⁴⁵⁶⁷⁸⁹])", reference_text
+            )
             superscripts = str.maketrans("¹²³⁴⁵⁶⁷⁸⁹", "123456789")
             condition_ids = [
                 number or superscript.translate(superscripts)
@@ -242,7 +486,7 @@ def normalize_document(
                 word_final or isolated
                 for word_final, isolated in re.findall(
                     r"(?<=[^\W\d])([1-9])(?=\s|$)|(?<=\s)([1-9])(?=\s*(?:\n|$))",
-                    description,
+                    reference_text,
                 )
             )
             condition_ids = list(dict.fromkeys(condition_ids))
@@ -271,11 +515,26 @@ def normalize_document(
                         locator=table_locator,
                     )
                 )
-            conditions.extend(
-                line.strip()
-                for line in description.splitlines()
-                if re.search(r"Nur in Verbindung|Hinweis:|nur mit", line, re.IGNORECASE)
-            )
+            condition_lines = description.splitlines()
+            for index, line in enumerate(condition_lines):
+                if not re.search(
+                    r"in Verbindung|Hinweis:|nur mit", line, re.IGNORECASE
+                ):
+                    continue
+                continuation = [line.strip()]
+                for following_line in condition_lines[index + 1 :]:
+                    if (
+                        not following_line.strip()
+                        or re.match(r"\s*[-–•]", following_line)
+                        or re.search(
+                            r"in Verbindung|Hinweis:|nur mit",
+                            following_line,
+                            re.IGNORECASE,
+                        )
+                    ):
+                        break
+                    continuation.append(following_line.strip())
+                conditions.append("\n".join(continuation))
             for cell in row_cells:
                 col = int(cell["start_col_offset_idx"])
                 header = " / ".join(headers.get(col, [])) or None
@@ -311,6 +570,7 @@ def normalize_document(
                     != 1
                     or not description
                     or bool(unresolved)
+                    or description_association_unknown
                 )
                 availability = (
                     "unknown" if ambiguous else legends.get(symbol, "unknown")
@@ -345,6 +605,9 @@ def normalize_document(
                                 "symbol": symbol,
                                 "availability": availability,
                                 "conditions": conditions,
+                                "condition_association": "unknown"
+                                if description_association_unknown
+                                else "source_associated",
                                 "footnote_references": condition_ids,
                                 "edition": edition,
                                 "table_row": row,

@@ -1,5 +1,7 @@
 # Backend development
 
+For the connected frontend, use the [root startup instructions](../README.md#run-the-connected-application). They use the separate `vehicle-app` Compose project and `compose.live.yaml`, which loads the configured AI credentials and mounts the frontend's i5 M60 scene catalog into both API and worker. The base Compose configuration below retains the synthetic backend catalog for backend development/tests. Keep backend database tests separate from the application database.
+
 Work in `backend/`. The runtime and parser dependencies are locked with uv
 0.13.0 for Python 3.14.8. Docker is the verified path on Windows; host application
 control can block Python extension modules. Development services bind to loopback.

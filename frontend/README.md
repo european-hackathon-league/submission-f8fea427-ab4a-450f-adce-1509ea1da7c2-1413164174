@@ -10,13 +10,13 @@ Suggestions open a compact review with an actual negative-feedback share, propos
 
 Counts are backend logical-record counts. Overlapping findings and cohorts are never summed into invented respondent totals, and unknown shares stay unknown. The graph draws only supplied node/edge identities. Sketchfab labels project asset-specific reference coordinates each frame, with collision-aware screen placement and leader lines; cabin coordinates are approximate regions, not verified meshes. Existing semantic part controls remain available if projection or 3D loading is unavailable.
 
-Normal development uses synthetic fixtures; live parsing, research, rendering, and persistent backend analysis require the configured authenticated API.
+Normal development uses the authenticated backend. Follow the [connected application setup](../README.md#run-the-connected-application) to start the API, worker and database with the shared i5 catalog. Synthetic fixtures remain available with `npm run dev:mock` or `npm run dev:harness`.
 
 ## Collection and model browsing
 
 The default entry shows the BMW journey and 24-model collection imported selectively from PR #10. `#workspace` opens the existing requirements workshop directly. Collection selections carry into run setup, and returning to the journey preserves the mounted workshop's uploads and edits. A saved run keeps its original vehicle configuration until **New run**.
 
-**Explore model in 360°** opens the PR's exterior sequence and interior panorama viewer from the workshop as well. These are representative family configurations, not verified exact-trim geometry or feedback mappings. Only catalog vehicles with baseline and part-catalog identifiers can start an analysis; currently the synthetic catalog enables the i5 M60. Other collection trims remain browsable without substituting that baseline.
+**Explore model in 360°** opens the PR's exterior sequence and interior panorama viewer from the workshop as well. These are representative family configurations, not verified exact-trim geometry or feedback mappings. Only catalog vehicles with baseline and part-catalog identifiers can start an analysis; the live stack and mock catalog enable the i5 M60. Other collection trims remain browsable without substituting that baseline.
 
 `src/collection/` retains the PR's JavaScript views, motion helpers and scoped styles. The PR's workspace, global stylesheet and application shell are excluded. Local assets include the 36 sampled spin frames per family, iX preview sequence, cabin panoramas and source manifests; unused high-resolution sequences are excluded. The cabin renderer loads Three.js lazily and requires WebGL.
 
@@ -33,8 +33,8 @@ npm run build
 
 Copy `.env.example` to `.env.local` as needed. No secrets are needed for mock mode. The development server binds to `127.0.0.1:5173` by default.
 
-- `VITE_API_MODE=mock` (default): synthetic wire fixtures, never analysis of uploaded contents. Refresh starts a new mock session. Published upload formats are XLSX/PDF; unsupported formats yield per-file rejection. Duplicate bytes share a synthetic source ID.
-- `VITE_API_MODE=real`: the same API boundary calls `VITE_API_BASE_URL` (default `/api/v1`). A separate backend must allow the frontend origin and credentialed requests. No development proxy is implicit. For local backend at port 8000, use `VITE_API_BASE_URL=http://127.0.0.1:8000/api/v1` and the backend's configured allowed frontend origin.
+- `VITE_API_MODE=mock`: explicit synthetic wire fixtures, never analysis of uploaded contents. `npm run dev:mock` selects this mode. Refresh starts a new mock session. Published upload formats are XLSX/PDF; unsupported formats yield per-file rejection. Duplicate bytes share a synthetic source ID.
+- `VITE_API_MODE=real` (default, including when unset): the API boundary calls `VITE_API_BASE_URL` (default `/api/v1`). Vite proxies `/api` to `http://127.0.0.1:8000`, preserving authorization, event streams and downloads. No CORS configuration is needed for this same-origin development path. Production needs its own reverse proxy or an explicitly configured backend URL and credentialed CORS policy.
 - `VITE_MOCK_SCENARIO`: named scenario, including `pm_edit_stale`, `deep_dive_success` and `deep_dive_partial`. Fixtures are synthetic and do not establish live analysis or generation.
 
 Real mode asks for an existing API access token and authorized workspace ID. It sends `Authorization: Bearer …` and `X-Workspace-ID`, matching the published backend contract. Tokens stay in memory, never browser storage, environment examples or URLs. Enter access again after reload; matching API/workspace restores current-tab run identity, selections and versioned proposal drafts. API consumers can instead supply `createRealApi(base, { headers: async () => applicationSessionHeaders, sessionNamespace })`. Existing identity provider, token issuance and membership remain external.
@@ -49,7 +49,7 @@ The G60 i5 M60 hosted exterior and bundled preview are labeled visual references
 
 Reimagine calls the application API, never a provider or `/renderer/v1/jobs`. Synthetic render outcomes do not generate geometry. Real exports must use API-returned authorized links and exact versions.
 
-Backend routes currently publish schemas but several analysis/proposal/render/export handlers return `501 not_implemented`. No backend was reachable at the documented localhost port during F6 acceptance; the current backend ref still has 501 handlers. Frontend fixture/network evidence is separate from live backend, original-file, external research and generation acceptance. Research dates and configured variant limits are absent from the current published schema; these dependencies remain explicit in the ledger.
+The backend implements analysis, proposal edits, decisions, history and exports. `npm run test:live` exercises the real upload-to-export path with the included synthetic workbook and configured AI provider. Historical F6 fixture evidence remains separate from this live integration check. Blender/rendering, external research and PDF model acceptance are separate gates. Research dates and configured variant limits remain absent from the published schema.
 
 
 F2 graph navigation resolves exact entity IDs, then exposes explicit finding choices. Search/type filters and progressive detail retain selected entity; paginated resources preserve server revisions. Findings stay grouped as spatially mapped, vehicle-wide, or unmapped/non-geometric. Unknown semantic IDs and hierarchy-only parts never select an unrelated viewer component. Saved run asset/catalog IDs, rather than current catalog defaults, determine viewer compatibility.
@@ -81,7 +81,7 @@ npm run dev:harness
 
 Open the printed localhost URL. Use public fixture token `harness-token` and one exact shared scenario name as Workspace ID: `standard_autonomous`, `deep_dive_success`, `deep_dive_partial`, `guided_conflict`, `duplicate_uploads`, `pm_edit_stale`, `render_partial`, `render_late`, `reconnect`, or `versioned_export`. Do not enter real credentials. The UI banner identifies synthetic HTTP fixtures; uploaded bytes are retained for source-opening tests but never analyzed. A file named `.xlsx` or `.pdf` exercises upload interaction without proving spreadsheet/PDF parsing.
 
-Tracked `.env.harness` sets `VITE_API_MODE=real`, same-origin `/api/v1`, and development-only harness activation. Existing shell variables or `.env.local` can override Vite configuration; remove those overrides when reproducing clean harness acceptance. The middleware is enabled only for development serve and is excluded from production builds. Normal `npm run dev` remains default mock mode. Production real mode requires a separately deployed backend and existing authorized access.
+Tracked `.env.harness` sets `VITE_API_MODE=real`, same-origin `/api/v1`, and development-only harness activation. Existing shell variables or `.env.local` can override Vite configuration; remove those overrides when reproducing clean harness acceptance. The harness disables the backend proxy and is excluded from production builds. Normal `npm run dev` connects to the backend. Production requires a separately deployed backend and existing authorized access.
 
 Each harness workspace has isolated in-memory fixture state. Browser reload/reconnect preserves the run while that development server process remains alive; restarting the process clears harness runs. Tokens remain memory-only in the browser, so re-enter public fixture access after reload. The fixed `run-synthetic` identity belongs to its isolated workspace, not a live global run. Never use the harness to certify live backend persistence or multiple-user authorization.
 

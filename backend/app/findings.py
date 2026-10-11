@@ -17,7 +17,7 @@ from app.config import Settings
 from app.db import EvidenceArtifact, Run, RunEvidence, Session
 from app.ingestion import stable_id
 
-PROMPT_REVISION = "findings-v4"
+PROMPT_REVISION = "findings-v5"
 SCALE_ID = "negative-share-v1"
 MAX_BATCH_CHARACTERS = 40000
 MAX_TOPICS = 200
@@ -28,8 +28,14 @@ class Observation(w.Wire):
     quote: str = Field(min_length=1, max_length=4000)
     topic_key: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=80)
     title: str = Field(min_length=1, max_length=200)
-    customer_need: str = Field(min_length=1, max_length=1000)
-    sentiment: Literal["negative", "positive", "neutral"]
+    customer_need: str = Field(
+        min_length=1,
+        max_length=1000,
+        description="A source-supported need or preservation of praised strengths. For neutral observations with no stated need, explicitly retain that uncertainty; never invent a desire.",
+    )
+    sentiment: Literal["negative", "positive", "neutral"] = Field(
+        description="Sentiment of the reported experience. Praise for an existing feature with a hypothetical worse alternative is positive, not an actual negative experience. Acknowledging advice or promising to test is not successful operation.",
+    )
     need_kind: Literal[
         "capability", "usability", "offering", "service", "possible_defect"
     ]
@@ -601,7 +607,7 @@ def extract_findings(args: list[str]) -> str:
                         )
                         reviewed, review_outcome = _call(
                             Review,
-                            "Independently check these observations against the original source evidence and catalog. Reject unsupported needs, sentiment errors, omitted product topics/positive feedback/disagreement, incorrect multilingual interpretation, and unsupported part mappings. No observation may claim scope not in its source. Dispositions must be justified. Accept only if the complete batch is faithfully represented.",
+                            "Independently check these observations against the original source evidence and catalog. Reject unsupported needs, sentiment errors, omitted product topics/positive feedback/disagreement, incorrect multilingual interpretation, and unsupported part mappings. No observation may claim scope not in its source. Do not count hypothetical absence of a praised existing feature as an actual negative experience. Acknowledging support instructions does not establish successful feature operation or defect resolution. Dispositions must be justified. Accept only if the complete batch is faithfully represented.",
                             {
                                 "evidence": batch,
                                 "catalog": policy["catalog"],

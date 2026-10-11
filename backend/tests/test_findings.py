@@ -1,4 +1,6 @@
+import httpx
 import pytest
+from openai import APITimeoutError
 
 from app import findings as module
 from app import wire as w
@@ -10,6 +12,85 @@ from app.findings import (
     applicability,
     validate_extraction,
 )
+
+
+def test_timed_out_batches_split_and_resume_without_losing_evidence(monkeypatch):
+    evidence = [
+        {
+            "evidence_id": str(index),
+            "record_id": str(index),
+            "source_kind": "feedback",
+            "excerpt": "Synthetic seat comfort",
+            "scope": w.Scope(markets=["DE"], cohort_ids=["DE"]).model_dump(),
+            "limitations": [],
+        }
+        for index in range(4)
+    ]
+    policy = {
+        "model": "synthetic-model",
+        "prompt_revision": "findings-v1",
+        "schema_revision": "findings-v1",
+        "ai_batch_size": 4,
+        "catalog": {"parts": [{"part_id": "part_seat"}]},
+    }
+    stages = {}
+    extraction_sizes = []
+    monkeypatch.setattr(
+        module, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(module, "_inputs", lambda *args: (policy, evidence, {}))
+    monkeypatch.setattr(
+        module, "get_stage", lambda run, generation, key: stages.get(key)
+    )
+    monkeypatch.setattr(
+        module,
+        "put_stage",
+        lambda run, generation, key, payload, **kw: stages.update({key: payload}),
+    )
+
+    def call(schema, instructions, data, frozen):
+        if schema is module.Extraction:
+            extraction_sizes.append(len(data["evidence"]))
+            if len(data["evidence"]) > 1:
+                raise APITimeoutError(
+                    request=httpx.Request("POST", "https://synthetic.invalid")
+                )
+            return module.Extraction(
+                observations=[
+                    Observation.model_validate(
+                        {
+                            key: value
+                            for key, value in observation(
+                                data["evidence"][0]["evidence_id"], "record"
+                            ).items()
+                            if key not in {"record_id", "scope", "observation_id"}
+                        }
+                    )
+                ],
+                dispositions=[],
+            ), {}
+        if schema is module.Reconciliation:
+            return module.Reconciliation(
+                links=[
+                    module.TopicLink(
+                        topic_key="seat-comfort",
+                        canonical_key="seat-comfort",
+                        basis="Same task",
+                    )
+                ]
+            ), {}
+        return module.Review(accepted=True, objections=[]), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    assert module.extract_findings(["run", "generation"]) == "ready"
+    assert extraction_sizes == [4, 2, 1, 1, 2, 1, 1]
+    assert stages["findings"]["counts"]["total_records"] == 4
+    del stages["findings"]
+    extraction_sizes.clear()
+    assert module.extract_findings(["run", "generation"]) == "ready"
+    assert extraction_sizes == []
+    assert stages["findings"]["counts"]["total_records"] == 4
 
 
 def observation(evidence, record, sentiment="negative", parts=None, cohorts=None):

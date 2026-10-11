@@ -1,10 +1,10 @@
 """Validated model observations, distinct-record projections, and scoped baselines."""
 
 import json
-from collections import defaultdict
+from collections import defaultdict, deque
 from typing import Any, Literal
 
-from openai import OpenAI, OpenAIError
+from openai import APITimeoutError, OpenAI, OpenAIError
 from pydantic import Field, ValidationError
 from sqlalchemy import select
 from temporalio import activity
@@ -431,9 +431,14 @@ def extract_findings(args: list[str]) -> str:
         coverage.append("ai_credentials_unavailable")
     else:
         registry: dict[str, dict[str, str]] = {}
-        for index, batch in enumerate(
-            _batches(bounded, policy.get("ai_batch_size", settings.ai_batch_size))
-        ):
+        pending = deque(
+            (str(index), batch)
+            for index, batch in enumerate(
+                _batches(bounded, policy.get("ai_batch_size", settings.ai_batch_size))
+            )
+        )
+        while pending:
+            index, batch = pending.popleft()
             if not _current_generation(run_id, generation):
                 return "superseded"
             if activity.in_activity():
@@ -610,6 +615,10 @@ def extract_findings(args: list[str]) -> str:
                                 else type(error).__name__,
                             }
                         )
+                        if isinstance(error, APITimeoutError) and len(batch) > 1:
+                            saved["split"] = True
+                            saved["observations"] = []
+                            break
                 else:
                     saved["coverage"] = ["ai_extraction_batch_failed:" + str(index)]
                     saved["observations"] = []
@@ -618,6 +627,11 @@ def extract_findings(args: list[str]) -> str:
                 saved = get_stage(run_id, generation, checkpoint)
                 if saved is None:
                     raise ValueError("Extraction checkpoint publication missing")
+            if saved.get("split"):
+                midpoint = len(batch) // 2
+                pending.appendleft((index + ":1", batch[midpoint:]))
+                pending.appendleft((index + ":0", batch[:midpoint]))
+                continue
             registry = saved["registry"]
             observations.extend(saved["observations"])
             coverage.extend(saved["coverage"])

@@ -3,6 +3,14 @@ import pytest
 from app.config import Settings
 
 
+def test_analysis_defaults_allow_small_batches_to_complete(monkeypatch):
+    monkeypatch.delenv("AI_BATCH_SIZE", raising=False)
+    monkeypatch.delenv("AI_TIMEOUT_SECONDS", raising=False)
+    settings = Settings(_env_file=None)
+    assert settings.ai_batch_size == 5
+    assert settings.ai_timeout_seconds == 180
+
+
 def test_production_rejects_development_identity():
     with pytest.raises(ValueError, match="development identity"):
         Settings(environment="production", auth_mode="development", _env_file=None)

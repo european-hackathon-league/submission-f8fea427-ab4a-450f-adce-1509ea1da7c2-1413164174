@@ -24,6 +24,13 @@ export type Send = <T>(
   key?: string,
   signal?: AbortSignal,
 ) => Promise<T>;
+async function pendingStage<T>(request: Promise<T>, empty: T): Promise<T> {
+  try { return await request; }
+  catch (error) {
+    if (error instanceof ApiError && error.status === 409 && error.code === "stage_pending") return empty;
+    throw error;
+  }
+}
 async function readPages<T>(
   send: Send,
   path: string,
@@ -329,8 +336,8 @@ function boundary(
         try {
           const before = await send<Wire.Snapshot>(root);
           const [f, g, r, c, p, h] = await Promise.all([
-            readPages<Wire.Finding>(send, `${root}/findings`),
-            readGraph(send, `${root}/graph`),
+            pendingStage(readPages<Wire.Finding>(send, `${root}/findings`), { items: [], first: {}, pages: [] }),
+            pendingStage(readGraph(send, `${root}/graph`), { nodes: [], edges: [], revision: before.revision, next_cursor: null }),
             researchResource(send, `${root}/research`),
             send<Wire.Conflicts>(`${root}/conflicts`),
             before.current_proposal_set_version === null

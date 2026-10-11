@@ -116,6 +116,7 @@ def test_assessed_documents_supplement_customer_citations_without_expanding_scop
     )
     assert proposals.draft_changes(run_id, generation, [finding], []).changes
     payload = json.loads(calls[0]["input"][1]["content"])
+    assert payload["source_scopes_by_finding"][finding.finding_id]["markets"] == ["DE"]
     assert {item["evidence_id"] for item in payload["evidence"]} == set(
         change["supporting_evidence_ids"]
     )
@@ -123,6 +124,88 @@ def test_assessed_documents_supplement_customer_citations_without_expanding_scop
         "Each conflict finding must itself have opposing_evidence_ids"
         in calls[0]["input"][0]["content"]
     )
+    assert (
+        "Generic praise is not opposition to a specific need"
+        in calls[0]["input"][0]["content"]
+    )
+
+
+def test_proposal_repair_uses_source_vehicle_scope_without_copying_configured_trim(
+    client,
+    monkeypatch,
+):
+    import json
+    from types import SimpleNamespace
+
+    from sqlalchemy import select
+    from test_ingestion_cache import feedback, frozen_run
+
+    from app import proposals
+    from app.config import Settings
+    from app.db import EvidenceArtifact, Run, RunEvidence, Session
+    from app.ingestion import publish_batch
+
+    run_id, generation, version, binding = frozen_run(client)
+    publish_batch(run_id, generation, version, feedback(binding), batch="feedback")
+    with Session.begin() as session:
+        run = session.get(Run, run_id)
+        run.config = {**run.config, "vehicle_id": "g60-i5-m60"}
+        customer = session.scalar(
+            select(EvidenceArtifact)
+            .join(RunEvidence, RunEvidence.evidence_id == EvidenceArtifact.id)
+            .where(
+                RunEvidence.run_id == run_id, EvidenceArtifact.source_kind == "feedback"
+            )
+        )
+        customer.scope = {**customer.scope, "vehicle_ids": ["G60"], "markets": ["CN"]}
+        row = observation(customer.id, customer.record_id)
+        row.update(quote=customer.excerpt, scope=customer.scope)
+    finding = w.Finding.model_validate(aggregate([row], [], run_id)["findings"][0])
+    calls = []
+
+    def parse(**options):
+        calls.append(options)
+        if len(calls) == 2:
+            message = options["input"][-1]["content"]
+            assert "change_demo" in message
+            assert "vehicle_ids" in message
+            assert "g60-i5-m60" in message
+            assert "G60" in message
+            assert "Check every change" in message
+        change = sample().changes[0].model_dump()
+        change.update(
+            change_id="change_demo",
+            finding_ids=[finding.finding_id],
+            supporting_evidence_ids=[row["evidence_id"]],
+            scope=w.Scope(
+                markets=["CN"], vehicle_ids=["g60-i5-m60" if len(calls) == 1 else "G60"]
+            ).model_dump(),
+        )
+        return SimpleNamespace(
+            output_parsed=Draft.model_validate({"changes": [change], "gaps": []}),
+            model="synthetic",
+            usage=None,
+        )
+
+    monkeypatch.setattr(
+        proposals, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(
+        proposals,
+        "OpenAI",
+        lambda **kw: SimpleNamespace(responses=SimpleNamespace(parse=parse)),
+    )
+    result = proposals.draft_changes(run_id, generation, [finding], [])
+    assert result.changes[0].scope.vehicle_ids == ["G60"]
+    assert result.changes[0].scope.markets == ["CN"]
+    assert len(calls) == 2
+    payload = json.loads(calls[0]["input"][1]["content"])
+    allowed = payload["source_scopes_by_finding"][finding.finding_id]
+    assert allowed == {"vehicle_ids": ["G60"], "markets": ["CN"], "equipment": []}
+    assert "g60-i5-m60" not in allowed["vehicle_ids"]
+    with pytest.raises(ValueError, match="scope is not established"):
+        result.changes[0].scope.markets = ["DE"]
+        validated_draft(result, [finding], [], run_id, generation)
 
 
 def test_proposal_schema_only_contains_closed_objects_with_required_properties():

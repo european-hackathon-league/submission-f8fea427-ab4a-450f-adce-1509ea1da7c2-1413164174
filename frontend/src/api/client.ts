@@ -663,7 +663,7 @@ export function createMockApi(scenario = "standard_autonomous"): Api {
   return boundary("mock", transport.send, { dispose: transport.dispose });
 }
 export function createApi(): Api {
-  return import.meta.env.VITE_API_MODE === "real"
-    ? createRealApi(import.meta.env.VITE_API_BASE_URL || "/api/v1")
-    : createMockApi(import.meta.env.VITE_MOCK_SCENARIO);
+  return import.meta.env.VITE_API_MODE === "mock"
+    ? createMockApi(import.meta.env.VITE_MOCK_SCENARIO)
+    : createRealApi(import.meta.env.VITE_API_BASE_URL || "/api/v1");
 }

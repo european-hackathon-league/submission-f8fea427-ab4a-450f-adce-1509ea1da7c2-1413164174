@@ -491,7 +491,7 @@ describe("frontend plan workspace", () => {
   });
 
   it("starts with autonomous setup and Deep Dive off, without separate pitch destinations", () => {
-    render(<App />);
+    render(<App api={createMockApi()} />);
     expect(screen.getByRole("switch", { name: "Autonomous" })).toBeChecked();
     expect(screen.getByRole("switch", { name: "Deep Dive" })).not.toBeChecked();
     expect(screen.getByRole("button", { name: "Add files" })).toBeDisabled();
@@ -508,7 +508,7 @@ describe("frontend plan workspace", () => {
 
   it("keeps unavailable vehicles honest and blocks mismatched asset creation", async () => {
     const user = userEvent.setup();
-    render(<App />);
+    render(<App api={createMockApi()} />);
     await screen.findByRole("option", { name: "BMW 1 Series / F70" });
     await user.selectOptions(screen.getByLabelText("Vehicle"), "f70");
     const scene = screen.getByRole("region", { name: "Scene capabilities" });
@@ -545,7 +545,7 @@ describe("frontend plan workspace", () => {
   it("rejects unsupported files while retaining a usable partial package", async () => {
     // Exercise server-side rejection even when a file picker filters unsupported extensions.
     const user = userEvent.setup({ applyAccept: false });
-    render(<App />);
+    render(<App api={createMockApi()} />);
     await user.upload(screen.getByLabelText("Upload files"), [
       new File(["x"], "bad.exe"),
       new File(["x"], "good.xlsx"),

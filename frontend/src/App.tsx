@@ -128,7 +128,7 @@ export default function App({
 }) {
   const [connectedApi, setConnectedApi] = useState<Api | null>(
     suppliedApi ??
-      (import.meta.env.VITE_API_MODE === "real" ? null : createApi()),
+      (import.meta.env.VITE_API_MODE === "mock" ? createApi() : null),
   );
   if (!connectedApi)
     return (

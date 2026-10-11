@@ -238,7 +238,13 @@ commits only; it did not deploy or push them.
 This section supersedes the earlier live-connection results. Tested application
 code: `378e578`. Real provider calls used the private environment file mounted
 as a Docker secret. Private inputs, passages and reference answers remain ignored.
-Full PDF corpus ingestion is still running; this is an interim evidence record.
+The user stopped further testing on 11 October before full PDF corpus ingestion
+finished. The annual report completed checkpoints through page 254 of 434; the
+full-document reference/fidelity checks were not completed. A separate 600-second
+G60 ingestion encountered `pdf_batch_failed` on pages 13-14. The pending fallback
+fix now splits that failure and batch-deadline failures into single pages too.
+Two new regression cases failed before the change; post-change verification was
+stopped at the user's request. The 219-test results below predate this final fix.
 
 Fresh-image regressions passed in both environments: **219 tests in 88.84s**
 in the API image and **219 tests in 236.91s** in the parser image. Ruff lint,
@@ -336,5 +342,8 @@ No renderer or OTLP container was found. No unrelated Docker service was modifie
 Production OIDC/S3/telemetry and hosted Temporal integration remain open.
 
 The default project's worker remains stopped to avoid consuming accumulated test
-commands and making unintended AI calls. The separate acceptance worker is running
-with the latest application code. This audit only creates local commits.
+commands and making unintended AI calls. The separate acceptance project's
+services and all audit/test containers were stopped at the user's request. The
+original API, PostgreSQL and Temporal remain available. The user requested
+publication to `origin/main` and a frontend merge; integration and further testing
+were explicitly deferred.

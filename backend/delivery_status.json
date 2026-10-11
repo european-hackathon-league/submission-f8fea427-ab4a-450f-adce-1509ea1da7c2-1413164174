@@ -207,7 +207,12 @@
       "Joint frontend and successful authenticated renderer acceptance",
       "Configured production identity, storage, hosted Temporal and telemetry",
       "Concurrent load, production throughput, full-corpus provider cost and production backup policy"
-    ]
+    ],
+    "post_verified_change": {
+      "commit": "9ccfefa",
+      "change": "Split failed PDF conversion/deadline batches into single-page checkpoints",
+      "verification": "Two new regression cases failed before fix; post-fix verification was stopped by user. The 219-test results apply to 378e578."
+    }
   },
   "main_integration": {
     "branch": "main",
@@ -303,11 +308,12 @@
       "sales_status": "partial_unknown_country_mapping",
       "pdf_manual_cases_matched": 12,
       "pdf_manual_locators_matched": 12,
-      "pdf_scope": "Full native PDF ingestion in progress; default-budget missing G60 page 14 remains explicit",
+      "pdf_scope": "Equipment documents completed with default G60 page 14 gap; annual report stopped after checkpoint page 254 of 434; final full-document references/fidelity not completed",
       "pdf_concurrency": "Default parser budgets preserved; dense single-page G60 probe recovered 25 passages under 600 seconds (267s wall / 463s CPU), still partial tables",
       "annotation_texts_and_identities_checked": 13771,
       "metrics_and_raw_references_checked": 1663,
-      "raw_cell_locator_comparisons": 173346
+      "raw_cell_locator_comparisons": 173346,
+      "higher_budget_full_g60": "Stopped by user; pages 13-14 returned pdf_batch_failed before fallback expansion; standalone page 14 had recovered 25 passages"
     },
     "live_pipeline": {
       "synthetic_run_id": "00619bef-5695-4ad1-9a28-1766b4f7f417",
@@ -383,8 +389,8 @@
       "Configured production identity, storage, hosted Temporal and telemetry",
       "Concurrent load, production throughput, full-corpus provider cost and production backup policy"
     ],
-    "runtime": "Default API port 8000; global worker stopped to avoid accumulated test commands. Isolated acceptance API port 8001 and normal worker active. Original volumes preserved; unrelated Docker projects untouched.",
-    "publication": "Local commits only; no push or deployment",
+    "runtime": "All audit/test runs and isolated acceptance services stopped by user. Original API/PostgreSQL/Temporal and volumes preserved; default worker remains stopped.",
+    "publication": "User requested backend push to origin/main and merge of existing frontend PR #11; further tests and frontend/backend connection deferred",
     "release_ready": false,
     "acceptance_test_commits": [
       "1d6513c",
@@ -398,6 +404,18 @@
       "object_bytes": 383137,
       "source_versions_digest_matched": 17,
       "scope": "Separate restore destinations; acceptance snapshot before guided run; originals preserved; not production backup policy"
+    },
+    "audit_state": "further_testing_stopped_at_user_request",
+    "post_verified_change": {
+      "commit": "9ccfefa",
+      "change": "Split failed PDF conversion/deadline batches into single-page checkpoints",
+      "verification": "Two new regression cases failed before fix; post-fix verification was stopped by user. The 219-test results apply to 378e578."
     }
+  },
+  "frontend_integration": {
+    "pr_url": "https://github.com/indkhan/vehicle-requirements-ai/pull/11",
+    "head_branch": "frontend",
+    "base_branch": "main",
+    "request": "Merge existing PR after pushing backend; no further testing or connection work"
   }
 }

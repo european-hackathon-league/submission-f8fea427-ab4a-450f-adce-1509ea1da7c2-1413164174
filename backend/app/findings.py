@@ -17,7 +17,7 @@ from app.config import Settings
 from app.db import EvidenceArtifact, Run, RunEvidence, Session
 from app.ingestion import stable_id
 
-PROMPT_REVISION = "findings-v3"
+PROMPT_REVISION = "findings-v4"
 SCALE_ID = "negative-share-v1"
 MAX_BATCH_CHARACTERS = 40000
 MAX_TOPICS = 200
@@ -423,6 +423,8 @@ def _current_generation(run_id: str, generation: str) -> bool:
 def reconcile_topics(
     new_topics: dict[str, Any],
     registry: dict[str, Any],
+    observations: list[Observation],
+    evidence: list[dict[str, Any]],
     policy: dict[str, Any],
     attempts: list[dict[str, Any]],
     extraction_attempt: int,
@@ -463,11 +465,25 @@ def reconcile_topics(
                     raise ValueError("cyclic_topic_reconciliation")
             reviewed, outcome = _call(
                 Review,
-                "Check every proposed topic link against both need descriptions. Reject merging different customer tasks or splitting equivalent needs. Existing registry descriptions stay immutable; a colliding new topic may use a fresh canonical key to preserve its distinct need. Positive and negative experiences of the same task must retain the same need. Each stated basis must match the supplied descriptions.",
+                "Check every proposed topic link against both need descriptions and original source evidence. The canonical need must be supported by every source linked to it: do not narrow general praise to a specific preference or invent a need from a neutral observation. Equivalence must work both ways. Reject merging different customer tasks or splitting equivalent needs. Existing registry descriptions stay immutable; a colliding new topic may use a fresh canonical key to preserve its distinct need. Positive and negative experiences of the same task must retain the same need. Each stated basis must match the supplied descriptions.",
                 {
                     "existing": registry,
                     "new": new_topics,
                     "links": reconciled.model_dump(mode="json"),
+                    "evidence": evidence,
+                    "candidate": [
+                        {
+                            **observation.model_dump(mode="json"),
+                            "canonical_need": registry.get(
+                                links[observation.topic_key],
+                                new_topics.get(
+                                    links[observation.topic_key],
+                                    new_topics[observation.topic_key],
+                                ),
+                            ),
+                        }
+                        for observation in observations
+                    ],
                 },
                 policy,
             )
@@ -612,7 +628,13 @@ def extract_findings(args: list[str]) -> str:
                             for item in extracted.observations
                         }
                         links = reconcile_topics(
-                            new_topics, registry, policy, attempts, attempt + 1
+                            new_topics,
+                            registry,
+                            extracted.observations,
+                            batch,
+                            policy,
+                            attempts,
+                            attempt + 1,
                         )
                         source_by_id = {item["evidence_id"]: item for item in batch}
                         for observation in extracted.observations:
@@ -627,7 +649,7 @@ def extract_findings(args: list[str]) -> str:
                                 raise ValueError("missing_topic_descriptor")
                             registry[canonical] = descriptor
                             row = observation.model_dump(mode="json")
-                            row.update(topic_key=canonical, **descriptor)
+                            row.update(topic_key=canonical)
                             row.update(
                                 observation_id=stable_id(
                                     [

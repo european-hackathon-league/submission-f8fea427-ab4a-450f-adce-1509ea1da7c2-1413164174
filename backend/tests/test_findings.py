@@ -121,8 +121,10 @@ def observation(evidence, record, sentiment="negative", parts=None, cohorts=None
     }
 
 
+@pytest.mark.parametrize("collision", [False, True])
 def test_topic_collision_repairs_grouping_without_reextracting_valid_feedback(
     monkeypatch,
+    collision,
 ):
     evidence = [
         {
@@ -143,6 +145,11 @@ def test_topic_collision_repairs_grouping_without_reextracting_valid_feedback(
         "catalog": {"parts": [{"part_id": "part_seat"}]},
     }
     stages, extractions, merges = {}, [], []
+    needs = (
+        ["Smaller sedan driving feel", "Light driving feel"]
+        if collision
+        else ["Comfortable seat for long trips", "Seat comfort on long journeys"]
+    )
     monkeypatch.setattr(
         module, "Settings", lambda: Settings(openai_api_key="synthetic")
     )
@@ -158,9 +165,7 @@ def test_topic_collision_repairs_grouping_without_reextracting_valid_feedback(
             eid = data["evidence"][0]["evidence_id"]
             extractions.append(eid)
             row = observation(eid, eid)
-            row["customer_need"] = (
-                "Smaller sedan driving feel" if eid == "0" else "Light driving feel"
-            )
+            row["customer_need"] = needs[int(eid)]
             return module.Extraction(
                 observations=[
                     Observation.model_validate(
@@ -192,8 +197,12 @@ def test_topic_collision_repairs_grouping_without_reextracting_valid_feedback(
         rejected = (
             "links" in data
             and data["existing"]
+            and collision
             and data["links"]["links"][0]["canonical_key"] == "seat-comfort"
         )
+        if "links" in data:
+            assert data["candidate"][0]["quote"] in data["evidence"][0]["excerpt"]
+            assert data["candidate"][0]["canonical_need"]["customer_need"]
         return module.Review(
             accepted=not rejected,
             objections=["Keep different needs separate"] if rejected else [],
@@ -203,11 +212,9 @@ def test_topic_collision_repairs_grouping_without_reextracting_valid_feedback(
     assert module.extract_findings(["run", "generation"]) == "ready"
     assert stages["findings"]["counts"]["total_records"] == 2
     assert extractions == ["0", "1"]
-    assert len(merges) == 3
-    assert {f["customer_need"] for f in stages["findings"]["findings"]} == {
-        "Smaller sedan driving feel",
-        "Light driving feel",
-    }
+    assert len(merges) == (3 if collision else 2)
+    assert stages["findings:batch:1"]["observations"][0]["customer_need"] == needs[1]
+    assert len(stages["findings"]["findings"]) == (2 if collision else 1)
 
 
 def test_annotation_overlap_counts_distinct_records_and_preserves_opposition():

@@ -135,7 +135,17 @@ def validated_draft(
             not set(change.supporting_evidence_ids) <= support | documents
             or not set(change.opposing_evidence_ids) <= oppose | documents
         ):
-            raise ValueError("Draft citations are outside supported finding evidence")
+            invalid = (set(change.supporting_evidence_ids) - support - documents) | (
+                set(change.opposing_evidence_ids) - oppose - documents
+            )
+            raise ValueError(
+                "Draft citations are outside supported finding evidence for "
+                f"{change.change_id}: invalid IDs {sorted(invalid)}; allowed supporting "
+                f"IDs {sorted(support | documents)}; allowed opposing IDs "
+                f"{sorted(oppose | documents)}. Check every change: feedback citations "
+                "must belong to its linked finding_ids; document citations must be "
+                "assessed claims or context of those findings, never arbitrary supplied evidence."
+            )
         if not set(change.supporting_evidence_ids) & support:
             raise ValueError(
                 "Draft change requires related customer or research supporting evidence"

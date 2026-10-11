@@ -120,8 +120,12 @@ def test_positive_strength_can_support_a_preservation_requirement(client):
     assert result.changes[0].supporting_evidence_ids == ["positive"]
     assert finding.counts.negative_records == 0
     result.changes[0].supporting_evidence_ids = ["unrelated"]
-    with pytest.raises(ValueError, match="outside supported finding evidence"):
+    with pytest.raises(
+        ValueError, match="outside supported finding evidence"
+    ) as rejected:
         validated_draft(result, [finding], [], run_id, generation)
+    assert "unrelated" in str(rejected.value)
+    assert "positive" in str(rejected.value)
     result.changes[0].supporting_evidence_ids = []
     result.changes[0].opposing_evidence_ids = ["positive"]
     with pytest.raises(ValueError, match="supporting evidence.*preservation"):

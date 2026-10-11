@@ -121,6 +121,95 @@ def observation(evidence, record, sentiment="negative", parts=None, cohorts=None
     }
 
 
+def test_topic_collision_repairs_grouping_without_reextracting_valid_feedback(
+    monkeypatch,
+):
+    evidence = [
+        {
+            "evidence_id": str(i),
+            "record_id": str(i),
+            "source_kind": "feedback",
+            "excerpt": "Synthetic seat comfort",
+            "scope": w.Scope().model_dump(),
+            "limitations": [],
+        }
+        for i in range(2)
+    ]
+    policy = {
+        "model": "synthetic",
+        "prompt_revision": module.PROMPT_REVISION,
+        "schema_revision": module.PROMPT_REVISION,
+        "ai_batch_size": 1,
+        "catalog": {"parts": [{"part_id": "part_seat"}]},
+    }
+    stages, extractions, merges = {}, [], []
+    monkeypatch.setattr(
+        module, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(module, "_current_generation", lambda *args: True)
+    monkeypatch.setattr(module, "_inputs", lambda *args: (policy, evidence, {}))
+    monkeypatch.setattr(module, "get_stage", lambda r, g, k: stages.get(k))
+    monkeypatch.setattr(
+        module, "put_stage", lambda r, g, k, p, **kw: stages.update({k: p})
+    )
+
+    def call(schema, instructions, data, frozen):
+        if schema is module.Extraction:
+            eid = data["evidence"][0]["evidence_id"]
+            extractions.append(eid)
+            row = observation(eid, eid)
+            row["customer_need"] = (
+                "Smaller sedan driving feel" if eid == "0" else "Light driving feel"
+            )
+            return module.Extraction(
+                observations=[
+                    Observation.model_validate(
+                        {
+                            k: v
+                            for k, v in row.items()
+                            if k not in {"record_id", "scope", "observation_id"}
+                        }
+                    )
+                ],
+                dispositions=[],
+            ), {}
+        if schema is module.Reconciliation:
+            merges.append(data)
+            target = (
+                "light-driving-feel"
+                if data.get("previous_objections")
+                else "seat-comfort"
+            )
+            return module.Reconciliation(
+                links=[
+                    module.TopicLink(
+                        topic_key="seat-comfort",
+                        canonical_key=target,
+                        basis="Preserve distinct needs",
+                    )
+                ]
+            ), {}
+        rejected = (
+            "links" in data
+            and data["existing"]
+            and data["links"]["links"][0]["canonical_key"] == "seat-comfort"
+        )
+        return module.Review(
+            accepted=not rejected,
+            objections=["Keep different needs separate"] if rejected else [],
+        ), {}
+
+    monkeypatch.setattr(module, "_call", call)
+    assert module.extract_findings(["run", "generation"]) == "ready"
+    assert stages["findings"]["counts"]["total_records"] == 2
+    assert extractions == ["0", "1"]
+    assert len(merges) == 3
+    assert {f["customer_need"] for f in stages["findings"]["findings"]} == {
+        "Smaller sedan driving feel",
+        "Light driving feel",
+    }
+
+
 def test_annotation_overlap_counts_distinct_records_and_preserves_opposition():
     rows = [
         observation("one", "respondent-one", parts=["part_seat", "part_interior"]),

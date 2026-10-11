@@ -17,7 +17,7 @@ from app.config import Settings
 from app.db import EvidenceArtifact, Run, RunEvidence, Session
 from app.ingestion import stable_id
 
-PROMPT_REVISION = "findings-v2"
+PROMPT_REVISION = "findings-v3"
 SCALE_ID = "negative-share-v1"
 MAX_BATCH_CHARACTERS = 40000
 MAX_TOPICS = 200
@@ -62,7 +62,7 @@ class Review(w.Wire):
 
 class TopicLink(w.Wire):
     topic_key: str
-    canonical_key: str
+    canonical_key: str = Field(pattern=r"^[a-z0-9]+(?:-[a-z0-9]+)*$", max_length=80)
     basis: str
 
 
@@ -420,6 +420,86 @@ def _current_generation(run_id: str, generation: str) -> bool:
         return run is not None and run.generation_id == generation
 
 
+def reconcile_topics(
+    new_topics: dict[str, Any],
+    registry: dict[str, Any],
+    policy: dict[str, Any],
+    attempts: list[dict[str, Any]],
+    extraction_attempt: int,
+) -> dict[str, str]:
+    objections: list[str] = []
+    error_message = "topic_semantic_validation_failed"
+    for merge_attempt in range(2):
+        try:
+            reconciled, outcome = _call(
+                Reconciliation,
+                "Reconcile new topics with the existing need registry. Merge only equivalent underlying customer tasks; sharing a part or broad subject is insufficient. Opposing experiences of the same task belong to one need. Emit exactly one link for each new key. Existing registry descriptions are immutable. A new topic whose key collides with a different existing need must receive a distinct new canonical key. Canonical keys may be existing keys or new stable short English keys. Include a semantic basis for each link and repair previous objections.",
+                {
+                    "existing": registry,
+                    "new": new_topics,
+                    "previous_objections": objections,
+                },
+                policy,
+            )
+            attempts.append(
+                {
+                    "attempt": extraction_attempt,
+                    "merge_attempt": merge_attempt + 1,
+                    "phase": "reconciliation",
+                    **outcome,
+                }
+            )
+            links = {item.topic_key: item.canonical_key for item in reconciled.links}
+            if len(links) != len(reconciled.links) or links.keys() != new_topics.keys():
+                raise ValueError("invalid_topic_reconciliation")
+            if len(registry.keys() | set(links.values())) > MAX_TOPICS:
+                raise ValueError("topic_reconciliation_budget_exhausted")
+            for target in links.values():
+                if (
+                    target not in registry
+                    and target in new_topics
+                    and links.get(target) != target
+                ):
+                    raise ValueError("cyclic_topic_reconciliation")
+            reviewed, outcome = _call(
+                Review,
+                "Check every proposed topic link against both need descriptions. Reject merging different customer tasks or splitting equivalent needs. Existing registry descriptions stay immutable; a colliding new topic may use a fresh canonical key to preserve its distinct need. Positive and negative experiences of the same task must retain the same need. Each stated basis must match the supplied descriptions.",
+                {
+                    "existing": registry,
+                    "new": new_topics,
+                    "links": reconciled.model_dump(mode="json"),
+                },
+                policy,
+            )
+            attempts.append(
+                {
+                    "attempt": extraction_attempt,
+                    "merge_attempt": merge_attempt + 1,
+                    "phase": "reconciliation_review",
+                    "accepted": reviewed.accepted,
+                    "objections": reviewed.objections,
+                    **outcome,
+                }
+            )
+            if not reviewed.accepted:
+                objections = reviewed.objections
+                raise ValueError("topic_semantic_validation_failed")
+            return links
+        except ValueError as error:
+            error_message = str(error)
+            if error_message != "topic_semantic_validation_failed":
+                objections = [error_message]
+            attempts.append(
+                {
+                    "attempt": extraction_attempt,
+                    "merge_attempt": merge_attempt + 1,
+                    "phase": "reconciliation_repair",
+                    "code": error_message,
+                }
+            )
+    raise ValueError(error_message)
+
+
 @activity.defn
 def extract_findings(args: list[str]) -> str:
     run_id, generation = args
@@ -531,65 +611,17 @@ def extract_findings(args: list[str]) -> str:
                             }
                             for item in extracted.observations
                         }
-                        reconciled, merge_outcome = _call(
-                            Reconciliation,
-                            "Reconcile all new topic keys with the existing need registry. Merge only equivalent underlying customer tasks, including equivalent German/English descriptions; do not merge unrelated needs just because they mention the same part. Opposing experiences of the same task belong to one need. Emit exactly one link for each new key. Canonical keys must be existing registry keys or new keys. Existing registry keys are immutable. Include a semantic basis for each link.",
-                            {"existing": registry, "new": new_topics},
-                            policy,
+                        links = reconcile_topics(
+                            new_topics, registry, policy, attempts, attempt + 1
                         )
-                        attempts.append(
-                            {
-                                "attempt": attempt + 1,
-                                "phase": "reconciliation",
-                                **merge_outcome,
-                            }
-                        )
-                        links = {
-                            item.topic_key: item.canonical_key
-                            for item in reconciled.links
-                        }
-                        if (
-                            len(links) != len(reconciled.links)
-                            or links.keys() != new_topics.keys()
-                            or any(
-                                target not in registry and target not in new_topics
-                                for target in links.values()
-                            )
-                        ):
-                            raise ValueError("invalid_topic_reconciliation")
-                        if len(registry.keys() | set(links.values())) > MAX_TOPICS:
-                            raise ValueError("topic_reconciliation_budget_exhausted")
-                        for key, target in links.items():
-                            if target not in registry and links.get(target) != target:
-                                raise ValueError("cyclic_topic_reconciliation")
-                            if key in registry and target != key:
-                                raise ValueError("existing_topic_key_changed")
-                        merged_review, merge_review_outcome = _call(
-                            Review,
-                            "Check every proposed topic link. Reject merging semantically different customer tasks or splitting equivalent needs across batches. Registry keys must be stable; positive and negative experiences of the same task must retain the same need. Each stated semantic basis must match both descriptions.",
-                            {
-                                "existing": registry,
-                                "new": new_topics,
-                                "links": reconciled.model_dump(mode="json"),
-                            },
-                            policy,
-                        )
-                        attempts.append(
-                            {
-                                "attempt": attempt + 1,
-                                "phase": "reconciliation_review",
-                                "accepted": merged_review.accepted,
-                                "objections": merged_review.objections,
-                                **merge_review_outcome,
-                            }
-                        )
-                        if not merged_review.accepted:
-                            raise ValueError("topic_semantic_validation_failed")
                         source_by_id = {item["evidence_id"]: item for item in batch}
                         for observation in extracted.observations:
                             canonical = links[observation.topic_key]
                             descriptor = registry.get(
-                                canonical, new_topics.get(canonical)
+                                canonical,
+                                new_topics.get(
+                                    canonical, new_topics[observation.topic_key]
+                                ),
                             )
                             if descriptor is None:
                                 raise ValueError("missing_topic_descriptor")

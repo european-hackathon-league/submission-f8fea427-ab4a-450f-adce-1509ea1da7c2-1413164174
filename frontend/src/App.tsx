@@ -15,7 +15,7 @@ import {
   RefreshCw,
   X,
 } from "lucide-react";
-import { ApiError, commandKey, createApi, createRealApi } from "./api/client";
+import { ApiError, commandKey, createApi, createMockApi, createRealApi } from "./api/client";
 import ApiAccess from "./ApiAccess";
 import WorkshopSummary, {
   FeedbackOverview,
@@ -621,7 +621,7 @@ function WorkspaceApp({
     setProposalSelection(null);
     if (api.mode === "mock") {
       api.dispose?.();
-      setApi(createApi());
+      setApi(createMockApi(import.meta.env.VITE_MOCK_SCENARIO));
     }
   };
 

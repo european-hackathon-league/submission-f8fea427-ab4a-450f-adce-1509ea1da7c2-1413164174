@@ -206,7 +206,7 @@ it("serializes numeric targets and published instruction identity fields", async
   expect(JSON.parse(body)).toEqual({
     operation: "edit_target",
     base_proposal_set_version: 8,
-    target_ids: ["v", "c"],
+    target_ids: ["c"],
     changed_fields: { target: 2.5 },
   });
 });

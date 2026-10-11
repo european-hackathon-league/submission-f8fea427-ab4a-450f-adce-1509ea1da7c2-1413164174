@@ -232,7 +232,7 @@ export function instruction(
     operation: view.operation,
     base_proposal_set_version: view.base_proposal_set_version,
     target_ids: view.change_id
-      ? [view.variant_id, view.change_id]
+      ? [view.change_id]
       : [view.variant_id],
     changed_fields,
   };

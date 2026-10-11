@@ -7,6 +7,8 @@
     "dev": "vite --host 127.0.0.1",
     "build": "tsc -b && vite build",
     "test": "vitest run",
+    "test:live": "vitest run --mode live testing/liveBackend.test.ts",
+    "dev:mock": "vite --mode mock --host 127.0.0.1",
     "typecheck": "tsc --noEmit",
     "dev:harness": "vite --mode harness --host 127.0.0.1",
     "test:acceptance": "vitest run testing/networkAcceptance.test.ts src/App.networkAcceptance.test.tsx src/accessibilityAcceptance.test.tsx"

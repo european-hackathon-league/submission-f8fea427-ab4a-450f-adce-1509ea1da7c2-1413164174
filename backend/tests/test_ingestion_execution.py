@@ -15,9 +15,11 @@ from app.dispatch import dispatch_once
 from app.workflows import AnalysisWorkflow
 
 
-@pytest.mark.parametrize("pair_exhausted", [False, True])
+@pytest.mark.parametrize(
+    "pair_failure", [None, "pdf_parser_limit", "pdf_batch_failed", "pdf_batch_deadline"]
+)
 def test_pdf_checkpoints_bound_cpu_work_and_preserve_every_page(
-    client, monkeypatch, pair_exhausted
+    client, monkeypatch, pair_failure
 ):
     from test_storage import text_pdf
 
@@ -55,15 +57,13 @@ def test_pdf_checkpoints_bound_cpu_work_and_preserve_every_page(
     def parse(data, filename, **options):
         first, last = options["page_range"]
         assert last - first + 1 <= 2
-        if pair_exhausted and last > first:
+        if pair_failure and last > first:
             return ParseResult(
                 kind="unknown",
                 parser_revision=revision,
                 status="failed",
                 coverage=[
-                    CoverageIssue(
-                        code="pdf_parser_limit", message="Synthetic CPU limit"
-                    )
+                    CoverageIssue(code=pair_failure, message="Synthetic batch failure")
                 ],
             )
         calls.append((first, last))

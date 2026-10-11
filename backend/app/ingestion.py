@@ -487,7 +487,11 @@ def ingest_source(args: list[str]) -> str:
             first < last
             and binding.get("pdf_single_page_fallback", False)
             and result.status == "failed"
-            and any(issue.code == "pdf_parser_limit" for issue in result.coverage)
+            and any(
+                issue.code
+                in {"pdf_parser_limit", "pdf_batch_failed", "pdf_batch_deadline"}
+                for issue in result.coverage
+            )
         ):
             middle = (first + last) // 2
             pending_batches.appendleft((middle + 1, last))

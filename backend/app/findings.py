@@ -140,7 +140,10 @@ def validate_extraction(
             or not item.quote.strip()
             or item.quote not in source["excerpt"]
         ):
-            raise ValueError("unsupported_evidence_or_quote")
+            raise ValueError(
+                f"unsupported_evidence_or_quote: {item.evidence_id}/{item.topic_key}; "
+                "use a supplied evidence ID and quote an exact substring of its original excerpt"
+            )
         if not set(item.part_ids) <= part_ids:
             raise ValueError("unknown_catalog_part")
         if not item.part_ids and item.mapping_kind not in {"vehicle_wide", "unmapped"}:
@@ -625,7 +628,13 @@ def extract_findings(args: list[str]) -> str:
                                 else type(error).__name__,
                             }
                         )
-                        if isinstance(error, APITimeoutError) and len(batch) > 1:
+                        if len(batch) > 1 and (
+                            isinstance(error, APITimeoutError)
+                            or (
+                                attempt == 1
+                                and isinstance(error, (ValidationError, ValueError))
+                            )
+                        ):
                             saved["split"] = True
                             saved["observations"] = []
                             break

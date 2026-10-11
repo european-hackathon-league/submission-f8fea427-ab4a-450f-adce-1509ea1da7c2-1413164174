@@ -14,7 +14,8 @@ from app.findings import (
 )
 
 
-def test_timed_out_batches_split_and_resume_without_losing_evidence(monkeypatch):
+@pytest.mark.parametrize("failure", ["timeout", "invalid_quote"])
+def test_failed_batches_split_and_resume_without_losing_evidence(monkeypatch, failure):
     evidence = [
         {
             "evidence_id": str(index),
@@ -52,11 +53,11 @@ def test_timed_out_batches_split_and_resume_without_losing_evidence(monkeypatch)
     def call(schema, instructions, data, frozen):
         if schema is module.Extraction:
             extraction_sizes.append(len(data["evidence"]))
-            if len(data["evidence"]) > 1:
+            if len(data["evidence"]) > 1 and failure == "timeout":
                 raise APITimeoutError(
                     request=httpx.Request("POST", "https://synthetic.invalid")
                 )
-            return module.Extraction(
+            extracted = module.Extraction(
                 observations=[
                     Observation.model_validate(
                         {
@@ -69,7 +70,10 @@ def test_timed_out_batches_split_and_resume_without_losing_evidence(monkeypatch)
                     )
                 ],
                 dispositions=[],
-            ), {}
+            )
+            if len(data["evidence"]) > 1:
+                extracted.observations[0].quote = "Fabricated quote"
+            return extracted, {}
         if schema is module.Reconciliation:
             return module.Reconciliation(
                 links=[
@@ -84,7 +88,11 @@ def test_timed_out_batches_split_and_resume_without_losing_evidence(monkeypatch)
 
     monkeypatch.setattr(module, "_call", call)
     assert module.extract_findings(["run", "generation"]) == "ready"
-    assert extraction_sizes == [4, 2, 1, 1, 2, 1, 1]
+    assert extraction_sizes == (
+        [4, 2, 1, 1, 2, 1, 1]
+        if failure == "timeout"
+        else [4, 4, 2, 2, 1, 1, 2, 2, 1, 1]
+    )
     assert stages["findings"]["counts"]["total_records"] == 4
     del stages["findings"]
     extraction_sizes.clear()
@@ -152,7 +160,7 @@ def test_fabricated_quote_or_catalog_part_is_rejected_before_publication():
     )
     evidence = [{"evidence_id": "one", "excerpt": "Synthetic seat comfort"}]
     validate_extraction([row], [], evidence, {"part_seat"})
-    with pytest.raises(ValueError):
+    with pytest.raises(ValueError, match="one/seat-comfort.*exact substring"):
         validate_extraction(
             [row.model_copy(update={"quote": "fabricated"})],
             [],

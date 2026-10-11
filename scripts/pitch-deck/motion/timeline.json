@@ -1,0 +1,14 @@
+{
+  "fps": 30,
+  "duration": 5.0,
+  "beats": {
+    "firstFrame": 0.0,
+    "rotationStart": 0.2,
+    "rotationEnd": 3.0,
+    "readingHold": 3.0,
+    "end": 5.0
+  },
+  "startAngleIndex": 4,
+  "turns": 1,
+  "description": "One calm 360-degree turn, decelerating into the restored cover, followed by a two-second hold. Silent opening clip."
+}

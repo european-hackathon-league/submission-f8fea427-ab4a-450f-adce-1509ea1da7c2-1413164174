@@ -17,3 +17,6 @@ frontend/.env.local
 frontend/.env.*.local
 frontend/test-results/
 frontend/playwright-report/
+
+# Private presentation renders, validation receipts, and video dependencies
+.codex/presentation-build/

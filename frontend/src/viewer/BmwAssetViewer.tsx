@@ -11,6 +11,7 @@ import {
 } from "./modelMapping";
 import { RotateCcw, RotateCw, ZoomIn, ZoomOut } from "lucide-react";
 import "./bmw-asset-viewer.css";
+import RegionTags from "./RegionTags";
 
 export const BMW_I5_MODEL_UID = supportedSceneCatalog.baseline_asset.model_id;
 const SKETCHFAB_API_SRC =
@@ -636,6 +637,15 @@ export default function BmwAssetViewer({
                   Retry exterior preview
                 </button>
               </div>
+            )}
+            {heatmap && findings.length > 0 && (
+              <RegionTags
+                api={apiRef}
+                ready={sceneReady && !apiFailed}
+                findings={findings}
+                onSelect={onSelectComponent}
+                selected={selectedComponent}
+              />
             )}
             <div
               className="bmw-asset-viewer__camera-controls"

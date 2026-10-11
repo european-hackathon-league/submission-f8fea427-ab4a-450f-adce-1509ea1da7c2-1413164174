@@ -27,6 +27,7 @@ export interface RenderPanelProps {
   variantId: string;
   busy?: boolean;
   hasUnsavedWork?: boolean;
+  createRequest?: number;
   onRefresh: () => Promise<Workspace>;
   onOpen: (e: Evidence) => void;
 }
@@ -537,27 +538,19 @@ function RunRenderPanel(props: RenderPanelProps) {
     saveRenderJobs(storageKey, next, api, runId);
     setJobs(next);
   }
+  const createRequest = props.createRequest ?? 0;
+  const lastCreateRequest = useRef(0);
+  useEffect(() => {
+    if (createRequest > lastCreateRequest.current) {
+      lastCreateRequest.current = createRequest;
+      create();
+    }
+  });
   return (
     <section aria-label="Visualization">
       <div className="section-title">
         <h2>{props.compact ? "Renders" : "Visualization"}</h2>
-        <button
-          className="primary"
-          disabled={
-            busy ||
-            props.hasUnsavedWork ||
-            !workspace.snapshot.available_actions.includes("reimagine") ||
-            !variant ||
-            !!latest ||
-            workspace.snapshot.current_proposal_set_version !==
-              workspace.proposals.proposal_set_version
-          }
-          onClick={() => create()}
-        >
-          Reimagine
-        </button>
       </div>
-      {props.hasUnsavedWork && <p className="notice">Save or discard unsaved edits before Reimagine. Only selected saved suggestions are used.</p>}
       {!variant && (
         <p>
           Selected variant unavailable. Choose an existing variant before

@@ -90,14 +90,6 @@ function requestError(error: unknown): string {
     .filter(Boolean)
     .join(" — ");
 }
-function analysisWarning(warning: string): string {
-  if (warning.includes("ai_extraction_batch_failed")) return "AI could not finish processing a feedback batch.";
-  if (warning.includes("ai_credentials_unavailable")) return "AI analysis is unavailable because its provider is not configured.";
-  if (warning.includes("pdf_parser_limit")) return "Some document pages exceeded the parsing limit.";
-  if (warning.includes("ambiguous_table_cell")) return "Some document table values remain uncertain.";
-  if (warning.includes("unresolved_footnote")) return "Some equipment conditions could not be linked to their footnotes.";
-  return warning;
-}
 const spatialPartIds = new Set<string>([
   "body",
   "lighting",
@@ -259,6 +251,7 @@ function WorkspaceApp({
   );
   const [confirmNewRun, setConfirmNewRun] = useState(false);
   const [ideaDraft, setIdeaDraft] = useState(restored?.ideaDraft ?? "");
+  const [reimagineSignal, setReimagineSignal] = useState(0);
   const [proposalDirty, setProposalDirty] = useState<boolean | null>(null);
   const hasUnsavedWork =
     proposalDirty ?? (dirtyDrafts.size > 0 || !!ideaDraft.trim());
@@ -338,6 +331,10 @@ function WorkspaceApp({
                 : "Add at least one source file to start.";
   const can = (action: string) =>
     !busy && !!run?.available_actions.includes(action);
+  const isProcessing = run
+    ? run.analysis_status === "processing" || run.analysis_status === "queued"
+    : !!pendingRun;
+  const showReimagine = workspace !== null && workspace.snapshot.analysis_status === "proposals_ready" && workspace.snapshot.available_actions.includes("reimagine");
 
   useEffect(() => {
     let active = true;
@@ -834,6 +831,25 @@ function WorkspaceApp({
                 )}
               </>
             )}
+            {isProcessing && (
+              <p role="status" className="run-status-pill">
+                <span className="run-status-spinner" aria-hidden="true" />
+                Processing…
+              </p>
+            )}
+            {workspace && showReimagine && (
+              <button
+                className="primary reimagine-cta"
+                disabled={busy || hasUnsavedWork || !variant || workspace.snapshot.current_proposal_set_version !== workspace.proposals.proposal_set_version}
+                title={hasUnsavedWork ? "Save or discard unsaved edits before Reimagine. Only selected saved suggestions are used." : undefined}
+                onClick={() => {
+                  setReimagineSignal((s) => s + 1);
+                  setTab("Renders");
+                }}
+              >
+                Reimagine
+              </button>
+            )}
           </div>
           {!run && (
             <p className="sr-only" id="start-run-readiness" role="status">
@@ -966,12 +982,6 @@ function WorkspaceApp({
                 {pendingRun ? "Retry new analysis" : "Start new analysis with existing files"}
               </button>
             </div>
-          )}
-          {!!run?.warnings.length && (
-            <details open={run.analysis_status === "failed"} aria-label="Analysis warnings" className="notice analysis-warnings">
-              <summary>Analysis warnings ({run.warnings.length})</summary>
-              <ul>{run.warnings.map(warning => <li key={warning}>{analysisWarning(warning)}</li>)}</ul>
-            </details>
           )}
           {runId && !run && <p role="status">Recovering saved analysis…</p>}
         </section>
@@ -1252,6 +1262,7 @@ function WorkspaceApp({
                       hasUnsavedWork={hasUnsavedWork}
                       onRefresh={() => refresh(runId!)}
                       onOpen={setSource}
+                      createRequest={reimagineSignal}
                     />
                   </div>
                   {tab === "Graph" && (

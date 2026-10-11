@@ -573,19 +573,44 @@ dialog blockquote {
 .graph-edges {
   list-style: none;
   padding: 0;
-  font-size: 12px;
+  margin: 0;
+  font-size: 12.5px;
+  display: grid;
+  gap: 10px;
 }
 .graph-edges li {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
-  gap: 14px;
-  padding: 14px 0;
-  border-bottom: 1px solid var(--line);
+  gap: 8px;
+  padding: 12px 14px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #fbfcfd;
 }
-.graph-edges li > span:nth-child(2) {
-  display: flex;
+.graph-edge-route {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  gap: 10px;
+  align-items: center;
+}
+.graph-edge-route > button {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.graph-edge-rel {
+  display: inline-flex;
   align-items: center;
   gap: 6px;
+  color: #607178;
+  white-space: nowrap;
+}
+.graph-edge-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+  justify-content: space-between;
   color: #607178;
 }
 .stacked-label {
@@ -863,9 +888,12 @@ summary {
   .empty-state {
     min-height: 240px;
   }
-  .graph-edges li {
-    gap: 8px;
-    font-size: 11px;
+  .graph-edge-route {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 6px;
+  }
+  .graph-edge-rel {
+    justify-content: flex-start;
   }
   button {
     min-height: 44px;

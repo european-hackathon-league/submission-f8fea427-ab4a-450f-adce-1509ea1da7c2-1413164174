@@ -151,23 +151,30 @@ export default function GraphPanel({
       : `${id} (entity detail unavailable)`;
   };
   const columns = [...new Set(visible.map((n) => n.entity_type))];
+  const COL_X = 220;
+  const ROW_Y = 108;
+  const PAD_X = 110;
+  const PAD_Y = 60;
   const positions = new Map(
     visible.map((n) => {
       const siblings = visible.filter((s) => s.entity_type === n.entity_type);
       return [
         n.node_id,
         {
-          x: 70 + columns.indexOf(n.entity_type) * 155,
-          y: 55 + siblings.indexOf(n) * 90,
+          x: PAD_X + columns.indexOf(n.entity_type) * COL_X,
+          y: PAD_Y + siblings.indexOf(n) * ROW_Y,
         },
       ];
     }),
   );
-  const diagramWidth = Math.max(300, columns.length * 155),
+  const diagramWidth = Math.max(
+      300,
+      columns.length * COL_X + (PAD_X - COL_X / 2) * 2,
+    ),
     diagramHeight = Math.max(
       180,
       ...columns.map(
-        (c) => visible.filter((n) => n.entity_type === c).length * 90 + 30,
+        (c) => visible.filter((n) => n.entity_type === c).length * ROW_Y + 60,
       ),
     );
   return (
@@ -219,45 +226,80 @@ export default function GraphPanel({
       </p>
       {!nodes.length && <p>No graph entities match these filters.</p>}
       {compact && (
-        <div className="relationship-map" style={{ height: diagramHeight }}>
-          <svg
-            viewBox={`0 0 ${diagramWidth} ${diagramHeight}`}
-            role="img"
-            aria-label={`${visible.length} entities linked by backend relationships`}
+        <div className="relationship-map">
+          <div
+            className="relationship-canvas"
+            style={{ width: diagramWidth, height: diagramHeight }}
           >
-            {workspace.graph.edges
-              .filter((e) => positions.has(e.from_id) && positions.has(e.to_id))
-              .map((e) => {
-                const a = positions.get(e.from_id)!,
-                  b = positions.get(e.to_id)!;
-                return (
-                  <path
-                    key={e.edge_id}
-                    d={`M${a.x},${a.y} C${(a.x + b.x) / 2},${a.y} ${(a.x + b.x) / 2},${b.y} ${b.x},${b.y}`}
-                  >
-                    <title>{e.relationship}</title>
-                  </path>
-                );
-              })}
-          </svg>
-          {visible.map((n) => {
-            const p = positions.get(n.node_id)!;
-            return (
-              <button
-                key={n.node_id}
-                style={{ left: `${(p.x / diagramWidth) * 100}%`, top: p.y }}
-                aria-label={`Inspect ${n.entity_type} ${n.node_id}`}
-                aria-pressed={selectedId === n.node_id}
-                onClick={() => {
-                  setSelectedId(n.node_id);
-                  setEdgeId(null);
-                }}
-              >
-                <small>{n.entity_type}</small>
-                <span>{entityDetails(n, workspace).label}</span>
-              </button>
-            );
-          })}
+            <svg
+              viewBox={`0 0 ${diagramWidth} ${diagramHeight}`}
+              width={diagramWidth}
+              height={diagramHeight}
+              role="img"
+              aria-label={`${visible.length} entities linked by backend relationships`}
+            >
+              <defs>
+                <marker
+                  id="graph-arrow"
+                  viewBox="0 0 10 10"
+                  refX="8"
+                  refY="5"
+                  markerWidth="7"
+                  markerHeight="7"
+                  orient="auto-start-reverse"
+                >
+                  <path d="M 0 0 L 10 5 L 0 10 z" fill="#94a8b8" />
+                </marker>
+              </defs>
+              {workspace.graph.edges
+                .filter(
+                  (e) => positions.has(e.from_id) && positions.has(e.to_id),
+                )
+                .map((e) => {
+                  const a = positions.get(e.from_id)!,
+                    b = positions.get(e.to_id)!;
+                  const dim =
+                    selectedId &&
+                    e.from_id !== selectedId &&
+                    e.to_id !== selectedId;
+                  const midX = (a.x + b.x) / 2;
+                  return (
+                    <path
+                      key={e.edge_id}
+                      d={`M${a.x},${a.y} C${midX},${a.y} ${midX},${b.y} ${b.x},${b.y}`}
+                      className={dim ? "is-dim" : undefined}
+                      markerEnd="url(#graph-arrow)"
+                    >
+                      <title>{e.relationship}</title>
+                    </path>
+                  );
+                })}
+            </svg>
+            {visible.map((n) => {
+              const p = positions.get(n.node_id)!;
+              const fullLabel = entityDetails(n, workspace).label;
+              const shortLabel =
+                fullLabel.length > 28
+                  ? `${fullLabel.slice(0, 27)}…`
+                  : fullLabel;
+              return (
+                <button
+                  key={n.node_id}
+                  style={{ left: p.x, top: p.y }}
+                  title={`${n.entity_type} · ${fullLabel} · ${n.node_id}`}
+                  aria-label={`Inspect ${n.entity_type} ${n.node_id}`}
+                  aria-pressed={selectedId === n.node_id}
+                  onClick={() => {
+                    setSelectedId(n.node_id);
+                    setEdgeId(null);
+                  }}
+                >
+                  <small>{n.entity_type}</small>
+                  <span>{shortLabel}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
       {!compact && (
@@ -331,43 +373,49 @@ export default function GraphPanel({
         <ul className="graph-edges">
           {edges.map((edge) => (
             <li key={edge.edge_id}>
-              <button
-                aria-label={`Inspect endpoint ${edge.from_id}`}
-                disabled={
-                  !workspace.graph.nodes.some((n) => n.node_id === edge.from_id)
-                }
-                onClick={() => {
-                  setSelectedId(edge.from_id);
-                  setEdgeId(null);
-                }}
-              >
-                {label(edge.from_id)}
-              </button>
-              <span>
-                <ArrowRight size={14} />
-                {edge.relationship}
-              </span>
-              <button
-                aria-label={`Inspect endpoint ${edge.to_id}`}
-                disabled={
-                  !workspace.graph.nodes.some((n) => n.node_id === edge.to_id)
-                }
-                onClick={() => {
-                  setSelectedId(edge.to_id);
-                  setEdgeId(null);
-                }}
-              >
-                {label(edge.to_id)}
-              </button>
-              <span>
-                Evidence provenance: {edge.provenance || "Not supplied"}
-              </span>
-              <button
-                aria-pressed={edge.edge_id === edgeId}
-                onClick={() => setEdgeId(edge.edge_id)}
-              >
-                Inspect relationship {edge.edge_id}
-              </button>
+              <div className="graph-edge-route">
+                <button
+                  aria-label={`Inspect endpoint ${edge.from_id}`}
+                  disabled={
+                    !workspace.graph.nodes.some((n) => n.node_id === edge.from_id)
+                  }
+                  onClick={() => {
+                    setSelectedId(edge.from_id);
+                    setEdgeId(null);
+                  }}
+                  title={label(edge.from_id)}
+                >
+                  {label(edge.from_id)}
+                </button>
+                <span className="graph-edge-rel">
+                  <ArrowRight size={14} aria-hidden />
+                  {edge.relationship}
+                </span>
+                <button
+                  aria-label={`Inspect endpoint ${edge.to_id}`}
+                  disabled={
+                    !workspace.graph.nodes.some((n) => n.node_id === edge.to_id)
+                  }
+                  onClick={() => {
+                    setSelectedId(edge.to_id);
+                    setEdgeId(null);
+                  }}
+                  title={label(edge.to_id)}
+                >
+                  {label(edge.to_id)}
+                </button>
+              </div>
+              <div className="graph-edge-meta">
+                <span>
+                  Evidence provenance: {edge.provenance || "Not supplied"}
+                </span>
+                <button
+                  aria-pressed={edge.edge_id === edgeId}
+                  onClick={() => setEdgeId(edge.edge_id)}
+                >
+                  Inspect relationship {edge.edge_id}
+                </button>
+              </div>
             </li>
           ))}
         </ul>

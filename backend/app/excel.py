@@ -21,7 +21,7 @@ from app.ingest_types import (
 )
 from app.wire import CellLocator, Scope
 
-REVISION = "excel-v6"
+REVISION = "excel-v7"
 HEADERS = {
     "id": "id",
     "source": "source",
@@ -58,6 +58,8 @@ COUNTRIES = {
     "united states of america": "US",
     "europe": "EU",
     "eu": "EU",
+    "rest of world": "RoW",
+    "row": "RoW",
     "united kingdom": "GB",
     "uk": "GB",
     "gb": "GB",

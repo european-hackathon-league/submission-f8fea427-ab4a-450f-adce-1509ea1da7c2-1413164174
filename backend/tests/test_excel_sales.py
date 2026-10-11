@@ -5,6 +5,26 @@ from fixtures.excel import workbook, worksheet_xml
 from app.excel import parse_excel
 
 
+def test_rest_of_world_is_an_aggregate_separate_from_named_markets():
+    result = parse_excel(
+        workbook(
+            {
+                "G60_G68": [
+                    ["market", "market_code", "volume_2025"],
+                    ["Rest of World", "RoW", 28000],
+                    ["Europe", "EU", 115000],
+                    ["USA", "US", 78000],
+                ]
+            }
+        ),
+        dataset_namespace="sales",
+    )
+    assert result.status == "ready"
+    assert [m.scope.markets for m in result.metrics] == [["RoW"], ["EU"], ["US"]]
+    assert result.metrics[0].scope.cohort_ids == ["RoW"]
+    assert result.metrics[0].value == 28000
+
+
 def test_sales_zero_unknown_combined_vehicle_and_future_year_are_context_only():
     result = parse_excel(
         workbook(

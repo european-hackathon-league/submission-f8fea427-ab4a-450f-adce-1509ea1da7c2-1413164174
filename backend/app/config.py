@@ -39,8 +39,8 @@ class Settings(BaseSettings):
     research_max_bytes: int = Field(default=1048576, ge=1024, le=8388608)
     research_max_tokens: int = Field(default=6000, ge=100, le=50000)
     ai_batch_size: int = Field(default=5, ge=1, le=100)
-    ai_timeout_seconds: int = Field(default=180, ge=1, le=300)
-    ai_max_output_tokens: int = Field(default=6000, ge=100, le=50000)
+    ai_timeout_seconds: int = Field(default=300, ge=1, le=300)
+    ai_max_output_tokens: int = Field(default=24000, ge=100, le=50000)
     cors_origins: list[str] = ["http://localhost:3000"]
     max_upload_bytes: int = 32 * 1024 * 1024
     max_archive_bytes: int = 256 * 1024 * 1024

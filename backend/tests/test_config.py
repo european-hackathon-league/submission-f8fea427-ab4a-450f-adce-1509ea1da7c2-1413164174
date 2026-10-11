@@ -6,9 +6,11 @@ from app.config import Settings
 def test_analysis_defaults_allow_small_batches_to_complete(monkeypatch):
     monkeypatch.delenv("AI_BATCH_SIZE", raising=False)
     monkeypatch.delenv("AI_TIMEOUT_SECONDS", raising=False)
+    monkeypatch.delenv("AI_MAX_OUTPUT_TOKENS", raising=False)
     settings = Settings(_env_file=None)
     assert settings.ai_batch_size == 5
-    assert settings.ai_timeout_seconds == 180
+    assert settings.ai_timeout_seconds == 300
+    assert settings.ai_max_output_tokens == 24000
     assert settings.pdf_timeout_seconds == 600
 
 

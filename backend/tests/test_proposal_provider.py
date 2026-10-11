@@ -50,8 +50,9 @@ def test_positive_strength_can_support_a_preservation_requirement(client):
 
 
 @pytest.mark.parametrize("repaired", [False, True])
+@pytest.mark.parametrize("malformed", [False, True])
 def test_proposal_validation_repair_is_bounded_and_reuses_returned_drafts(
-    client, monkeypatch, repaired
+    client, monkeypatch, repaired, malformed
 ):
     from types import SimpleNamespace
 
@@ -66,6 +67,8 @@ def test_proposal_validation_repair_is_bounded_and_reuses_returned_drafts(
 
     def parse(**options):
         calls.append(options)
+        if malformed and (not repaired or len(calls) == 1):
+            return Draft.model_validate_json('{"changes": [')
         change = sample().changes[0].model_dump()
         change.update(
             finding_ids=[finding.finding_id],
@@ -92,7 +95,44 @@ def test_proposal_validation_repair_is_bounded_and_reuses_returned_drafts(
         if repaired:
             assert proposals.draft_changes(run_id, generation, [finding], []).changes
         else:
-            with pytest.raises(ValueError, match="scope is not established"):
+            with pytest.raises(
+                ValueError, match="structured draft|scope is not established"
+            ):
                 proposals.draft_changes(run_id, generation, [finding], [])
     assert len(calls) == 2
-    assert "scope is not established" in str(calls[1]["input"])
+    assert ("structured draft" if malformed else "scope is not established") in str(
+        calls[1]["input"]
+    )
+
+
+def test_uncertain_proposal_timeout_is_not_automatically_repeated(client, monkeypatch):
+    from types import SimpleNamespace
+
+    import httpx
+    from openai import APITimeoutError
+
+    from app import proposals
+    from app.config import Settings
+
+    run_id, generation = ready_run(client)
+    calls = []
+
+    def parse(**options):
+        calls.append(options)
+        raise APITimeoutError(
+            request=httpx.Request("POST", "https://synthetic.invalid")
+        )
+
+    monkeypatch.setattr(
+        proposals, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(
+        proposals,
+        "OpenAI",
+        lambda **options: SimpleNamespace(responses=SimpleNamespace(parse=parse)),
+    )
+    with pytest.raises(APITimeoutError):
+        proposals.draft_changes(run_id, generation, [], [])
+    with pytest.raises(ValueError, match="uncertain outcome"):
+        proposals.draft_changes(run_id, generation, [], [])
+    assert len(calls) == 1

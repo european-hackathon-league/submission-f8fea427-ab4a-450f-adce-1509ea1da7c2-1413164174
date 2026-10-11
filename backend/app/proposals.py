@@ -4,7 +4,7 @@ import json
 
 from openai import OpenAI
 from openai.types.responses import ResponseInputParam
-from pydantic import Field
+from pydantic import Field, ValidationError
 from sqlalchemy import select
 from temporalio import activity
 
@@ -297,27 +297,33 @@ def draft_changes(
                 raise ValueError(
                     "Prior proposal provider attempt has an uncertain outcome"
                 )
-            response = client.responses.parse(
-                model=policy.get("model", settings.app_model),
-                input=inputs,
-                text_format=Draft,
-                max_output_tokens=policy.get("ai_max_output_tokens", 6000),
-                store=False,
-            )
+            try:
+                response = client.responses.parse(
+                    model=policy.get("model", settings.app_model),
+                    input=inputs,
+                    text_format=Draft,
+                    max_output_tokens=policy.get(
+                        "ai_max_output_tokens", settings.ai_max_output_tokens
+                    ),
+                    store=False,
+                )
+            except ValidationError:
+                # The provider returned malformed JSON; persist this known outcome before one repair.
+                response = None
             saved = {
                 "draft": response.output_parsed.model_dump(mode="json")
-                if response.output_parsed is not None
+                if response is not None and response.output_parsed is not None
                 else None,
                 "policy": {
-                    "model": response.model,
+                    "model": response.model if response is not None else None,
                     "configured_model": policy.get("model", settings.app_model),
                     "prompt_revision": "proposals-v3",
                     "schema_revision": "proposals-v1",
                     "input_tokens": response.usage.input_tokens
-                    if response.usage
+                    if response is not None and response.usage
                     else None,
                     "output_tokens": response.usage.output_tokens
-                    if response.usage
+                    if response is not None and response.usage
                     else None,
                     "scoring_policy": POLICY,
                 },
@@ -326,7 +332,9 @@ def draft_changes(
             put_stage(run_id, generation, key, saved)
         try:
             if saved["draft"] is None:
-                raise ValueError("Proposal provider returned no structured draft")
+                raise ValueError(
+                    "Proposal provider returned no valid structured draft. Return complete JSON within the output budget; keep fields concise."
+                )
             draft = validated_draft(
                 Draft.model_validate(saved["draft"]),
                 findings,

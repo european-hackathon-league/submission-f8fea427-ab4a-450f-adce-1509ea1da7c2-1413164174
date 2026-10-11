@@ -9,12 +9,17 @@ from app.proposals import Draft, validated_draft
 
 @pytest.mark.parametrize("role", ["claim", "context"])
 def test_assessed_documents_supplement_customer_citations_without_expanding_scope(
-    client, role
+    client, monkeypatch, role
 ):
+    import json
+    from types import SimpleNamespace
+
     from sqlalchemy import select
     from test_ingestion_cache import feedback, frozen_run
 
+    from app import proposals
     from app.artifacts import put_stage
+    from app.config import Settings
     from app.db import EvidenceArtifact, RunEvidence, Session
     from app.ingest_types import ParsedPassage, ParseResult
     from app.ingestion import publish_batch
@@ -34,7 +39,12 @@ def test_assessed_documents_supplement_customer_citations_without_expanding_scop
                     text="Synthetic document context",
                     locator=w.PDFLocator(page=1),
                     scope=w.Scope(markets=["CN"]),
-                )
+                ),
+                ParsedPassage(
+                    source_kind="equipment",
+                    text="Unassessed document passage",
+                    locator=w.PDFLocator(page=2),
+                ),
             ],
         ),
         batch="document",
@@ -46,7 +56,9 @@ def test_assessed_documents_supplement_customer_citations_without_expanding_scop
             .where(RunEvidence.run_id == run_id)
         ).all()
         customer = next(item for item in artifacts if item.source_kind == "feedback")
-        document = next(item for item in artifacts if item.source_kind != "feedback")
+        document = next(
+            item for item in artifacts if item.excerpt == "Synthetic document context"
+        )
         row = observation(customer.id, customer.record_id)
         row.update(quote=customer.excerpt, scope=customer.scope)
         document_id = document.id
@@ -84,6 +96,33 @@ def test_assessed_documents_supplement_customer_citations_without_expanding_scop
         validate(supporting_evidence_ids=[row["evidence_id"], "unassessed-document"])
     with pytest.raises(ValueError, match="scope is not established"):
         validate(scope=w.Scope(markets=["CN"]).model_dump())
+    calls = []
+
+    def parse(**options):
+        calls.append(options)
+        return SimpleNamespace(
+            output_parsed=Draft.model_validate({"changes": [change], "gaps": []}),
+            model="synthetic",
+            usage=None,
+        )
+
+    monkeypatch.setattr(
+        proposals, "Settings", lambda: Settings(openai_api_key="synthetic")
+    )
+    monkeypatch.setattr(
+        proposals,
+        "OpenAI",
+        lambda **kw: SimpleNamespace(responses=SimpleNamespace(parse=parse)),
+    )
+    assert proposals.draft_changes(run_id, generation, [finding], []).changes
+    payload = json.loads(calls[0]["input"][1]["content"])
+    assert {item["evidence_id"] for item in payload["evidence"]} == set(
+        change["supporting_evidence_ids"]
+    )
+    assert (
+        "Each conflict finding must itself have opposing_evidence_ids"
+        in calls[0]["input"][0]["content"]
+    )
 
 
 def test_proposal_schema_only_contains_closed_objects_with_required_properties():

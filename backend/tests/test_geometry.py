@@ -46,10 +46,12 @@ def test_renderer_loads_private_local_configuration(tmp_path, monkeypatch):
     (tmp_path / ".local").mkdir()
     (tmp_path / ".local/geometry.env").write_text(
         "GEOMETRY_TOKEN=synthetic-private-token\nGEOMETRY_AI_ENABLED=false\n"
+        "GEOMETRY_MODEL=gpt-6-astra\n"
     )
     settings = RendererSettings()
     assert settings.token.get_secret_value() == "synthetic-private-token"
     assert not settings.ai_enabled
+    assert settings.model == "gpt-6-astra"
 
 
 def manifest():
